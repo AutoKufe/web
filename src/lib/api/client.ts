@@ -113,9 +113,11 @@ export class ApiClient {
   async createJobWithToken(
     dianToken: string,
     jobData: {
+      entity_id?: string
+      job_name?: string
       date_range: { start_date: string; end_date: string }
       document_filter: string
-      consolidation_interval: string
+      consolidation_interval: { value: number; unit: string }
     },
     confirmEntity = false,
     traceId?: string
