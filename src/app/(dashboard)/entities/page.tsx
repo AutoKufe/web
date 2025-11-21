@@ -267,7 +267,7 @@ export default function EntitiesPage() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>NIT</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Token</TableHead>
+                    <TableHead>Token DIAN</TableHead>
                     <TableHead>Registrado</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
