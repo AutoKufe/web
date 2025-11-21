@@ -49,8 +49,6 @@ interface Entity {
   display_name: string
   identifier_suffix: string
   entity_type: string
-  has_managed_token: boolean
-  last_token_validation_result: boolean | null
 }
 
 function NewJobContent() {
@@ -121,18 +119,36 @@ function NewJobContent() {
     }
   }
 
-  const handleSelectEntity = (entity: Entity) => {
+  const handleSelectEntity = async (entity: Entity) => {
     setSelectedEntity(entity)
     setEntitySearchOpen(false)
 
-    // Determinar estado del token
-    if (entity.has_managed_token && entity.last_token_validation_result === true) {
-      setTokenStatus('valid')
-      setUseNewToken(false)
-    } else if (entity.has_managed_token && entity.last_token_validation_result === false) {
-      setTokenStatus('expired')
-      setUseNewToken(true)
-    } else {
+    // Verificar estado del token con el backend
+    setTokenStatus('unknown') // Loading state
+
+    try {
+      const response = await apiClient.getEntityTokenStatus(entity.id)
+
+      if (response && !response.error) {
+        const data = response as { has_valid_token?: boolean; needs_new_token?: boolean }
+
+        if (data.has_valid_token) {
+          setTokenStatus('valid')
+          setUseNewToken(false)
+        } else if (data.needs_new_token) {
+          setTokenStatus('expired')
+          setUseNewToken(true)
+        } else {
+          setTokenStatus('unknown')
+          setUseNewToken(true)
+        }
+      } else {
+        // En caso de error, asumir que necesita token
+        setTokenStatus('unknown')
+        setUseNewToken(true)
+      }
+    } catch (err) {
+      console.error('Error checking token status:', err)
       setTokenStatus('unknown')
       setUseNewToken(true)
     }
@@ -428,11 +444,6 @@ function NewJobContent() {
                               ****{entity.identifier_suffix}
                             </span>
                           </div>
-                          {entity.has_managed_token && entity.last_token_validation_result && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
-                              Token válido
-                            </Badge>
-                          )}
                         </CommandItem>
                       ))}
                     </CommandGroup>

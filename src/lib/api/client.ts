@@ -105,6 +105,10 @@ export class ApiClient {
     return this.request('POST', '/api/entities/register', { dian_token: dianToken })
   }
 
+  async getEntityTokenStatus(entityId: string) {
+    return this.request('GET', `/api/entities/${entityId}/token-status`)
+  }
+
   // === JOBS ===
   async createJobWithToken(
     dianToken: string,
