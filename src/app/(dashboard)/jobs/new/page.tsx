@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -17,30 +18,129 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info } from 'lucide-react'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+
+interface Entity {
+  id: string
+  display_name: string
+  identifier_suffix: string
+  entity_type: string
+  has_managed_token: boolean
+  last_token_validation_result: boolean | null
+}
 
 function NewJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const preselectedEntity = searchParams.get('entity')
+  const preselectedEntityId = searchParams.get('entity')
 
+  // Entity selection
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [loadingEntities, setLoadingEntities] = useState(false)
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
+  const [entitySearchOpen, setEntitySearchOpen] = useState(false)
+
+  // Token DIAN
   const [dianToken, setDianToken] = useState('')
+  const [useNewToken, setUseNewToken] = useState(false)
+  const [tokenStatus, setTokenStatus] = useState<'valid' | 'expired' | 'unknown'>('unknown')
+
+  // Job config
   const [jobName, setJobName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [documentFilter, setDocumentFilter] = useState('all')
-  const [consolidationInterval, setConsolidationInterval] = useState('monthly')
+
+  // Filtro de documentos
+  const [documentFilter, setDocumentFilter] = useState('todos')
+  const [useDefaultDocFilter, setUseDefaultDocFilter] = useState(true)
+
+  // Intervalo de consolidado
+  const [consolidationValue, setConsolidationValue] = useState('1')
+  const [consolidationUnit, setConsolidationUnit] = useState('months')
+  const [useDefaultConsolidation, setUseDefaultConsolidation] = useState(true)
+
+  // Form states
   const [creating, setCreating] = useState(false)
   const [step, setStep] = useState<'form' | 'confirming' | 'success'>('form')
   const [createdJobId, setCreatedJobId] = useState<string | null>(null)
   const [entityInfo, setEntityInfo] = useState<{ name: string; nit: string } | null>(null)
   const [traceId, setTraceId] = useState<string | null>(null)
 
+  // Load entities on mount
+  useEffect(() => {
+    fetchEntities()
+  }, [])
+
+  // Auto-select entity if preselected
+  useEffect(() => {
+    if (preselectedEntityId && entities.length > 0) {
+      const entity = entities.find(e => e.id === preselectedEntityId)
+      if (entity) {
+        handleSelectEntity(entity)
+      }
+    }
+  }, [preselectedEntityId, entities])
+
+  const fetchEntities = async () => {
+    setLoadingEntities(true)
+    try {
+      const response = await apiClient.listEntities(1, 100)
+      if (response && !response.error) {
+        const data = response as { entities?: Entity[] }
+        setEntities(data.entities || [])
+      }
+    } catch (err) {
+      console.error('Error loading entities:', err)
+      toast.error('Error cargando entidades')
+    } finally {
+      setLoadingEntities(false)
+    }
+  }
+
+  const handleSelectEntity = (entity: Entity) => {
+    setSelectedEntity(entity)
+    setEntitySearchOpen(false)
+
+    // Determinar estado del token
+    if (entity.has_managed_token && entity.last_token_validation_result === true) {
+      setTokenStatus('valid')
+      setUseNewToken(false)
+    } else if (entity.has_managed_token && entity.last_token_validation_result === false) {
+      setTokenStatus('expired')
+      setUseNewToken(true)
+    } else {
+      setTokenStatus('unknown')
+      setUseNewToken(true)
+    }
+  }
+
   const handleSubmit = async (confirmEntity = false) => {
-    if (!dianToken.trim()) {
-      toast.error('Ingresa el token DIAN')
+    if (!selectedEntity && !dianToken.trim()) {
+      toast.error('Selecciona una entidad o ingresa un token DIAN')
       return
     }
 
@@ -54,17 +154,50 @@ function NewJobContent() {
       return
     }
 
+    // Si la entidad tiene token válido y no se pidió nuevo token
+    if (selectedEntity && tokenStatus === 'valid' && !useNewToken) {
+      // Usar token almacenado
+      if (!dianToken.trim()) {
+        toast.error('Token DIAN requerido')
+        return
+      }
+    }
+
+    // Si se requiere nuevo token
+    if (useNewToken || !selectedEntity) {
+      if (!dianToken.trim()) {
+        toast.error('Ingresa el token DIAN')
+        return
+      }
+    }
+
     setCreating(true)
 
     try {
+      // Preparar intervalo de consolidado
+      let consolidationInterval
+      if (useDefaultConsolidation) {
+        consolidationInterval = { value: 1, unit: 'months' }
+      } else {
+        consolidationInterval = {
+          value: parseInt(consolidationValue),
+          unit: consolidationUnit
+        }
+      }
+
+      // Preparar filtro de documentos
+      const finalDocFilter = useDefaultDocFilter ? 'todos' : documentFilter
+
       const response = await apiClient.createJobWithToken(
-        dianToken,
+        dianToken || 'use_stored_token', // Si no hay nuevo token, indicar que use el almacenado
         {
+          entity_id: selectedEntity?.id,
+          job_name: jobName.trim() || undefined,
           date_range: {
             start_date: startDate,
             end_date: endDate,
           },
-          document_filter: documentFilter,
+          document_filter: finalDocFilter,
           consolidation_interval: consolidationInterval,
         },
         confirmEntity,
@@ -114,8 +247,13 @@ function NewJobContent() {
     setJobName('')
     setStartDate('')
     setEndDate('')
-    setDocumentFilter('all')
-    setConsolidationInterval('monthly')
+    setDocumentFilter('todos')
+    setConsolidationValue('1')
+    setConsolidationUnit('months')
+    setUseDefaultDocFilter(true)
+    setUseDefaultConsolidation(true)
+    setSelectedEntity(null)
+    setUseNewToken(false)
     setEntityInfo(null)
     setTraceId(null)
     setCreatedJobId(null)
@@ -123,20 +261,22 @@ function NewJobContent() {
 
   if (step === 'success') {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto p-8">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
-              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              </div>
               <h2 className="text-2xl font-bold mb-2">Job Creado Exitosamente</h2>
               <p className="text-muted-foreground mb-6">
                 Tu job ha sido enviado para procesamiento
               </p>
               <div className="flex gap-4 justify-center">
                 <Link href={`/jobs/${createdJobId}`}>
-                  <Button>Ver Estado del Job</Button>
+                  <Button size="lg">Ver Estado del Job</Button>
                 </Link>
-                <Button variant="outline" onClick={resetForm}>
+                <Button variant="outline" size="lg" onClick={resetForm}>
                   Crear Otro Job
                 </Button>
               </div>
@@ -149,7 +289,7 @@ function NewJobContent() {
 
   if (step === 'confirming') {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto p-8">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -168,8 +308,8 @@ function NewJobContent() {
                   <p className="font-medium">{entityInfo?.name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">NIT</p>
-                  <p className="font-mono">{entityInfo?.nit}</p>
+                  <p className="text-sm text-muted-foreground">Identificador</p>
+                  <p className="font-mono">****{entityInfo?.nit}</p>
                 </div>
               </div>
             </div>
@@ -203,7 +343,7 @@ function NewJobContent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-8 p-8">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/jobs">
@@ -212,35 +352,188 @@ function NewJobContent() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Nuevo Job</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Nuevo Job</h1>
+          <p className="text-muted-foreground mt-1">
             Crea un nuevo trabajo de procesamiento DIAN
           </p>
         </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Configuración del Job</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl">Configuración del Job</CardTitle>
           <CardDescription>
             Ingresa los datos necesarios para procesar documentos DIAN
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Token DIAN */}
+          {/* Selector de Entidad */}
           <div className="space-y-2">
-            <Label htmlFor="dian-token">Token DIAN *</Label>
-            <Input
-              id="dian-token"
-              placeholder="https://catalogo-vpfe.dian.gov.co/..."
-              value={dianToken}
-              onChange={(e) => setDianToken(e.target.value)}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Pega la URL completa del token que obtuviste del portal DIAN
-            </p>
+            <Label>Entidad *</Label>
+            <Popover open={entitySearchOpen} onOpenChange={setEntitySearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={entitySearchOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedEntity ? (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span>{selectedEntity.display_name}</span>
+                      <span className="text-muted-foreground font-mono text-xs">
+                        ****{selectedEntity.identifier_suffix}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Selecciona una entidad...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar por nombre o identificador..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      <div className="py-6 text-center">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          No se encontraron entidades
+                        </p>
+                        <Link href="/entities">
+                          <Button variant="outline" size="sm">
+                            <Building2 className="h-4 w-4 mr-2" />
+                            Registrar Entidad
+                          </Button>
+                        </Link>
+                      </div>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {entities.map((entity) => (
+                        <CommandItem
+                          key={entity.id}
+                          value={`${entity.display_name} ${entity.identifier_suffix}`}
+                          onSelect={() => handleSelectEntity(entity)}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              selectedEntity?.id === entity.id ? 'opacity-100' : 'opacity-0'
+                            }`}
+                          />
+                          <div className="flex items-center gap-2 flex-1">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span>{entity.display_name}</span>
+                            <span className="text-muted-foreground font-mono text-xs">
+                              ****{entity.identifier_suffix}
+                            </span>
+                          </div>
+                          {entity.has_managed_token && entity.last_token_validation_result && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              Token válido
+                            </Badge>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Selecciona la entidad para la cual deseas procesar documentos
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchEntities}
+                disabled={loadingEntities}
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingEntities ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
+
+          {/* Token DIAN */}
+          {selectedEntity && (
+            <>
+              {tokenStatus === 'valid' && !useNewToken && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <AlertDescription className="ml-2">
+                    <div className="flex items-center justify-between">
+                      <span>Esta entidad tiene un token DIAN válido guardado</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUseNewToken(true)}
+                      >
+                        Usar nuevo token
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {(tokenStatus === 'expired' || tokenStatus === 'unknown' || useNewToken) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="dian-token">
+                      Token DIAN {tokenStatus === 'valid' && useNewToken && '(Nuevo)'}*
+                    </Label>
+                    {tokenStatus === 'valid' && useNewToken && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setUseNewToken(false)}
+                      >
+                        Usar token guardado
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    id="dian-token"
+                    placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                    value={dianToken}
+                    onChange={(e) => setDianToken(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                  {tokenStatus === 'expired' && (
+                    <p className="text-xs text-yellow-600">
+                      El último token guardado estaba expirado. Ingresa uno nuevo.
+                    </p>
+                  )}
+                  {tokenStatus === 'unknown' && (
+                    <p className="text-xs text-muted-foreground">
+                      Esta entidad no tiene un token DIAN gestionado previamente
+                    </p>
+                  )}
+                  {tokenStatus === 'valid' && useNewToken && (
+                    <p className="text-xs text-muted-foreground">
+                      El token actual será reemplazado por este nuevo token
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {!selectedEntity && (
+            <div className="space-y-2">
+              <Label htmlFor="dian-token">Token DIAN *</Label>
+              <Input
+                id="dian-token"
+                placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                value={dianToken}
+                onChange={(e) => setDianToken(e.target.value)}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Pega la URL completa del token que obtuviste del portal DIAN
+              </p>
+            </div>
+          )}
 
           {/* Nombre del Job (opcional) */}
           <div className="space-y-2">
@@ -251,6 +544,9 @@ function NewJobContent() {
               value={jobName}
               onChange={(e) => setJobName(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Si no ingresas un nombre, se generará automáticamente
+            </p>
           </div>
 
           {/* Rango de Fechas */}
@@ -270,79 +566,132 @@ function NewJobContent() {
                 id="end-date"
                 type="date"
                 value={endDate}
+                min={startDate || undefined}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Filtros */}
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="basic">Básico</TabsTrigger>
-              <TabsTrigger value="advanced">Avanzado</TabsTrigger>
-            </TabsList>
-            <TabsContent value="basic" className="space-y-4 pt-4">
+          {/* Filtro de Documentos */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="use-default-filter"
+                checked={useDefaultDocFilter}
+                onCheckedChange={(checked) => setUseDefaultDocFilter(checked as boolean)}
+              />
+              <Label
+                htmlFor="use-default-filter"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Usar predeterminado (Todos los documentos)
+              </Label>
+            </div>
+            {!useDefaultDocFilter && (
               <div className="space-y-2">
-                <Label>Tipo de Documentos</Label>
+                <Label>Filtro de Documentos</Label>
                 <Select value={documentFilter} onValueChange={setDocumentFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona tipo" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="received">Solo recibidos</SelectItem>
-                    <SelectItem value="sent">Solo emitidos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
-            <TabsContent value="advanced" className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Tipo de Documentos</Label>
-                <Select value={documentFilter} onValueChange={setDocumentFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los documentos</SelectItem>
-                    <SelectItem value="received">Solo recibidos</SelectItem>
-                    <SelectItem value="sent">Solo emitidos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Intervalo de Consolidación</Label>
-                <Select
-                  value={consolidationInterval}
-                  onValueChange={setConsolidationInterval}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona intervalo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Diario</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="todos">Todos los documentos</SelectItem>
+                    <SelectItem value="ingresos">Ingresos</SelectItem>
+                    <SelectItem value="egresos">Egresos</SelectItem>
+                    <SelectItem value="nominas">Nóminas</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Define cómo se agrupan los documentos en el reporte
+                  Filtra qué tipo de documentos quieres procesar
                 </p>
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
+
+          {/* Intervalo de Consolidado */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use-default-consolidation"
+                  checked={useDefaultConsolidation}
+                  onCheckedChange={(checked) => setUseDefaultConsolidation(checked as boolean)}
+                />
+                <Label
+                  htmlFor="use-default-consolidation"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Usar predeterminado (Mensual)
+                </Label>
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">Intervalo de Consolidado</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Define el intervalo de tiempo para la hoja resumen de consolidado en el Excel.
+                      El consolidado agrupa los documentos por periodo y muestra totales de impuestos,
+                      ingresos, egresos, etc.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {!useDefaultConsolidation && (
+              <div className="space-y-2">
+                <Label>Intervalo de Consolidado</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    placeholder="1"
+                    value={consolidationValue}
+                    onChange={(e) => setConsolidationValue(e.target.value)}
+                    className="w-24"
+                  />
+                  <Select value={consolidationUnit} onValueChange={setConsolidationUnit}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">Días</SelectItem>
+                      <SelectItem value="weeks">Semanas</SelectItem>
+                      <SelectItem value="months">Meses</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ej: "15 días" agrupa documentos cada 15 días en el consolidado
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Submit */}
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-4 pt-4 border-t">
             <Link href="/jobs" className="flex-1">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" size="lg">
                 Cancelar
               </Button>
             </Link>
             <Button
               onClick={() => handleSubmit(false)}
-              disabled={creating || !dianToken.trim() || !startDate || !endDate}
+              disabled={
+                creating ||
+                !selectedEntity ||
+                !startDate ||
+                !endDate ||
+                (useNewToken && !dianToken.trim()) ||
+                (tokenStatus !== 'valid' && !dianToken.trim())
+              }
               className="flex-1"
+              size="lg"
             >
               {creating ? (
                 <>
@@ -366,10 +715,10 @@ function NewJobContent() {
 export default function NewJobPage() {
   return (
     <Suspense fallback={
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto p-8">
         <div className="animate-pulse space-y-4">
           <div className="h-10 bg-muted rounded w-48" />
-          <div className="h-64 bg-muted rounded" />
+          <div className="h-96 bg-muted rounded" />
         </div>
       </div>
     }>
