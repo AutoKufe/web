@@ -48,8 +48,6 @@ interface Entity {
   display_name: string
   nit: string
   entity_type: string
-  token_valid: boolean
-  last_token_check?: string
   created_at: string
 }
 
@@ -267,7 +265,6 @@ export default function EntitiesPage() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>NIT</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead>Token DIAN</TableHead>
                     <TableHead>Registrado</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -284,13 +281,6 @@ export default function EntitiesPage() {
                       <TableCell className="font-mono">{entity.nit}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{entity.entity_type}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {entity.token_valid ? (
-                          <Badge variant="default" className="bg-green-500">Válido</Badge>
-                        ) : (
-                          <Badge variant="destructive">Expirado</Badge>
-                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(entity.created_at).toLocaleDateString()}
