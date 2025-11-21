@@ -46,9 +46,20 @@ import { toast } from 'sonner'
 interface Entity {
   id: string
   display_name: string
-  nit: string
+  identifier_suffix: string
   entity_type: string
   created_at: string
+}
+
+const getEntityTypeLabel = (type: string): string => {
+  switch (type) {
+    case 'juridica':
+      return 'Persona Jurídica'
+    case 'natural':
+      return 'Persona Natural'
+    default:
+      return type
+  }
 }
 
 export default function EntitiesPage() {
@@ -139,12 +150,12 @@ export default function EntitiesPage() {
   const filteredEntities = entities
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 p-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Entidades</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Entidades</h1>
+          <p className="text-muted-foreground mt-1">
             Gestiona tus empresas registradas en AutoKufe
           </p>
         </div>
@@ -229,29 +240,34 @@ export default function EntitiesPage() {
 
       {/* Entities Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Entidades Registradas</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl">Entidades Registradas</CardTitle>
           <CardDescription>
             {entities.length} entidad{entities.length !== 1 ? 'es' : ''} encontrada{entities.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           {loading ? (
-            <div className="space-y-4">
+            <div className="space-y-3 px-6">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+                <div key={i} className="h-14 bg-muted/50 animate-pulse rounded-lg" />
               ))}
             </div>
           ) : filteredEntities.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center py-16 px-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Building2 className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">
+                {searchQuery ? 'No se encontraron entidades' : 'No tienes entidades registradas'}
+              </h3>
+              <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
                 {searchQuery
-                  ? 'No se encontraron entidades con ese criterio'
-                  : 'No tienes entidades registradas aún'}
+                  ? 'Intenta con otro término de búsqueda'
+                  : 'Registra tu primera entidad para comenzar a procesar documentos DIAN'}
               </p>
               {!searchQuery && (
-                <Button onClick={() => setRegisterDialogOpen(true)}>
+                <Button onClick={() => setRegisterDialogOpen(true)} size="lg">
                   <Plus className="h-4 w-4 mr-2" />
                   Registrar primera entidad
                 </Button>
@@ -261,46 +277,56 @@ export default function EntitiesPage() {
             <>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>NIT</TableHead>
+                  <TableRow className="border-b">
+                    <TableHead className="pl-6">Nombre</TableHead>
+                    <TableHead>Identificador</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Registrado</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[70px] pr-6"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredEntities.map((entity) => (
-                    <TableRow key={entity.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <TableRow key={entity.id} className="hover:bg-muted/50">
+                      <TableCell className="pl-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                            <Building2 className="h-4 w-4 text-primary" />
+                          </div>
                           <span className="font-medium">{entity.display_name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono">{entity.nit}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{entity.entity_type}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {new Date(entity.created_at).toLocaleDateString()}
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        ****{entity.identifier_suffix}
                       </TableCell>
                       <TableCell>
+                        <Badge variant="secondary" className="font-normal">
+                          {getEntityTypeLabel(entity.entity_type)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(entity.created_at).toLocaleDateString('es-ES', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </TableCell>
+                      <TableCell className="pr-6">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem asChild>
-                              <Link href={`/entities/${entity.id}`}>
+                              <Link href={`/entities/${entity.id}`} className="cursor-pointer">
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Ver detalles
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/jobs/new?entity=${entity.id}`}>
+                              <Link href={`/jobs/new?entity=${entity.id}`} className="cursor-pointer">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Crear job
                               </Link>
@@ -315,7 +341,7 @@ export default function EntitiesPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-4">
+                <div className="flex items-center justify-center gap-2 pt-4 pb-2 border-t">
                   <Button
                     variant="outline"
                     size="sm"
@@ -324,7 +350,7 @@ export default function EntitiesPage() {
                   >
                     Anterior
                   </Button>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground px-2">
                     Página {page} de {totalPages}
                   </span>
                   <Button
