@@ -1,12 +1,9 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { apiClient } from '@/lib/api/client'
+import { AuthProvider, useAuth } from '@/lib/auth/context'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -33,59 +30,17 @@ const navigation = [
   { name: 'Jobs', href: '/jobs', icon: FileText },
 ]
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [user, setUser] = useState<{ email: string; id: string } | null>(null)
-  const [loading, setLoading] = useState(true)
+function DashboardContent({ children }: { children: React.ReactNode }) {
+  const { user, loading, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
-  const supabase = createClient()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.push('/login')
-        return
-      }
-
-      setUser({
-        email: session.user.email || '',
-        id: session.user.id,
-      })
-
-      apiClient.setAccessToken(session.access_token)
-      setLoading(false)
+    if (!loading && !user) {
+      router.push('/login')
     }
-
-    checkAuth()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          router.push('/login')
-        } else if (session) {
-          setUser({
-            email: session.user.email || '',
-            id: session.user.id,
-          })
-          apiClient.setAccessToken(session.access_token)
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+  }, [loading, user, router])
 
   if (loading) {
     return (
@@ -93,6 +48,10 @@ export default function DashboardLayout({
         <div className="animate-pulse text-muted-foreground">Cargando...</div>
       </div>
     )
+  }
+
+  if (!user) {
+    return null
   }
 
   return (
@@ -148,16 +107,16 @@ export default function DashboardLayout({
                 <Button variant="ghost" size="icon" className="relative">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                      {user.email.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user?.email}</p>
+                  <p className="text-sm font-medium">{user.email}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    ID: {user?.id.slice(0, 8)}...
+                    ID: {user.id.slice(0, 8)}...
                   </p>
                 </div>
                 <DropdownMenuSeparator />
@@ -168,7 +127,7 @@ export default function DashboardLayout({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
+                <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesión
                 </DropdownMenuItem>
@@ -209,5 +168,17 @@ export default function DashboardLayout({
         {children}
       </main>
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <AuthProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </AuthProvider>
   )
 }

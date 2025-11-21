@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,6 +50,7 @@ interface JobDetails {
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { user, loading: authLoading } = useAuth()
   const [job, setJob] = useState<JobDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -77,8 +77,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   useEffect(() => {
+    if (authLoading || !user) return
     fetchJobStatus()
-  }, [id])
+  }, [id, authLoading, user])
 
   useEffect(() => {
     if (job && (job.status === 'processing' || job.status === 'pending')) {

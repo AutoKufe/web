@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,6 +44,7 @@ interface EntitySummary {
 }
 
 export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth()
   const [usage, setUsage] = useState<UsageData | null>(null)
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([])
   const [entities, setEntities] = useState<EntitySummary | null>(null)
@@ -52,6 +52,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (authLoading || !user) return
+
     const fetchData = async () => {
       try {
         const [usageRes, jobsRes, entitiesRes] = await Promise.all([
@@ -85,7 +87,7 @@ export default function DashboardPage() {
     }
 
     fetchData()
-  }, [])
+  }, [authLoading, user])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

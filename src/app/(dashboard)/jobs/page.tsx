@@ -1,9 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,6 +53,7 @@ interface Job {
 }
 
 export default function JobsPage() {
+  const { user, loading: authLoading } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -86,8 +86,9 @@ export default function JobsPage() {
   }
 
   useEffect(() => {
+    if (authLoading || !user) return
     fetchJobs(page)
-  }, [page])
+  }, [page, authLoading, user])
 
   useEffect(() => {
     const hasActiveJobs = jobs.some(

@@ -1,10 +1,8 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,28 +36,16 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserProfile | null>(null)
+  const { user: authUser, loading: authLoading, signOut } = useAuth()
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
+    if (authLoading || !authUser) return
+
     const fetchData = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-
-        if (!session) {
-          router.push('/login')
-          return
-        }
-
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          created_at: session.user.created_at,
-        })
-
         const subResponse = await apiClient.getSubscription()
         if (subResponse && !subResponse.error) {
           setSubscription(subResponse as unknown as SubscriptionData)
@@ -73,10 +59,10 @@ export default function ProfilePage() {
     }
 
     fetchData()
-  }, [router, supabase.auth])
+  }, [authLoading, authUser])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await signOut()
     router.push('/login')
   }
 
@@ -129,12 +115,12 @@ export default function ProfilePage() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-bold">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+              {authUser?.email?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div>
-              <p className="font-medium text-lg">{user?.email}</p>
+              <p className="font-medium text-lg">{authUser?.email}</p>
               <p className="text-sm text-muted-foreground">
-                ID: {user?.id.slice(0, 8)}...
+                ID: {authUser?.id.slice(0, 8)}...
               </p>
             </div>
           </div>
@@ -146,7 +132,7 @@ export default function ProfilePage() {
               <Mail className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Email</p>
-                <p className="text-sm font-medium">{user?.email}</p>
+                <p className="text-sm font-medium">{authUser?.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -154,9 +140,7 @@ export default function ProfilePage() {
               <div>
                 <p className="text-xs text-muted-foreground">Miembro desde</p>
                 <p className="text-sm font-medium">
-                  {user?.created_at
-                    ? new Date(user.created_at).toLocaleDateString()
-                    : 'N/A'}
+                  N/A
                 </p>
               </div>
             </div>
