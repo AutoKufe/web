@@ -69,6 +69,7 @@ function NewJobContent() {
   const [dianToken, setDianToken] = useState('')
   const [useNewToken, setUseNewToken] = useState(false)
   const [tokenStatus, setTokenStatus] = useState<'valid' | 'expired' | 'unknown'>('unknown')
+  const [tokenMasked, setTokenMasked] = useState<string | null>(null)
 
   // Auto-token management
   const [autoTokenStatus, setAutoTokenStatus] = useState<{
@@ -151,21 +152,29 @@ function NewJobContent() {
 
       // Procesar token status
       if (tokenResponse && !tokenResponse.error) {
-        const data = tokenResponse as { has_valid_token?: boolean; needs_new_token?: boolean }
+        const data = tokenResponse as {
+          has_valid_token?: boolean
+          needs_new_token?: boolean
+          token_masked?: string
+        }
 
         if (data.has_valid_token) {
           setTokenStatus('valid')
           setUseNewToken(false)
+          setTokenMasked(data.token_masked || null)
         } else if (data.needs_new_token) {
           setTokenStatus('expired')
           setUseNewToken(true)
+          setTokenMasked(null)
         } else {
           setTokenStatus('unknown')
           setUseNewToken(true)
+          setTokenMasked(null)
         }
       } else {
         setTokenStatus('unknown')
         setUseNewToken(true)
+        setTokenMasked(null)
       }
 
       // Procesar auto-token status
@@ -324,6 +333,7 @@ function NewJobContent() {
     setUseDefaultConsolidation(true)
     setSelectedEntity(null)
     setUseNewToken(false)
+    setTokenMasked(null)
     setAutoTokenStatus(null)
     setUseAutoToken(false)
     setEntityInfo(null)
@@ -623,41 +633,35 @@ function NewJobContent() {
 
               {/* Token manual (cuando no usa auto-token) */}
               {!loadingAutoTokenStatus && !useAutoToken && (
-                <>
-                  {tokenStatus === 'valid' && !useNewToken && (
+                <div className="space-y-3">
+                  {/* Token válido guardado */}
+                  {tokenStatus === 'valid' && (
                     <Alert>
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
                       <AlertDescription className="ml-2">
                         <div className="flex items-center justify-between">
-                          <span>Esta entidad tiene un token DIAN válido guardado</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setUseNewToken(true)}
-                          >
-                            Usar nuevo token
-                          </Button>
+                          <span>
+                            Token DIAN válido guardado: {tokenMasked || '****'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="use-new-manual-token"
+                              checked={useNewToken}
+                              onCheckedChange={(checked) => setUseNewToken(checked as boolean)}
+                            />
+                            <Label htmlFor="use-new-manual-token" className="text-sm cursor-pointer">
+                              Usar nuevo Token DIAN
+                            </Label>
+                          </div>
                         </div>
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  {(tokenStatus === 'expired' || tokenStatus === 'unknown' || useNewToken) && (
+                  {/* Input para nuevo token */}
+                  {(tokenStatus !== 'valid' || useNewToken) && (
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="dian-token">
-                          Token DIAN {tokenStatus === 'valid' && useNewToken && '(Nuevo)'}*
-                        </Label>
-                        {tokenStatus === 'valid' && useNewToken && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setUseNewToken(false)}
-                          >
-                            Usar token guardado
-                          </Button>
-                        )}
-                      </div>
+                      <Label htmlFor="dian-token">Token DIAN *</Label>
                       <Input
                         id="dian-token"
                         placeholder="https://catalogo-vpfe.dian.gov.co/..."
@@ -682,7 +686,7 @@ function NewJobContent() {
                       )}
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
