@@ -109,6 +109,14 @@ export class ApiClient {
     return this.request('GET', `/api/entities/${entityId}/token-status`)
   }
 
+  async getEntityAutoTokenStatus(entityId: string) {
+    return this.request<{
+      auto_token_available: boolean
+      status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
+      dian_email_masked?: string
+    }>('GET', `/api/entities/${entityId}/auto-token-status`)
+  }
+
   // === JOBS ===
   async createJobWithToken(
     dianToken: string,

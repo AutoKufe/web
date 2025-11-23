@@ -39,7 +39,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -66,6 +66,15 @@ function NewJobContent() {
   const [dianToken, setDianToken] = useState('')
   const [useNewToken, setUseNewToken] = useState(false)
   const [tokenStatus, setTokenStatus] = useState<'valid' | 'expired' | 'unknown'>('unknown')
+
+  // Auto-token management
+  const [autoTokenStatus, setAutoTokenStatus] = useState<{
+    available: boolean
+    status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
+    dianEmailMasked?: string
+  } | null>(null)
+  const [useAutoToken, setUseAutoToken] = useState(false)
+  const [loadingAutoTokenStatus, setLoadingAutoTokenStatus] = useState(false)
 
   // Job config
   const [jobName, setJobName] = useState('')
@@ -123,14 +132,22 @@ function NewJobContent() {
     setSelectedEntity(entity)
     setEntitySearchOpen(false)
 
-    // Verificar estado del token con el backend
-    setTokenStatus('unknown') // Loading state
+    // Reset states
+    setTokenStatus('unknown')
+    setAutoTokenStatus(null)
+    setUseAutoToken(false)
+    setLoadingAutoTokenStatus(true)
 
     try {
-      const response = await apiClient.getEntityTokenStatus(entity.id)
+      // Consultar ambos endpoints en paralelo
+      const [tokenResponse, autoTokenResponse] = await Promise.all([
+        apiClient.getEntityTokenStatus(entity.id),
+        apiClient.getEntityAutoTokenStatus(entity.id)
+      ])
 
-      if (response && !response.error) {
-        const data = response as { has_valid_token?: boolean; needs_new_token?: boolean }
+      // Procesar token status
+      if (tokenResponse && !tokenResponse.error) {
+        const data = tokenResponse as { has_valid_token?: boolean; needs_new_token?: boolean }
 
         if (data.has_valid_token) {
           setTokenStatus('valid')
@@ -143,14 +160,36 @@ function NewJobContent() {
           setUseNewToken(true)
         }
       } else {
-        // En caso de error, asumir que necesita token
         setTokenStatus('unknown')
         setUseNewToken(true)
+      }
+
+      // Procesar auto-token status
+      if (autoTokenResponse && !autoTokenResponse.error) {
+        const autoData = autoTokenResponse as {
+          auto_token_available?: boolean
+          status?: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
+          dian_email_masked?: string
+        }
+
+        setAutoTokenStatus({
+          available: autoData.auto_token_available || false,
+          status: autoData.status || 'not_configured',
+          dianEmailMasked: autoData.dian_email_masked
+        })
+
+        // Pre-seleccionar auto-token si está disponible
+        if (autoData.auto_token_available) {
+          setUseAutoToken(true)
+          setUseNewToken(false)
+        }
       }
     } catch (err) {
       console.error('Error checking token status:', err)
       setTokenStatus('unknown')
       setUseNewToken(true)
+    } finally {
+      setLoadingAutoTokenStatus(false)
     }
   }
 
@@ -170,20 +209,23 @@ function NewJobContent() {
       return
     }
 
-    // Si la entidad tiene token válido y no se pidió nuevo token
-    if (selectedEntity && tokenStatus === 'valid' && !useNewToken) {
-      // Usar token almacenado
-      if (!dianToken.trim()) {
-        toast.error('Token DIAN requerido')
-        return
+    // Si usa auto-token, no necesita validación de token manual
+    if (!useAutoToken) {
+      // Si la entidad tiene token válido y no se pidió nuevo token
+      if (selectedEntity && tokenStatus === 'valid' && !useNewToken) {
+        // Usar token almacenado
+        if (!dianToken.trim()) {
+          toast.error('Token DIAN requerido')
+          return
+        }
       }
-    }
 
-    // Si se requiere nuevo token
-    if (useNewToken || !selectedEntity) {
-      if (!dianToken.trim()) {
-        toast.error('Ingresa el token DIAN')
-        return
+      // Si se requiere nuevo token
+      if (useNewToken || !selectedEntity) {
+        if (!dianToken.trim()) {
+          toast.error('Ingresa el token DIAN')
+          return
+        }
       }
     }
 
@@ -204,8 +246,16 @@ function NewJobContent() {
       // Preparar filtro de documentos
       const finalDocFilter = useDefaultDocFilter ? 'todos' : documentFilter
 
+      // Determinar token a enviar
+      let tokenToSend = dianToken
+      if (useAutoToken) {
+        tokenToSend = 'use_auto_token'
+      } else if (!dianToken.trim()) {
+        tokenToSend = 'use_stored_token'
+      }
+
       const response = await apiClient.createJobWithToken(
-        dianToken || 'use_stored_token', // Si no hay nuevo token, indicar que use el almacenado
+        tokenToSend,
         {
           entity_id: selectedEntity?.id,
           job_name: jobName.trim() || undefined,
@@ -270,6 +320,8 @@ function NewJobContent() {
     setUseDefaultConsolidation(true)
     setSelectedEntity(null)
     setUseNewToken(false)
+    setAutoTokenStatus(null)
+    setUseAutoToken(false)
     setEntityInfo(null)
     setTraceId(null)
     setCreatedJobId(null)
@@ -466,68 +518,169 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Token DIAN */}
+          {/* Token DIAN y Auto-Token Management */}
           {selectedEntity && (
-            <>
-              {tokenStatus === 'valid' && !useNewToken && (
+            <div className="space-y-4">
+              {/* Loading state */}
+              {loadingAutoTokenStatus && (
                 <Alert>
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertDescription className="ml-2">
+                    Verificando estado del token...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Auto-token available */}
+              {!loadingAutoTokenStatus && autoTokenStatus?.available && (
+                <Alert className="border-green-500/50 bg-green-500/10">
+                  <Zap className="h-4 w-4 text-green-500" />
                   <AlertDescription className="ml-2">
                     <div className="flex items-center justify-between">
-                      <span>Esta entidad tiene un token DIAN válido guardado</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setUseNewToken(true)}
-                      >
-                        Usar nuevo token
-                      </Button>
+                      <div className="space-y-1">
+                        <span className="font-medium text-green-600">
+                          Gestión automática de tokens disponible
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          AutoKufe puede solicitar tokens DIAN automáticamente para esta entidad
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="use-auto-token"
+                          checked={useAutoToken}
+                          onCheckedChange={(checked) => {
+                            setUseAutoToken(checked as boolean)
+                            if (checked) {
+                              setUseNewToken(false)
+                              setDianToken('')
+                            }
+                          }}
+                        />
+                        <Label htmlFor="use-auto-token" className="text-sm cursor-pointer">
+                          Usar automático
+                        </Label>
+                      </div>
                     </div>
                   </AlertDescription>
                 </Alert>
               )}
 
-              {(tokenStatus === 'expired' || tokenStatus === 'unknown' || useNewToken) && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="dian-token">
-                      Token DIAN {tokenStatus === 'valid' && useNewToken && '(Nuevo)'}*
-                    </Label>
-                    {tokenStatus === 'valid' && useNewToken && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setUseNewToken(false)}
-                      >
-                        Usar token guardado
-                      </Button>
-                    )}
-                  </div>
-                  <Input
-                    id="dian-token"
-                    placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                    value={dianToken}
-                    onChange={(e) => setDianToken(e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                  {tokenStatus === 'expired' && (
-                    <p className="text-xs text-yellow-600">
-                      El último token guardado estaba expirado. Ingresa uno nuevo.
-                    </p>
-                  )}
-                  {tokenStatus === 'unknown' && (
-                    <p className="text-xs text-muted-foreground">
-                      Esta entidad no tiene un token DIAN gestionado previamente
-                    </p>
-                  )}
-                  {tokenStatus === 'valid' && useNewToken && (
-                    <p className="text-xs text-muted-foreground">
-                      El token actual será reemplazado por este nuevo token
-                    </p>
-                  )}
-                </div>
+              {/* Auto-token not configured */}
+              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'not_configured' && (
+                <Alert>
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="ml-2">
+                    <div className="space-y-1">
+                      <span className="font-medium">Gestión automática no disponible</span>
+                      <p className="text-xs text-muted-foreground">
+                        Esta entidad aún no tiene un email DIAN vinculado. Una vez que AutoKufe reciba
+                        un token para esta entidad vía email, la gestión automática se activará.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
               )}
-            </>
+
+              {/* Auto-token not received */}
+              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'token_not_received' && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                  <AlertDescription className="ml-2">
+                    <div className="space-y-1">
+                      <span className="font-medium text-yellow-600">Token no recibido</span>
+                      <p className="text-xs text-muted-foreground">
+                        La última solicitud automática de token no llegó. Por favor verifica que el
+                        email DIAN esté correctamente configurado y tiene acceso para solicitar tokens.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Auto-token email expired */}
+              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'email_expired' && (
+                <Alert className="border-red-500/50 bg-red-500/10">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  <AlertDescription className="ml-2">
+                    <div className="space-y-1">
+                      <span className="font-medium text-red-600">Email DIAN expirado</span>
+                      <p className="text-xs text-muted-foreground">
+                        El email que gestionaba tokens para esta entidad ya no está disponible
+                        {autoTokenStatus.dianEmailMasked && (
+                          <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
+                        )}
+                        . Configura un nuevo email DIAN para reactivar la gestión automática.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Token manual (cuando no usa auto-token) */}
+              {!loadingAutoTokenStatus && !useAutoToken && (
+                <>
+                  {tokenStatus === 'valid' && !useNewToken && (
+                    <Alert>
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <AlertDescription className="ml-2">
+                        <div className="flex items-center justify-between">
+                          <span>Esta entidad tiene un token DIAN válido guardado</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUseNewToken(true)}
+                          >
+                            Usar nuevo token
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {(tokenStatus === 'expired' || tokenStatus === 'unknown' || useNewToken) && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="dian-token">
+                          Token DIAN {tokenStatus === 'valid' && useNewToken && '(Nuevo)'}*
+                        </Label>
+                        {tokenStatus === 'valid' && useNewToken && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUseNewToken(false)}
+                          >
+                            Usar token guardado
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        id="dian-token"
+                        placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                        value={dianToken}
+                        onChange={(e) => setDianToken(e.target.value)}
+                        className="font-mono text-sm"
+                      />
+                      {tokenStatus === 'expired' && (
+                        <p className="text-xs text-yellow-600">
+                          El último token guardado estaba expirado. Ingresa uno nuevo.
+                        </p>
+                      )}
+                      {tokenStatus === 'unknown' && (
+                        <p className="text-xs text-muted-foreground">
+                          Esta entidad no tiene un token DIAN gestionado previamente
+                        </p>
+                      )}
+                      {tokenStatus === 'valid' && useNewToken && (
+                        <p className="text-xs text-muted-foreground">
+                          El token actual será reemplazado por este nuevo token
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {!selectedEntity && (
@@ -698,8 +851,9 @@ function NewJobContent() {
                 !selectedEntity ||
                 !startDate ||
                 !endDate ||
-                (useNewToken && !dianToken.trim()) ||
-                (tokenStatus !== 'valid' && !dianToken.trim())
+                // Si usa auto-token, no necesita token manual
+                (!useAutoToken && useNewToken && !dianToken.trim()) ||
+                (!useAutoToken && tokenStatus !== 'valid' && !dianToken.trim())
               }
               className="flex-1"
               size="lg"
@@ -708,6 +862,11 @@ function NewJobContent() {
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Creando...
+                </>
+              ) : useAutoToken ? (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Crear Job (Auto-Token)
                 </>
               ) : (
                 <>
