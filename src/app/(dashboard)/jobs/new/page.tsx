@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/popover'
 import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { useExpiredTempId } from '@/hooks/useExpiredTempId'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
@@ -54,13 +55,15 @@ interface Entity {
 function NewJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const preselectedEntityId = searchParams.get('entity')
 
   // Entity selection
   const [entities, setEntities] = useState<Entity[]>([])
   const [loadingEntities, setLoadingEntities] = useState(false)
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
+
+  // Handle expired temp IDs in URL
+  useExpiredTempId('entity', entities, loadingEntities)
 
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
@@ -102,15 +105,16 @@ function NewJobContent() {
     fetchEntities()
   }, [])
 
-  // Auto-select entity if preselected
+  // Auto-select entity if preselected in URL
   useEffect(() => {
-    if (preselectedEntityId && entities.length > 0) {
+    const preselectedEntityId = searchParams.get('entity')
+    if (preselectedEntityId && entities.length > 0 && !selectedEntity) {
       const entity = entities.find(e => e.id === preselectedEntityId)
       if (entity) {
         handleSelectEntity(entity)
       }
     }
-  }, [preselectedEntityId, entities])
+  }, [searchParams, entities, selectedEntity])
 
   const fetchEntities = async () => {
     setLoadingEntities(true)
