@@ -25,11 +25,9 @@ import { toast } from 'sonner'
 
 interface JobDetails {
   job_id: string
+  entity_id: string
   job_name: string
   status: string
-  entity_display_name?: string
-  entity_identifier_suffix?: string
-  entity_type?: string
   start_date: string
   end_date: string
   document_categories?: string
@@ -44,10 +42,17 @@ interface JobDetails {
   progress_percentage?: number
 }
 
+interface EntityDetails {
+  full_name: string
+  identifier_suffix: string
+  type: string
+}
+
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, loading: authLoading } = useAuth()
   const [job, setJob] = useState<JobDetails | null>(null)
+  const [entity, setEntity] = useState<EntityDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -59,7 +64,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     try {
       const response = await apiClient.getJobStatus(id)
       if (response && !response.error) {
-        setJob(response as unknown as JobDetails)
+        const jobData = response as unknown as JobDetails
+        setJob(jobData)
+
+        // Fetch entity data separately
+        if (jobData.entity_id) {
+          const entityResponse = await apiClient.getEntity(jobData.entity_id)
+          if (entityResponse && !entityResponse.error && entityResponse.entity) {
+            setEntity({
+              full_name: entityResponse.entity.name,
+              identifier_suffix: entityResponse.entity.identifier?.slice(-4) || 'N/A',
+              type: entityResponse.entity.type_code || 'N/A'
+            })
+          }
+        }
       } else {
         toast.error('Error cargando estado del job')
       }
@@ -250,15 +268,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               Entidad
             </h3>
             <div className="bg-muted p-4 rounded-lg">
-              <p className="font-medium">{job.entity_display_name || 'N/A'}</p>
-              {job.entity_identifier_suffix && (
+              <p className="font-medium">{entity?.full_name || 'Cargando...'}</p>
+              {entity?.identifier_suffix && (
                 <p className="text-sm text-muted-foreground font-mono">
-                  Últimos 4 dígitos: {job.entity_identifier_suffix}
+                  Últimos 4 dígitos: {entity.identifier_suffix}
                 </p>
               )}
-              {job.entity_type && (
+              {entity?.type && (
                 <p className="text-sm text-muted-foreground capitalize">
-                  Tipo: {job.entity_type.replace('_', ' ')}
+                  Tipo: {entity.type.replace('_', ' ')}
                 </p>
               )}
             </div>
@@ -308,7 +326,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Intervalo</p>
                 <p className="font-medium capitalize">
-                  {job.consolidation_interval || 'Mensual'}
+                  {job.consolidation_interval || 'Total'}
                 </p>
               </div>
             </div>
