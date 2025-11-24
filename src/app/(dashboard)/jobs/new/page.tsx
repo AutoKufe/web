@@ -555,37 +555,55 @@ function NewJobContent() {
 
               {/* Auto-token available */}
               {!loadingAutoTokenStatus && autoTokenStatus?.available && (
-                <Alert className="border-green-500/50 bg-green-500/10">
-                  <Zap className="h-4 w-4 text-green-500" />
-                  <AlertDescription className="ml-2">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <span className="font-medium text-green-600">
-                          Gestión automática de tokens disponible
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          AutoKufe puede solicitar tokens DIAN automáticamente para esta entidad
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="use-auto-token"
-                          checked={useAutoToken}
-                          onCheckedChange={(checked) => {
-                            setUseAutoToken(checked as boolean)
-                            if (checked) {
-                              setUseNewToken(false)
-                              setDianToken('')
-                            }
-                          }}
-                        />
-                        <Label htmlFor="use-auto-token" className="text-sm cursor-pointer">
-                          Usar automático
-                        </Label>
+                <div className="border rounded-lg p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <Zap className="h-4 w-4 text-green-600" />
                       </div>
                     </div>
-                  </AlertDescription>
-                </Alert>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-green-900">
+                            Gestión automática disponible
+                          </h4>
+                          <p className="text-sm text-green-700 mt-0.5">
+                            AutoKufe puede solicitar tokens DIAN automáticamente para esta entidad
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 ml-4">
+                          <Label
+                            htmlFor="use-auto-token"
+                            className="text-sm font-medium text-green-900 cursor-pointer whitespace-nowrap"
+                          >
+                            {useAutoToken ? 'Activado' : 'Usar automático'}
+                          </Label>
+                          <Checkbox
+                            id="use-auto-token"
+                            checked={useAutoToken}
+                            onCheckedChange={(checked) => {
+                              setUseAutoToken(checked as boolean)
+                              if (checked) {
+                                setUseNewToken(false)
+                                setDianToken('')
+                              }
+                            }}
+                            className="h-5 w-5 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                          />
+                        </div>
+                      </div>
+                      {useAutoToken && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-green-200">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-900">
+                            Token DIAN se solicitará automáticamente al crear el job
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Auto-token not received */}
