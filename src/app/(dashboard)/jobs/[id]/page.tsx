@@ -69,10 +69,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         // Fetch entity data separately
         if (jobData.entity_id) {
-          const entityResponse = await apiClient.getEntity(jobData.entity_id)
+          const entityResponse = await apiClient.getEntity(jobData.entity_id) as any
           if (entityResponse && !entityResponse.error && entityResponse.entity) {
             setEntity({
-              full_name: entityResponse.entity.name,
+              full_name: entityResponse.entity.name || 'N/A',
               identifier_suffix: entityResponse.entity.identifier?.slice(-4) || 'N/A',
               type: entityResponse.entity.type_code || 'N/A'
             })
