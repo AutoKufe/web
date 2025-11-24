@@ -64,7 +64,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     try {
       const response = await apiClient.getJobStatus(id)
       if (response && !response.error) {
-        const jobData = response as unknown as JobDetails
+        // Backend wraps data in job_data field
+        const responseData = response as any
+        const jobData = responseData.job_data as JobDetails
         setJob(jobData)
 
         // Fetch entity data separately
