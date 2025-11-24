@@ -110,7 +110,7 @@ export default function DianEmailsPage() {
 
     setRegistering(true)
     try {
-      const response = await apiClient.registerDianEmail(registerEmail)
+      const response = await apiClient.registerDianEmail(registerEmail) as any
       if (response.error) {
         toast.error(response.message || 'Error registrando DIAN email')
         return
@@ -137,7 +137,7 @@ export default function DianEmailsPage() {
 
   const handleRegenerateOAuth = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.regenerateOAuthUrl(dianEmailId)
+      const response = await apiClient.regenerateOAuthUrl(dianEmailId) as any
       if (response.error) {
         toast.error(response.message || 'Error regenerando OAuth URL')
         return
@@ -157,7 +157,7 @@ export default function DianEmailsPage() {
 
   const handleDeactivate = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.deactivateDianEmail(dianEmailId)
+      const response = await apiClient.deactivateDianEmail(dianEmailId) as any
       if (response.error) {
         toast.error(response.message || 'Error desactivando DIAN email')
         return
@@ -173,7 +173,7 @@ export default function DianEmailsPage() {
 
   const handleReactivate = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.reactivateDianEmail(dianEmailId)
+      const response = await apiClient.reactivateDianEmail(dianEmailId) as any
       if (response.error) {
         toast.error(response.message || 'Error reactivando DIAN email')
         return
