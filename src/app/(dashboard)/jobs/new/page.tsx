@@ -588,22 +588,6 @@ function NewJobContent() {
                 </Alert>
               )}
 
-              {/* Auto-token not configured */}
-              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'not_configured' && (
-                <Alert>
-                  <Info className="h-4 w-4 text-blue-500" />
-                  <AlertDescription className="ml-2">
-                    <div className="space-y-1">
-                      <span className="font-medium">Gestión automática no disponible</span>
-                      <p className="text-xs text-muted-foreground">
-                        Esta entidad aún no tiene un email DIAN vinculado. Una vez que AutoKufe reciba
-                        un token para esta entidad vía email, la gestión automática se activará.
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
               {/* Auto-token not received */}
               {!loadingAutoTokenStatus && autoTokenStatus?.status === 'token_not_received' && (
                 <Alert className="border-yellow-500/50 bg-yellow-500/10">
@@ -679,19 +663,30 @@ function NewJobContent() {
                                 <span className="text-xs text-muted-foreground">Gestión automática no disponible</span>
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-80" align="end">
-                              <div className="space-y-2">
+                            <PopoverContent className="w-96" align="end">
+                              <div className="space-y-3">
                                 <h4 className="font-medium text-sm">¿Cómo activar la gestión automática?</h4>
-                                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                                  <li>Solicita manualmente un Token DIAN en el portal de la DIAN</li>
-                                  <li>El token llegará al email configurado en tu cuenta DIAN</li>
-                                  <li>AutoKufe detectará automáticamente ese email</li>
-                                  <li>La próxima vez podrás usar gestión automática para esta entidad</li>
-                                </ol>
-                                <p className="text-xs text-muted-foreground pt-2 border-t">
-                                  <strong>Nota:</strong> Si ya registraste el email DIAN donde llegan los tokens,
-                                  simplemente solicita un token manualmente y AutoKufe lo vinculará automáticamente.
-                                </p>
+                                <div className="space-y-2 text-xs text-muted-foreground">
+                                  <p>Para habilitar la gestión automática de tokens DIAN para esta entidad:</p>
+                                  <ol className="space-y-1.5 list-decimal list-inside pl-1">
+                                    <li>
+                                      <strong>Registra tu email DIAN</strong> donde recibes los tokens (si aún no lo has hecho).
+                                      Verifica que el OAuth esté autorizado correctamente.
+                                      <Link href="/profile" className="text-primary hover:underline ml-1">
+                                        Ver configuración →
+                                      </Link>
+                                    </li>
+                                    <li>
+                                      <strong>Solicita manualmente un Token DIAN</strong> para esta entidad en el portal oficial de la DIAN.
+                                    </li>
+                                    <li>
+                                      <strong>AutoKufe detectará automáticamente</strong> el email donde llegó el token y lo vinculará a esta entidad.
+                                    </li>
+                                    <li>
+                                      <strong>La próxima vez</strong> podrás solicitar tokens automáticamente sin ingresar la URL manualmente.
+                                    </li>
+                                  </ol>
+                                </div>
                               </div>
                             </PopoverContent>
                           </Popover>
@@ -779,38 +774,71 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Tipos de Hojas */}
+          {/* Categorías de Documentos */}
           <div className="space-y-2">
-            <Label>Tipos de Hojas a Incluir *</Label>
-            <div className="space-y-2">
-              {[
-                { value: 'ingresos', label: 'Ingresos' },
-                { value: 'egresos', label: 'Egresos' },
-                { value: 'nominas', label: 'Nóminas' },
-              ].map((type) => (
-                <div key={type.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`sheet-type-${type.value}`}
-                    checked={selectedSheetTypes.includes(type.value)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedSheetTypes([...selectedSheetTypes, type.value])
-                      } else {
-                        setSelectedSheetTypes(selectedSheetTypes.filter((t) => t !== type.value))
-                      }
-                    }}
-                  />
-                  <Label
-                    htmlFor={`sheet-type-${type.value}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {type.label}
-                  </Label>
-                </div>
-              ))}
+            <Label>Categorías de Documentos a Incluir *</Label>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-sm">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="select-all-categories"
+                          checked={selectedSheetTypes.length === 3}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedSheetTypes(['ingresos', 'egresos', 'nominas'])
+                            } else {
+                              setSelectedSheetTypes([])
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor="select-all-categories"
+                          className="font-medium cursor-pointer"
+                        >
+                          Seleccionar todas
+                        </Label>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { value: 'ingresos', label: 'Ingresos' },
+                    { value: 'egresos', label: 'Egresos' },
+                    { value: 'nominas', label: 'Nóminas' },
+                  ].map((type) => (
+                    <tr key={type.value} className="border-t">
+                      <td className="p-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`category-${type.value}`}
+                            checked={selectedSheetTypes.includes(type.value)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSheetTypes([...selectedSheetTypes, type.value])
+                              } else {
+                                setSelectedSheetTypes(selectedSheetTypes.filter((t) => t !== type.value))
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`category-${type.value}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {type.label}
+                          </Label>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Selecciona qué tipos de hojas deseas incluir en el reporte Excel
+              Selecciona las categorías de documentos que deseas incluir en el reporte Excel
             </p>
           </div>
 
