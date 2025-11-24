@@ -87,7 +87,7 @@ export default function DianEmailsPage() {
     try {
       const response = await apiClient.listDianEmails()
       if (response && 'success' in response && response.success && 'dian_emails' in response) {
-        setDianEmails(response.dian_emails)
+        setDianEmails(response.dian_emails as DianEmail[])
       }
     } catch (err) {
       console.error('Error fetching DIAN emails:', err)
