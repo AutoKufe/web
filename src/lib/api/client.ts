@@ -52,15 +52,6 @@ export class ApiClient {
       const json = await response.json()
 
       if (!response.ok) {
-        // Detectar si el temporary ID expiró
-        if (json.error === 'TEMP_ID_EXPIRED' || json.action_required === 'refresh_page') {
-          console.warn('Temporary ID expired - reloading page...')
-          // Recargar página automáticamente
-          if (typeof window !== 'undefined') {
-            window.location.reload()
-          }
-        }
-
         return {
           error: json.detail?.error || json.error || 'Unknown error',
           message: json.detail?.message || json.message || 'Request failed',

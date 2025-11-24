@@ -41,7 +41,6 @@ import {
 } from '@/components/ui/popover'
 import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useExpiredTempId } from '@/hooks/useExpiredTempId'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
@@ -79,9 +78,6 @@ function NewJobContent() {
   const [loadingEntities, setLoadingEntities] = useState(false)
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
-
-  // Handle expired temp IDs in URL
-  useExpiredTempId('entity', entities, loadingEntities)
 
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
