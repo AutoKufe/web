@@ -88,6 +88,11 @@ function NewJobContent() {
   // Tipos de hojas (multi-select)
   const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
 
+  // Selector de fechas: 'days' o 'months'
+  const [dateSelectionMode, setDateSelectionMode] = useState<'days' | 'months'>('months')
+  const [startMonth, setStartMonth] = useState('')
+  const [endMonth, setEndMonth] = useState('')
+
   // Intervalo de consolidado
   const [consolidationValue, setConsolidationValue] = useState('1')
   const [consolidationUnit, setConsolidationUnit] = useState('months')
@@ -217,7 +222,18 @@ function NewJobContent() {
     }
 
     if (new Date(startDate) > new Date(endDate)) {
-      toast.error('La fecha de inicio debe ser anterior a la fecha de fin')
+      toast.error('La fecha de inicio debe ser anterior a la fecha final')
+      return
+    }
+
+    // Validar que la fecha final no sea mayor que hoy
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const endDateObj = new Date(endDate)
+    endDateObj.setHours(0, 0, 0, 0)
+
+    if (endDateObj > today) {
+      toast.error('La fecha final no puede ser mayor que hoy (no se pueden descargar documentos futuros)')
       return
     }
 
@@ -769,26 +785,122 @@ function NewJobContent() {
           </div>
 
           {/* Rango de Fechas */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-date">Fecha Inicio *</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Rango de Fechas *</Label>
+              <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
+                <Button
+                  type="button"
+                  variant={dateSelectionMode === 'months' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={() => setDateSelectionMode('months')}
+                >
+                  Por meses
+                </Button>
+                <Button
+                  type="button"
+                  variant={dateSelectionMode === 'days' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={() => setDateSelectionMode('days')}
+                >
+                  Por días
+                </Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-date">Fecha Fin *</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                min={startDate || undefined}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
+
+            {dateSelectionMode === 'months' ? (
+              <>
+                {/* Selector de meses */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-month">Mes Inicial</Label>
+                    <Input
+                      id="start-month"
+                      type="month"
+                      value={startMonth}
+                      max={new Date().toISOString().slice(0, 7)}
+                      onChange={(e) => {
+                        setStartMonth(e.target.value)
+                        // Convertir a primer día del mes
+                        if (e.target.value) {
+                          const [year, month] = e.target.value.split('-')
+                          setStartDate(`${year}-${month}-01`)
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end-month">Mes Final</Label>
+                    <Input
+                      id="end-month"
+                      type="month"
+                      value={endMonth}
+                      min={startMonth || undefined}
+                      max={new Date().toISOString().slice(0, 7)}
+                      onChange={(e) => {
+                        setEndMonth(e.target.value)
+                        // Convertir a último día del mes (o hoy si es mes actual)
+                        if (e.target.value) {
+                          const [year, month] = e.target.value.split('-')
+                          const today = new Date()
+                          const selectedMonth = new Date(parseInt(year), parseInt(month) - 1)
+
+                          // Si es el mes actual, usar hoy como fecha final
+                          if (
+                            selectedMonth.getFullYear() === today.getFullYear() &&
+                            selectedMonth.getMonth() === today.getMonth()
+                          ) {
+                            setEndDate(today.toISOString().split('T')[0])
+                          } else {
+                            // Último día del mes
+                            const lastDay = new Date(parseInt(year), parseInt(month), 0)
+                            setEndDate(lastDay.toISOString().split('T')[0])
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                {startMonth && endMonth && (
+                  <p className="text-xs text-muted-foreground">
+                    Rango: {startDate} al {endDate}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Selector de días */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-date">Fecha Inicio</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={startDate}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end-date">Fecha Final</Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      value={endDate}
+                      min={startDate || undefined}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              No se pueden descargar documentos de fechas futuras
+            </p>
           </div>
 
           {/* Categorías de Documentos */}
