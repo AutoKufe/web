@@ -254,24 +254,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       {/* Error Card */}
       {job.status === 'failed' && job.error_message && (
-        <Card className="border-destructive">
-          <CardContent className="p-0">
-            <div className="flex items-start gap-3 p-4">
-              <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="flex-1 space-y-3">
-                <div>
-                  <h3 className="font-semibold text-destructive mb-1">Error en el procesamiento</h3>
-                  <p className="text-sm text-muted-foreground">{job.error_message}</p>
-                </div>
-                <Link href={`/soporte?job_id=${job.job_id}`}>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Contactar Soporte
-                  </Button>
-                </Link>
+        <Card className="border-destructive overflow-hidden">
+          <div className="flex items-start gap-3 px-4 py-4">
+            <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-3">
+              <div>
+                <h3 className="font-semibold text-destructive mb-1">Error en el procesamiento</h3>
+                <p className="text-sm text-muted-foreground">{job.error_message}</p>
               </div>
+              <Link href={`/soporte?job_id=${job.job_id}`}>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Contactar Soporte
+                </Button>
+              </Link>
             </div>
-          </CardContent>
+          </div>
         </Card>
       )}
 
