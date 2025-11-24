@@ -193,9 +193,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <h1 className="text-3xl font-bold">{job.job_name}</h1>
               {getStatusBadge(job.status)}
             </div>
-            <p className="text-muted-foreground">
-              ID: {job.job_id?.slice(0, 8) || 'N/A'}...
-            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -258,7 +255,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Error Card */}
       {job.status === 'failed' && job.error_message && (
         <Card className="border-destructive">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
               <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 space-y-3">
