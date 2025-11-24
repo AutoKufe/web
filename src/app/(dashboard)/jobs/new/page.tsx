@@ -85,14 +85,13 @@ function NewJobContent() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Filtro de documentos
-  const [documentFilter, setDocumentFilter] = useState('todos')
-  const [useDefaultDocFilter, setUseDefaultDocFilter] = useState(true)
+  // Tipos de hojas (multi-select)
+  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
 
   // Intervalo de consolidado
   const [consolidationValue, setConsolidationValue] = useState('1')
   const [consolidationUnit, setConsolidationUnit] = useState('months')
-  const [useDefaultConsolidation, setUseDefaultConsolidation] = useState(true)
+  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true)
 
   // Form states
   const [creating, setCreating] = useState(false)
@@ -245,10 +244,17 @@ function NewJobContent() {
     setCreating(true)
 
     try {
+      // Validar que al menos un tipo de hoja esté seleccionado
+      if (selectedSheetTypes.length === 0) {
+        toast.error('Selecciona al menos un tipo de hoja')
+        setCreating(false)
+        return
+      }
+
       // Preparar intervalo de consolidado
       let consolidationInterval
-      if (useDefaultConsolidation) {
-        consolidationInterval = { value: 1, unit: 'months' }
+      if (useTotalConsolidation) {
+        consolidationInterval = null // Total consolidation
       } else {
         consolidationInterval = {
           value: parseInt(consolidationValue),
@@ -256,8 +262,11 @@ function NewJobContent() {
         }
       }
 
-      // Preparar filtro de documentos
-      const finalDocFilter = useDefaultDocFilter ? 'todos' : documentFilter
+      // Preparar filtro de documentos (enviar array o 'todos' si todos están seleccionados)
+      const allTypes = ['ingresos', 'egresos', 'nominas']
+      const finalDocFilter = selectedSheetTypes.length === allTypes.length
+        ? 'todos'
+        : selectedSheetTypes
 
       // Determinar token a enviar
       let tokenToSend = dianToken
@@ -661,7 +670,34 @@ function NewJobContent() {
                   {/* Input para nuevo token */}
                   {(tokenStatus !== 'valid' || useNewToken) && (
                     <div className="space-y-2">
-                      <Label htmlFor="dian-token">Token DIAN *</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="dian-token">Token DIAN *</Label>
+                        {autoTokenStatus?.status === 'not_configured' && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent">
+                                <Info className="h-3.5 w-3.5 text-muted-foreground mr-1" />
+                                <span className="text-xs text-muted-foreground">Gestión automática no disponible</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" align="end">
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-sm">¿Cómo activar la gestión automática?</h4>
+                                <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                                  <li>Solicita manualmente un Token DIAN en el portal de la DIAN</li>
+                                  <li>El token llegará al email configurado en tu cuenta DIAN</li>
+                                  <li>AutoKufe detectará automáticamente ese email</li>
+                                  <li>La próxima vez podrás usar gestión automática para esta entidad</li>
+                                </ol>
+                                <p className="text-xs text-muted-foreground pt-2 border-t">
+                                  <strong>Nota:</strong> Si ya registraste el email DIAN donde llegan los tokens,
+                                  simplemente solicita un token manualmente y AutoKufe lo vinculará automáticamente.
+                                </p>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
                       <Input
                         id="dian-token"
                         placeholder="https://catalogo-vpfe.dian.gov.co/..."
@@ -744,58 +780,45 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Filtro de Documentos */}
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="use-default-filter"
-                checked={useDefaultDocFilter}
-                onCheckedChange={(checked) => setUseDefaultDocFilter(checked as boolean)}
-              />
-              <Label
-                htmlFor="use-default-filter"
-                className="text-sm font-normal cursor-pointer"
-              >
-                Usar predeterminado (Todos los documentos)
-              </Label>
+          {/* Tipos de Hojas */}
+          <div className="space-y-2">
+            <Label>Tipos de Hojas a Incluir *</Label>
+            <div className="space-y-2">
+              {[
+                { value: 'ingresos', label: 'Ingresos' },
+                { value: 'egresos', label: 'Egresos' },
+                { value: 'nominas', label: 'Nóminas' },
+              ].map((type) => (
+                <div key={type.value} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`sheet-type-${type.value}`}
+                    checked={selectedSheetTypes.includes(type.value)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedSheetTypes([...selectedSheetTypes, type.value])
+                      } else {
+                        setSelectedSheetTypes(selectedSheetTypes.filter((t) => t !== type.value))
+                      }
+                    }}
+                  />
+                  <Label
+                    htmlFor={`sheet-type-${type.value}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {type.label}
+                  </Label>
+                </div>
+              ))}
             </div>
-            {!useDefaultDocFilter && (
-              <div className="space-y-2">
-                <Label>Filtro de Documentos</Label>
-                <Select value={documentFilter} onValueChange={setDocumentFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los documentos</SelectItem>
-                    <SelectItem value="ingresos">Ingresos</SelectItem>
-                    <SelectItem value="egresos">Egresos</SelectItem>
-                    <SelectItem value="nominas">Nóminas</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Filtra qué tipo de documentos quieres procesar
-                </p>
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Selecciona qué tipos de hojas deseas incluir en el reporte Excel
+            </p>
           </div>
 
           {/* Intervalo de Consolidado */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="use-default-consolidation"
-                  checked={useDefaultConsolidation}
-                  onCheckedChange={(checked) => setUseDefaultConsolidation(checked as boolean)}
-                />
-                <Label
-                  htmlFor="use-default-consolidation"
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  Usar predeterminado (Mensual)
-                </Label>
-              </div>
+              <Label>Intervalo de Consolidado *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -808,15 +831,32 @@ function NewJobContent() {
                     <p className="text-xs text-muted-foreground">
                       Define el intervalo de tiempo para la hoja resumen de consolidado en el Excel.
                       El consolidado agrupa los documentos por periodo y muestra totales de impuestos,
-                      ingresos, egresos, etc.
+                      ingresos, egresos, etc. Si seleccionas "Total", todo el rango de fechas se
+                      consolidará en un solo periodo.
                     </p>
                   </div>
                 </PopoverContent>
               </Popover>
             </div>
-            {!useDefaultConsolidation && (
+
+            {/* Total consolidation checkbox */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="use-total-consolidation"
+                checked={useTotalConsolidation}
+                onCheckedChange={(checked) => setUseTotalConsolidation(checked as boolean)}
+              />
+              <Label
+                htmlFor="use-total-consolidation"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Consolidado Total (sin dividir por intervalos)
+              </Label>
+            </div>
+
+            {/* Interval configuration (only when not using total) */}
+            {!useTotalConsolidation && (
               <div className="space-y-2">
-                <Label>Intervalo de Consolidado</Label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
@@ -832,9 +872,15 @@ function NewJobContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="days">Días</SelectItem>
-                      <SelectItem value="weeks">Semanas</SelectItem>
-                      <SelectItem value="months">Meses</SelectItem>
+                      <SelectItem value="days">
+                        {consolidationValue === '1' ? 'Día' : 'Días'}
+                      </SelectItem>
+                      <SelectItem value="weeks">
+                        {consolidationValue === '1' ? 'Semana' : 'Semanas'}
+                      </SelectItem>
+                      <SelectItem value="months">
+                        {consolidationValue === '1' ? 'Mes' : 'Meses'}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

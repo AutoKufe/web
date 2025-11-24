@@ -58,7 +58,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 flex h-14 items-center">
           {/* Mobile menu button */}
           <Button
             variant="ghost"
@@ -139,7 +139,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t">
-            <nav className="container py-2 space-y-1">
+            <nav className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-2 space-y-1">
               {navigation.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 return (
@@ -164,7 +164,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content */}
-      <main className="container py-6">
+      <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </main>
     </div>
