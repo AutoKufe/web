@@ -863,11 +863,16 @@ function NewJobContent() {
                     />
                   </div>
                 </div>
-                {startMonth && endMonth && (
+                <div className="space-y-1">
+                  {startMonth && endMonth && (
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Rango seleccionado: {startDate} al {endDate}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Rango: {startDate} al {endDate}
+                    El mes inicial comenzará desde el día 1. El mes final terminará el último día del mes (o hoy si es el mes actual).
                   </p>
-                )}
+                </div>
               </>
             ) : (
               <>
