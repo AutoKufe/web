@@ -86,7 +86,7 @@ export default function DianEmailsPage() {
     setLoading(true)
     try {
       const response = await apiClient.listDianEmails()
-      if (response && response.success && response.dian_emails) {
+      if (response && 'success' in response && response.success && 'dian_emails' in response) {
         setDianEmails(response.dian_emails)
       }
     } catch (err) {
