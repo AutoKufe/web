@@ -288,7 +288,7 @@ function NewJobContent() {
       // Preparar intervalo de consolidado
       let consolidationInterval
       if (useTotalConsolidation) {
-        consolidationInterval = null // Total consolidation
+        consolidationInterval = 'total' // Total consolidation
       } else {
         consolidationInterval = {
           value: parseInt(consolidationValue),
