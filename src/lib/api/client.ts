@@ -184,7 +184,7 @@ export class ApiClient {
   }
 
   async listJobs(page = 1, pageSize = 10) {
-    return this.request('GET', '/api/jobs/', undefined, {
+    return this.request('GET', '/api/jobs/list', undefined, {
       page: page.toString(),
       page_size: pageSize.toString(),
     })
