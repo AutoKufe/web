@@ -32,7 +32,7 @@ interface JobDetails {
   entity_type?: string
   start_date: string
   end_date: string
-  document_filter?: string
+  document_categories?: string
   consolidation_interval?: string
   processed_documents?: number
   total_documents?: number
@@ -302,8 +302,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Filtro de documentos</p>
-                <p className="font-medium capitalize">{job.document_filter || 'Todos'}</p>
+                <p className="text-xs text-muted-foreground">Categorías de documentos</p>
+                <p className="font-medium capitalize">{job.document_categories || 'Todos'}</p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Intervalo</p>
