@@ -19,7 +19,9 @@ import {
   Building2,
   Calendar,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Info,
+  MessageCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -133,6 +135,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     return <Badge variant={variant} className="text-base px-3 py-1">{label}</Badge>
   }
 
+  const getEntityTypeLabel = (typeCode: string) => {
+    const types: Record<string, string> = {
+      'persona_juridica': 'Persona Jurídica',
+      'juridica': 'Persona Jurídica',
+      'persona_natural': 'Persona Natural',
+      'natural': 'Persona Natural'
+    }
+    return types[typeCode.toLowerCase()] || typeCode
+  }
+
+  const formatIdentifier = (suffix: string) => {
+    return `****${suffix}`
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
@@ -242,14 +258,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Error Card */}
       {job.status === 'failed' && job.error_message && (
         <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <XCircle className="h-5 w-5" />
-              Error
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-destructive">{job.error_message}</p>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-destructive mb-1">Error en el procesamiento</h3>
+                  <p className="text-sm text-muted-foreground">{job.error_message}</p>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Contactar Soporte
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -269,16 +291,24 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <Building2 className="h-4 w-4" />
               Entidad
             </h3>
-            <div className="bg-muted p-4 rounded-lg">
+            <div className="bg-muted p-4 rounded-lg space-y-2">
               <p className="font-medium">{entity?.full_name || 'Cargando...'}</p>
               {entity?.identifier_suffix && (
-                <p className="text-sm text-muted-foreground font-mono">
-                  Últimos 4 dígitos: {entity.identifier_suffix}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground font-mono">
+                    Identificador: {formatIdentifier(entity.identifier_suffix)}
+                  </p>
+                  <div className="group relative">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-md border z-10">
+                      Los últimos 4 dígitos del número de identificación de la entidad
+                    </div>
+                  </div>
+                </div>
               )}
               {entity?.type && (
-                <p className="text-sm text-muted-foreground capitalize">
-                  Tipo: {entity.type.replace('_', ' ')}
+                <p className="text-sm text-muted-foreground">
+                  Tipo: {getEntityTypeLabel(entity.type)}
                 </p>
               )}
             </div>
