@@ -262,9 +262,9 @@ function NewJobContent() {
         }
       }
 
-      // Preparar filtro de documentos (enviar array o 'todos' si todos están seleccionados)
+      // Preparar categorías de documentos (enviar array o 'todos' si todos están seleccionados)
       const allTypes = ['ingresos', 'egresos', 'nominas']
-      const finalDocFilter = selectedSheetTypes.length === allTypes.length
+      const finalDocCategories = selectedSheetTypes.length === allTypes.length
         ? 'todos'
         : selectedSheetTypes
 
@@ -285,7 +285,7 @@ function NewJobContent() {
             start_date: startDate,
             end_date: endDate,
           },
-          document_filter: finalDocFilter,
+          document_categories: finalDocCategories,
           consolidation_interval: consolidationInterval,
         },
         confirmEntity,

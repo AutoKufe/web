@@ -124,8 +124,8 @@ export class ApiClient {
       entity_id?: string
       job_name?: string
       date_range: { start_date: string; end_date: string }
-      document_filter: string
-      consolidation_interval: { value: number; unit: string }
+      document_categories: string | string[]
+      consolidation_interval: { value: number; unit: string } | null
     },
     confirmEntity = false,
     traceId?: string
