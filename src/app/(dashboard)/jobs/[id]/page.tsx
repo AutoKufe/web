@@ -24,28 +24,24 @@ import {
 import { toast } from 'sonner'
 
 interface JobDetails {
-  id: string
+  job_id: string
   job_name: string
   status: string
-  entity_name?: string
-  entity_nit?: string
-  date_range?: {
-    start_date: string
-    end_date: string
-  }
+  entity_display_name?: string
+  entity_identifier_suffix?: string
+  entity_type?: string
+  start_date: string
+  end_date: string
   document_filter?: string
   consolidation_interval?: string
-  docs_processed?: number
-  docs_total?: number
+  processed_documents?: number
+  total_documents?: number
   created_at: string
-  started_at?: string
+  processing_start_time?: string
   completed_at?: string
   error_message?: string
-  progress?: {
-    stage: string
-    percentage: number
-    message: string
-  }
+  stage?: string
+  progress_percentage?: number
 }
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -109,6 +105,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       completed: { variant: 'default', label: 'Completado' },
       processing: { variant: 'secondary', label: 'Procesando' },
+      queued: { variant: 'secondary', label: 'En Cola' },
       pending: { variant: 'outline', label: 'Pendiente' },
       failed: { variant: 'destructive', label: 'Fallido' },
     }
@@ -161,7 +158,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               {getStatusBadge(job.status)}
             </div>
             <p className="text-muted-foreground">
-              ID: {job.id.slice(0, 8)}...
+              ID: {job.job_id?.slice(0, 8) || 'N/A'}...
             </p>
           </div>
         </div>
@@ -184,7 +181,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       </div>
 
       {/* Progress Card (only for active jobs) */}
-      {(job.status === 'processing' || job.status === 'pending') && (
+      {(job.status === 'processing' || job.status === 'pending' || job.status === 'queued') && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -194,30 +191,27 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {job.progress && (
+              {job.stage && (
                 <>
                   <div>
                     <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{job.progress.stage}</span>
+                      <span className="text-sm font-medium">{job.stage}</span>
                       <span className="text-sm text-muted-foreground">
-                        {job.progress.percentage}%
+                        {job.progress_percentage || 0}%
                       </span>
                     </div>
                     <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary transition-all duration-500"
-                        style={{ width: `${job.progress.percentage}%` }}
+                        style={{ width: `${job.progress_percentage || 0}%` }}
                       />
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {job.progress.message}
-                  </p>
                 </>
               )}
-              {job.docs_total && job.docs_total > 0 && (
+              {job.total_documents && job.total_documents > 0 && (
                 <p className="text-sm">
-                  Documentos: <strong>{job.docs_processed || 0}</strong> de <strong>{job.docs_total}</strong>
+                  Documentos: <strong>{job.processed_documents || 0}</strong> de <strong>{job.total_documents}</strong>
                 </p>
               )}
             </div>
@@ -256,10 +250,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               Entidad
             </h3>
             <div className="bg-muted p-4 rounded-lg">
-              <p className="font-medium">{job.entity_name || 'N/A'}</p>
-              {job.entity_nit && (
+              <p className="font-medium">{job.entity_display_name || 'N/A'}</p>
+              {job.entity_identifier_suffix && (
                 <p className="text-sm text-muted-foreground font-mono">
-                  NIT: {job.entity_nit}
+                  Últimos 4 dígitos: {job.entity_identifier_suffix}
+                </p>
+              )}
+              {job.entity_type && (
+                <p className="text-sm text-muted-foreground capitalize">
+                  Tipo: {job.entity_type.replace('_', ' ')}
                 </p>
               )}
             </div>
@@ -277,16 +276,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Inicio</p>
                 <p className="font-medium">
-                  {job.date_range
-                    ? new Date(job.date_range.start_date).toLocaleDateString()
+                  {job.start_date
+                    ? new Date(job.start_date).toLocaleDateString()
                     : 'N/A'}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Fin</p>
                 <p className="font-medium">
-                  {job.date_range
-                    ? new Date(job.date_range.end_date).toLocaleDateString()
+                  {job.end_date
+                    ? new Date(job.end_date).toLocaleDateString()
                     : 'N/A'}
                 </p>
               </div>
@@ -333,8 +332,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Iniciado</p>
                 <p className="font-medium text-sm">
-                  {job.started_at
-                    ? new Date(job.started_at).toLocaleString()
+                  {job.processing_start_time
+                    ? new Date(job.processing_start_time).toLocaleString()
                     : '-'}
                 </p>
               </div>
@@ -350,7 +349,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
 
           {/* Documents Processed */}
-          {job.status === 'completed' && job.docs_total && (
+          {job.status === 'completed' && job.total_documents && (
             <>
               <Separator />
               <div>
@@ -361,7 +360,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                     <p className="font-medium text-green-700 dark:text-green-300">
-                      {job.docs_processed || job.docs_total} documentos procesados
+                      {job.processed_documents || job.total_documents} documentos procesados
                     </p>
                   </div>
                 </div>
