@@ -21,13 +21,15 @@ import {
   LogOut,
   User,
   Menu,
-  X
+  X,
+  Mail
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Entidades', href: '/entities', icon: Building2 },
   { name: 'Jobs', href: '/jobs', icon: FileText },
+  { name: 'DIAN Emails', href: '/dian-emails', icon: Mail },
 ]
 
 function DashboardContent({ children }: { children: React.ReactNode }) {

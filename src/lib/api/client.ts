@@ -117,6 +117,43 @@ export class ApiClient {
     }>('GET', `/api/entities/${entityId}/auto-token-status`)
   }
 
+  // === DIAN EMAILS ===
+  async listDianEmails() {
+    return this.request<{
+      success: boolean
+      dian_emails: Array<{
+        dian_email_id: string
+        email: string
+        status: string
+        requested_at: string
+        authorized_at?: string
+        deactivated_at?: string
+        has_filter: boolean
+      }>
+      total: number
+    }>('GET', '/api/dian-emails/list')
+  }
+
+  async registerDianEmail(dianEmail: string) {
+    return this.request('POST', '/api/dian-emails/register', { dian_email: dianEmail })
+  }
+
+  async getDianEmailDetails(dianEmailId: string) {
+    return this.request('GET', `/api/dian-emails/${dianEmailId}/details`)
+  }
+
+  async deactivateDianEmail(dianEmailId: string) {
+    return this.request('POST', `/api/dian-emails/${dianEmailId}/deactivate`)
+  }
+
+  async reactivateDianEmail(dianEmailId: string) {
+    return this.request('POST', `/api/dian-emails/${dianEmailId}/reactivate`)
+  }
+
+  async regenerateOAuthUrl(dianEmailId: string) {
+    return this.request('POST', `/api/dian-emails/${dianEmailId}/regenerate-oauth`)
+  }
+
   // === JOBS ===
   async createJobWithToken(
     dianToken: string,

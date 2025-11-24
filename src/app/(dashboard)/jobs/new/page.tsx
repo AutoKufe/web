@@ -672,11 +672,10 @@ function NewJobContent() {
                                     <li>
                                       <strong>Registra tu email DIAN</strong> donde recibes los tokens (si aún no lo has hecho).
                                       Verifica que el OAuth esté autorizado correctamente.
-                                      <Link href="/profile" className="text-primary hover:underline ml-1">
-                                        Ver configuración →
+                                      <Link href="/dian-emails" className="text-primary hover:underline ml-1">
+                                        Gestionar DIAN Emails →
                                       </Link>
-                                    </li>
-                                    <li>
+                                    </li>                                    <li>
                                       <strong>Solicita manualmente un Token DIAN</strong> para esta entidad en el portal oficial de la DIAN.
                                     </li>
                                     <li>
