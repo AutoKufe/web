@@ -52,6 +52,24 @@ interface Entity {
   entity_type: string
 }
 
+// Helper para obtener fecha local de Colombia (UTC-5)
+const getColombiaToday = () => {
+  const now = new Date()
+  // Ajustar a timezone de Colombia (UTC-5)
+  const colombiaOffset = -5 * 60 // -5 horas en minutos
+  const localOffset = now.getTimezoneOffset() // Offset del navegador
+  const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
+  return colombiaTime.toISOString().split('T')[0]
+}
+
+const getColombiaMonth = () => {
+  const now = new Date()
+  const colombiaOffset = -5 * 60
+  const localOffset = now.getTimezoneOffset()
+  const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
+  return colombiaTime.toISOString().slice(0, 7)
+}
+
 function NewJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -788,25 +806,28 @@ function NewJobContent() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Rango de Fechas *</Label>
-              <div className="flex items-center gap-2 bg-muted p-1 rounded-md">
-                <Button
-                  type="button"
-                  variant={dateSelectionMode === 'months' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-3"
-                  onClick={() => setDateSelectionMode('months')}
-                >
-                  Por meses
-                </Button>
-                <Button
-                  type="button"
-                  variant={dateSelectionMode === 'days' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-3"
-                  onClick={() => setDateSelectionMode('days')}
-                >
-                  Por días
-                </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Por:</span>
+                <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
+                  <Button
+                    type="button"
+                    variant={dateSelectionMode === 'months' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 px-3"
+                    onClick={() => setDateSelectionMode('months')}
+                  >
+                    Meses
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={dateSelectionMode === 'days' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 px-3"
+                    onClick={() => setDateSelectionMode('days')}
+                  >
+                    Días
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -820,13 +841,22 @@ function NewJobContent() {
                       id="start-month"
                       type="month"
                       value={startMonth}
-                      max={new Date().toISOString().slice(0, 7)}
+                      max={getColombiaMonth()}
                       onChange={(e) => {
-                        setStartMonth(e.target.value)
+                        const selectedMonth = e.target.value
+                        setStartMonth(selectedMonth)
+
                         // Convertir a primer día del mes
-                        if (e.target.value) {
-                          const [year, month] = e.target.value.split('-')
+                        if (selectedMonth) {
+                          const [year, month] = selectedMonth.split('-')
                           setStartDate(`${year}-${month}-01`)
+
+                          // Si selecciona el mes actual como inicial, auto-seleccionar también como final
+                          const currentMonth = getColombiaMonth()
+                          if (selectedMonth === currentMonth && !endMonth) {
+                            setEndMonth(currentMonth)
+                            setEndDate(getColombiaToday())
+                          }
                         }
                       }}
                     />
@@ -838,21 +868,17 @@ function NewJobContent() {
                       type="month"
                       value={endMonth}
                       min={startMonth || undefined}
-                      max={new Date().toISOString().slice(0, 7)}
+                      max={getColombiaMonth()}
                       onChange={(e) => {
                         setEndMonth(e.target.value)
                         // Convertir a último día del mes (o hoy si es mes actual)
                         if (e.target.value) {
                           const [year, month] = e.target.value.split('-')
-                          const today = new Date()
-                          const selectedMonth = new Date(parseInt(year), parseInt(month) - 1)
+                          const currentMonth = getColombiaMonth()
 
                           // Si es el mes actual, usar hoy como fecha final
-                          if (
-                            selectedMonth.getFullYear() === today.getFullYear() &&
-                            selectedMonth.getMonth() === today.getMonth()
-                          ) {
-                            setEndDate(today.toISOString().split('T')[0])
+                          if (e.target.value === currentMonth) {
+                            setEndDate(getColombiaToday())
                           } else {
                             // Último día del mes
                             const lastDay = new Date(parseInt(year), parseInt(month), 0)
@@ -863,16 +889,12 @@ function NewJobContent() {
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  {startMonth && endMonth && (
-                    <p className="text-xs font-medium text-muted-foreground">
-                      Rango seleccionado: {startDate} al {endDate}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    El mes inicial comenzará desde el día 1. El mes final terminará el último día del mes (o hoy si es el mes actual).
-                  </p>
-                </div>
+                {startMonth && endMonth && (
+                  <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                    <span className="font-medium">Rango: </span>
+                    {startDate} al {endDate}
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -884,7 +906,7 @@ function NewJobContent() {
                       id="start-date"
                       type="date"
                       value={startDate}
-                      max={new Date().toISOString().split('T')[0]}
+                      max={getColombiaToday()}
                       onChange={(e) => setStartDate(e.target.value)}
                     />
                   </div>
@@ -895,17 +917,13 @@ function NewJobContent() {
                       type="date"
                       value={endDate}
                       min={startDate || undefined}
-                      max={new Date().toISOString().split('T')[0]}
+                      max={getColombiaToday()}
                       onChange={(e) => setEndDate(e.target.value)}
                     />
                   </div>
                 </div>
               </>
             )}
-
-            <p className="text-xs text-muted-foreground">
-              No se pueden descargar documentos de fechas futuras
-            </p>
           </div>
 
           {/* Categorías de Documentos */}
