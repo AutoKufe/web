@@ -92,7 +92,7 @@ export default function JobsPage() {
           }
 
           return {
-            id: job.job_id,
+            id: job.job_id || job.id,  // Backend uses job_id in JobProgressResponse
             job_name: job.job_name,
             status: job.status,
             entity_name: entityName,
