@@ -98,9 +98,12 @@ export default function DashboardPage() {
         }
 
         if (entitiesRes && !entitiesRes.error) {
-          const entitiesData = entitiesRes as { entities?: Array<{ id: string; display_name: string; identifier_suffix: string }>; total_count?: number }
+          const entitiesData = entitiesRes as {
+            entities?: Array<{ id: string; display_name: string; identifier_suffix: string }>
+            pagination?: { total_count?: number }
+          }
           setEntities({
-            total: entitiesData.total_count || 0,
+            total: entitiesData.pagination?.total_count || 0,
             recent: entitiesData.entities || [],
           })
         }
@@ -194,7 +197,7 @@ export default function DashboardPage() {
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="text-2xl font-bold">
               {usage?.docs_used?.toLocaleString() || 0}
               <span className="text-sm font-normal text-muted-foreground">
@@ -229,7 +232,7 @@ export default function DashboardPage() {
             </CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="text-2xl font-bold">{entities?.total || 0}</div>
             <p className="text-xs text-muted-foreground">
               {entities?.recent?.length
@@ -252,7 +255,7 @@ export default function DashboardPage() {
             </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="text-2xl font-bold">{recentJobs.length}</div>
             <p className="text-xs text-muted-foreground">
               {recentJobs.filter(j => j.status === 'completed').length} completados
