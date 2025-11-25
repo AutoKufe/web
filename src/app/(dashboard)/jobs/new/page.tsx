@@ -96,6 +96,7 @@ function NewJobContent() {
 
   // Job config
   const [jobName, setJobName] = useState('')
+  const [jobNameError, setJobNameError] = useState<string | null>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -134,6 +135,37 @@ function NewJobContent() {
       }
     }
   }, [searchParams, entities, selectedEntity])
+
+  // Validación de job_name
+  const validateJobName = (name: string): string | null => {
+    if (!name) {
+      // Vacío es válido (se auto-generará)
+      return null
+    }
+
+    // Max 25 caracteres
+    if (name.length > 25) {
+      return 'El nombre no puede exceder 25 caracteres'
+    }
+
+    // Solo letras minúsculas, números, guiones y guiones bajos
+    const validPattern = /^[a-z0-9_-]+$/
+    if (!validPattern.test(name)) {
+      return 'Solo se permiten letras minúsculas, números, guiones (-) y guiones bajos (_)'
+    }
+
+    return null
+  }
+
+  const handleJobNameChange = (value: string) => {
+    // Convertir a minúsculas automáticamente
+    const lowercaseValue = value.toLowerCase()
+    setJobName(lowercaseValue)
+
+    // Validar
+    const error = validateJobName(lowercaseValue)
+    setJobNameError(error)
+  }
 
   const fetchEntities = async () => {
     setLoadingEntities(true)
@@ -228,6 +260,15 @@ function NewJobContent() {
     if (!selectedEntity && !dianToken.trim()) {
       toast.error('Selecciona una entidad o ingresa un token DIAN')
       return
+    }
+
+    // Validar job_name si se proporcionó
+    if (jobName) {
+      const error = validateJobName(jobName)
+      if (error) {
+        toast.error(`Nombre de job inválido: ${error}`)
+        return
+      }
     }
 
     if (!startDate || !endDate) {
@@ -789,13 +830,19 @@ function NewJobContent() {
             <Label htmlFor="job-name">Nombre del Job (opcional)</Label>
             <Input
               id="job-name"
-              placeholder="Ej: Facturas Enero 2024"
+              placeholder="Ej: facturas_enero_2024"
               value={jobName}
-              onChange={(e) => setJobName(e.target.value)}
+              onChange={(e) => handleJobNameChange(e.target.value)}
+              maxLength={25}
+              className={jobNameError ? 'border-red-500' : ''}
             />
-            <p className="text-xs text-muted-foreground">
-              Si no ingresas un nombre, se generará automáticamente
-            </p>
+            {jobNameError ? (
+              <p className="text-xs text-red-500">{jobNameError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Si no ingresas un nombre, se generará automáticamente. Máximo 25 caracteres.
+              </p>
+            )}
           </div>
 
           {/* Rango de Fechas */}
