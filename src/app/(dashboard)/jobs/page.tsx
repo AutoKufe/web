@@ -70,10 +70,47 @@ export default function JobsPage() {
     try {
       const response = await apiClient.listJobs(currentPage, 10)
       if (response && !response.error) {
-        const data = response as { jobs?: Job[]; total?: number; page_size?: number }
-        setJobs(data.jobs || [])
-        const total = data.total || 0
-        const pageSize = data.page_size || 10
+        const data = response as any
+        const jobsList = data.jobs || []
+
+        // Map backend response to frontend Job interface
+        const mappedJobs = await Promise.all(jobsList.map(async (job: any) => {
+          // Fetch entity data for each job
+          let entityName = 'N/A'
+          let entityNit = undefined
+
+          if (job.entity_id) {
+            try {
+              const entityResponse = await apiClient.getEntity(job.entity_id) as any
+              if (entityResponse && !entityResponse.error && entityResponse.entity) {
+                entityName = entityResponse.entity.name || 'N/A'
+                entityNit = entityResponse.entity.identifier?.slice(-4)
+              }
+            } catch {
+              // Silently fail, use N/A
+            }
+          }
+
+          return {
+            id: job.job_id,
+            job_name: job.job_name,
+            status: job.status,
+            entity_name: entityName,
+            entity_nit: entityNit ? `****${entityNit}` : undefined,
+            date_range: {
+              start_date: job.start_date,
+              end_date: job.end_date
+            },
+            docs_processed: job.processed_documents,
+            docs_total: job.total_documents,
+            created_at: job.created_at,
+            completed_at: job.completed_at
+          }
+        }))
+
+        setJobs(mappedJobs)
+        const total = data.total_count || 0
+        const pageSize = data.per_page || 10
         setTotalPages(Math.ceil(total / pageSize))
       }
     } catch (err) {
