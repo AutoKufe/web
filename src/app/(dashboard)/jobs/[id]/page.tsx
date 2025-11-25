@@ -21,7 +21,8 @@ import {
   FileText,
   AlertCircle,
   Info,
-  MessageCircle
+  MessageCircle,
+  Ban
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -57,6 +58,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [entity, setEntity] = useState<EntityDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const fetchJobStatus = async (showRefreshing = false) => {
     if (showRefreshing) {
@@ -149,6 +151,28 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     return `****${suffix}`
   }
 
+  const handleCancelJob = async () => {
+    if (!confirm('¿Estás seguro de que quieres cancelar este job? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setCancelling(true)
+    try {
+      const response = await apiClient.cancelJob(id)
+      if (response && !response.error) {
+        toast.success('Job cancelado exitosamente')
+        fetchJobStatus(true)
+      } else {
+        toast.error('Error cancelando job')
+      }
+    } catch (err) {
+      console.error('Error cancelling job:', err)
+      toast.error('Error cancelando job')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
@@ -204,6 +228,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
+          {(job.status === 'pending' || job.status === 'queued' || job.status === 'processing') && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              onClick={handleCancelJob}
+              disabled={cancelling}
+            >
+              <Ban className="h-4 w-4" />
+              {cancelling ? 'Cancelando...' : 'Cancelar Job'}
+            </Button>
+          )}
           {job.status === 'completed' && (
             <Button className="gap-2">
               <Download className="h-4 w-4" />
@@ -254,8 +290,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       {/* Error Card */}
       {job.status === 'failed' && job.error_message && (
-        <Card className="border-destructive overflow-hidden">
-          <div className="flex items-start gap-3 px-4 py-4">
+        <Card className="border-destructive overflow-hidden p-0">
+          <div className="flex items-start gap-3 px-4">
             <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1 space-y-3">
               <div>

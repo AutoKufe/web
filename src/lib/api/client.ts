@@ -198,6 +198,10 @@ export class ApiClient {
     return this.request('GET', `/api/jobs/${jobId}/status`)
   }
 
+  async cancelJob(jobId: string) {
+    return this.request('POST', `/api/jobs/${jobId}/cancel`)
+  }
+
   // === SUBSCRIPTIONS ===
   async getSubscription() {
     return this.request('GET', '/subscriptions/me')
