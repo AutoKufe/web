@@ -16,7 +16,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  XCircle
+  XCircle,
+  Info
 } from 'lucide-react'
 
 interface UsageData {
@@ -191,10 +192,19 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-3">
         {/* Usage Card */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Documentos este mes
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-medium">
+                Uso mensual
+              </CardTitle>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-3 bg-popover text-popover-foreground text-xs rounded-md shadow-md border z-10">
+                  <p className="font-semibold mb-1">¿Qué cuenta como uso?</p>
+                  <p>Solo los documentos que descargamos de la DIAN cuentan para tu límite mensual. Procesar o regenerar reportes no consume límite adicional.</p>
+                </div>
+              </div>
+            </div>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="pt-0">
@@ -226,7 +236,7 @@ export default function DashboardPage() {
 
         {/* Entities Card */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-sm font-medium">
               Entidades registradas
             </CardTitle>
@@ -249,7 +259,7 @@ export default function DashboardPage() {
 
         {/* Jobs Card */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-sm font-medium">
               Jobs recientes
             </CardTitle>
