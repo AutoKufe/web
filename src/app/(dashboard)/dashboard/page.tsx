@@ -39,7 +39,7 @@ interface EntitySummary {
   recent: Array<{
     id: string
     display_name: string
-    nit: string
+    identifier_suffix: string
   }>
 }
 
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         }
 
         if (entitiesRes && !entitiesRes.error) {
-          const entitiesData = entitiesRes as { entities?: Array<{ id: string; display_name: string; nit: string }>; total?: number }
+          const entitiesData = entitiesRes as { entities?: Array<{ id: string; display_name: string; identifier_suffix: string }>; total?: number }
           setEntities({
             total: entitiesData.total || 0,
             recent: entitiesData.entities || [],
@@ -209,7 +209,9 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{entities?.total || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {entities?.recent?.length ? `${entities.recent.length} más recientes` : 'Sin entidades'}
+              {entities?.recent?.length
+                ? `${entities.recent.length} más ${entities.recent.length === 1 ? 'reciente' : 'recientes'}`
+                : 'Sin entidades'}
             </p>
             <Link href="/entities">
               <Button variant="link" className="px-0 h-auto text-xs">
@@ -309,7 +311,7 @@ export default function DashboardPage() {
               <div>
                 <CardTitle>Entidades Recientes</CardTitle>
                 <CardDescription>
-                  Tus empresas registradas
+                  Tus entidades registradas
                 </CardDescription>
               </div>
               <Link href="/entities">
@@ -328,9 +330,11 @@ export default function DashboardPage() {
                       <Building2 className="h-8 w-8 text-muted-foreground" />
                       <div className="min-w-0">
                         <p className="font-medium truncate">{entity.display_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          NIT: {entity.nit}
-                        </p>
+                        {entity.identifier_suffix && (
+                          <p className="text-sm text-muted-foreground font-mono">
+                            Identificador: ****{entity.identifier_suffix}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

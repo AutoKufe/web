@@ -291,7 +291,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Error Card */}
       {job.status === 'failed' && job.error_message && (
         <Card className="border-destructive">
-          <CardContent className="py-3">
+          <CardContent className="py-1 px-4">
             <div className="flex items-start gap-3">
               <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 space-y-3">
