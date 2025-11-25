@@ -156,7 +156,7 @@ export default function EntitiesPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Entidades</h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona tus entidades registradas en AutoKufe
+            Gestiona tus entidades registradas
           </p>
         </div>
         <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>

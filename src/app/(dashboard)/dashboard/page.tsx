@@ -67,14 +67,40 @@ export default function DashboardPage() {
         }
 
         if (jobsRes && !jobsRes.error) {
-          const jobsData = jobsRes as { jobs?: RecentJob[] }
-          setRecentJobs(jobsData.jobs || [])
+          const jobsData = jobsRes as { jobs?: any[] }
+          const jobsList = jobsData.jobs || []
+
+          // Fetch entity names for each job
+          const mappedJobs = await Promise.all(jobsList.map(async (job: any) => {
+            let entityName = undefined
+
+            if (job.entity_id) {
+              try {
+                const entityResponse = await apiClient.getEntity(job.entity_id) as any
+                if (entityResponse && !entityResponse.error && entityResponse.entity) {
+                  entityName = entityResponse.entity.name
+                }
+              } catch {
+                // Silently fail
+              }
+            }
+
+            return {
+              id: job.job_id || job.id,
+              job_name: job.job_name,
+              status: job.status,
+              created_at: job.created_at,
+              entity_name: entityName
+            }
+          }))
+
+          setRecentJobs(mappedJobs)
         }
 
         if (entitiesRes && !entitiesRes.error) {
-          const entitiesData = entitiesRes as { entities?: Array<{ id: string; display_name: string; identifier_suffix: string }>; total?: number }
+          const entitiesData = entitiesRes as { entities?: Array<{ id: string; display_name: string; identifier_suffix: string }>; total_count?: number }
           setEntities({
-            total: entitiesData.total || 0,
+            total: entitiesData.total_count || 0,
             recent: entitiesData.entities || [],
           })
         }
@@ -104,17 +130,14 @@ export default function DashboardPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      completed: 'default',
-      processing: 'secondary',
-      pending: 'outline',
-      failed: 'destructive',
+    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      completed: { variant: 'default', label: 'Completado' },
+      processing: { variant: 'secondary', label: 'Procesando' },
+      pending: { variant: 'outline', label: 'Pendiente' },
+      failed: { variant: 'destructive', label: 'Fallido' },
     }
-    return (
-      <Badge variant={variants[status] || 'outline'}>
-        {status}
-      </Badge>
-    )
+    const { variant, label } = config[status] || { variant: 'outline' as const, label: status }
+    return <Badge variant={variant}>{label}</Badge>
   }
 
   const usagePercentage = usage ? Math.round((usage.docs_used / usage.docs_limit) * 100) : 0
