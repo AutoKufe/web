@@ -121,6 +121,28 @@ export class ApiClient {
     }>('GET', `/api/entities/${entityId}/auto-token-status`)
   }
 
+  async getEntityJobCreationOptions(entityId: string) {
+    return this.request<{
+      auto_management: {
+        available: boolean
+        status: string
+        message: string
+        dian_email_masked?: string
+        should_be_default: boolean
+      }
+      saved_token: {
+        available: boolean
+        token_masked?: string
+        should_be_default: boolean
+      }
+      manual_token: {
+        available: boolean
+        should_be_default: boolean
+      }
+      recommended_option: 'auto' | 'saved' | 'manual'
+    }>('GET', `/api/entities/${entityId}/job-creation-options`)
+  }
+
   // === DIAN EMAILS ===
   async listDianEmails() {
     return this.request<{

@@ -33,7 +33,8 @@ import {
   RefreshCw,
   AlertCircle,
   ExternalLink,
-  MoreHorizontal
+  MoreHorizontal,
+  Mail
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -49,6 +50,12 @@ interface Entity {
   identifier_suffix: string
   entity_type: string
   created_at: string
+  dian_email?: {
+    email_masked?: string
+    status: 'active' | 'oauth_expired' | 'oauth_revoked' | 'inactive' | 'not_associated' | 'not_found' | 'error'
+    message: string
+    auth_failed_at?: string | null
+  }
 }
 
 const getEntityTypeLabel = (type: string): string => {
@@ -59,6 +66,23 @@ const getEntityTypeLabel = (type: string): string => {
       return 'Persona Natural'
     default:
       return type
+  }
+}
+
+const getDianEmailBadge = (status: string) => {
+  switch (status) {
+    case 'active':
+      return { variant: 'default' as const, icon: '✅', label: 'Auto activa' }
+    case 'oauth_expired':
+      return { variant: 'destructive' as const, icon: '⚠️', label: 'OAuth expirado' }
+    case 'oauth_revoked':
+      return { variant: 'destructive' as const, icon: '❌', label: 'OAuth revocado' }
+    case 'not_associated':
+      return { variant: 'secondary' as const, icon: '📧', label: 'Sin email' }
+    case 'not_found':
+      return { variant: 'outline' as const, icon: '⚠️', label: 'Email no encontrado' }
+    default:
+      return { variant: 'outline' as const, icon: '❓', label: 'Desconocido' }
   }
 }
 
@@ -281,61 +305,90 @@ export default function EntitiesPage() {
                     <TableHead className="pl-6">Nombre</TableHead>
                     <TableHead>Identificador</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Gestión Automática</TableHead>
                     <TableHead>Registrado</TableHead>
                     <TableHead className="w-[70px] pr-6"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEntities.map((entity) => (
-                    <TableRow key={entity.id} className="hover:bg-muted/50">
-                      <TableCell className="pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
-                            <Building2 className="h-4 w-4 text-primary" />
+                  {filteredEntities.map((entity) => {
+                    const dianEmail = entity.dian_email
+                    const badgeInfo = dianEmail ? getDianEmailBadge(dianEmail.status) : null
+
+                    return (
+                      <TableRow key={entity.id} className="hover:bg-muted/50">
+                        <TableCell className="pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                              <Building2 className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{entity.display_name}</span>
                           </div>
-                          <span className="font-medium">{entity.display_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        ****{entity.identifier_suffix}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
-                          {getEntityTypeLabel(entity.entity_type)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(entity.created_at).toLocaleDateString('es-ES', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </TableCell>
-                      <TableCell className="pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/entities/${entity.id}`} className="cursor-pointer">
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Ver detalles
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/jobs/new?entity=${entity.id}`} className="cursor-pointer">
-                                <Plus className="h-4 w-4 mr-2" />
-                                Crear job
-                              </Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          ****{entity.identifier_suffix}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-normal">
+                            {getEntityTypeLabel(entity.entity_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {badgeInfo ? (
+                            <div className="space-y-1">
+                              <Badge variant={badgeInfo.variant} className="font-normal">
+                                {badgeInfo.icon} {badgeInfo.label}
+                              </Badge>
+                              {dianEmail?.email_masked && dianEmail.status === 'active' && (
+                                <p className="text-xs text-muted-foreground">
+                                  {dianEmail.email_masked}
+                                </p>
+                              )}
+                              {(dianEmail?.status === 'oauth_expired' || dianEmail?.status === 'oauth_revoked') && dianEmail.email_masked && (
+                                <p className="text-xs text-muted-foreground">
+                                  {dianEmail.email_masked}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <Badge variant="secondary" className="font-normal">
+                              📧 Sin email
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(entity.created_at).toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </TableCell>
+                        <TableCell className="pr-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/entities/${entity.id}`} className="cursor-pointer">
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Ver detalles
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/jobs/new?entity=${entity.id}`} className="cursor-pointer">
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Crear job
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
 
@@ -365,6 +418,78 @@ export default function EntitiesPage() {
               )}
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Educational Section - How to associate DIAN email */}
+      <Card className="border-dashed">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            ¿Cómo asociar un email DIAN a tu entidad?
+          </CardTitle>
+          <CardDescription>
+            Habilita la gestión automática de tokens para tus entidades
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
+                1
+              </div>
+              <div>
+                <p className="font-medium">Autoriza tu email DIAN</p>
+                <p className="text-muted-foreground text-xs">
+                  Ve a <strong>Configuración → Emails DIAN</strong> y autoriza el email donde recibes los tokens
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
+                2
+              </div>
+              <div>
+                <p className="font-medium">Solicita un token manual para esta entidad</p>
+                <p className="text-muted-foreground text-xs">
+                  Crea un job manual (solicitando token tú mismo desde la DIAN)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
+                3
+              </div>
+              <div>
+                <p className="font-medium">¡Listo! La asociación es automática</p>
+                <p className="text-muted-foreground text-xs">
+                  Cuando llegue el token, el sistema detectará automáticamente qué email DIAN corresponde a esta entidad
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold shrink-0 mt-0.5">
+                ✓
+              </div>
+              <div>
+                <p className="font-medium text-green-600">Próximos jobs usarán gestión automática</p>
+                <p className="text-muted-foreground text-xs">
+                  Ya no necesitarás solicitar tokens manualmente - el sistema lo hará por ti
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              <strong>Importante:</strong> Si cambias el email de la DIAN donde recibes los tokens,
+              simplemente solicita un nuevo token manual y el sistema actualizará la asociación automáticamente.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     </div>
