@@ -198,19 +198,19 @@ export default function DianEmailsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">DIAN Emails</h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Gestiona los emails DIAN para recibir tokens automáticamente
         </p>
       </div>
 
       {/* 2-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Left Column - Main Content (2/3 width) */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-3">
           {/* Register Button */}
           <div className="flex justify-end">
             <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
@@ -430,17 +430,17 @@ export default function DianEmailsPage() {
         </div>
 
         {/* Right Column - Educational Content (1/3 width) */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* How it Works Card */}
           <Card className="border-blue-200 bg-blue-50/30 sticky top-4">
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-1.5 pt-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-600" />
                 ¿Cómo funciona?
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2.5">
-              <div className="space-y-2 text-xs">
+            <CardContent className="space-y-2 pt-2 pb-3">
+              <div className="space-y-1.5 text-xs">
                 <div className="flex items-start gap-2">
                   <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
                     1
