@@ -278,9 +278,9 @@ export default function DianEmailsPage() {
                 1
               </div>
               <div>
-                <p className="font-medium text-blue-900">Registra tu email DIAN</p>
+                <p className="font-medium text-blue-900">Registra y autoriza tu email DIAN aquí</p>
                 <p className="text-muted-foreground text-xs">
-                  El email donde <strong>recibes tokens DIAN de tus entidades</strong>. AutoKufe escuchará este email 24/7.
+                  Registra el email donde <strong>recibes tokens DIAN</strong> y autoriza el acceso OAuth para que AutoKufe pueda leer emails y crear filtros automáticos.
                 </p>
               </div>
             </div>
@@ -290,9 +290,9 @@ export default function DianEmailsPage() {
                 2
               </div>
               <div>
-                <p className="font-medium text-blue-900">Autoriza el acceso OAuth</p>
+                <p className="font-medium text-blue-900">Registra tus entidades</p>
                 <p className="text-muted-foreground text-xs">
-                  Da permisos a AutoKufe para leer emails y crear filtros automáticos en Gmail.
+                  Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
                 </p>
               </div>
             </div>
@@ -302,21 +302,9 @@ export default function DianEmailsPage() {
                 3
               </div>
               <div>
-                <p className="font-medium text-blue-900">Registra tu(s) entidad(es)</p>
+                <p className="font-medium text-blue-900">Solicita un token DIAN para cada entidad (una sola vez)</p>
                 <p className="text-muted-foreground text-xs">
-                  Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
-                4
-              </div>
-              <div>
-                <p className="font-medium text-blue-900">Solicita un token desde el portal DIAN (una sola vez)</p>
-                <p className="text-muted-foreground text-xs">
-                  Ve al <strong>Catálogo DIAN</strong> y solicita manualmente un token para cada entidad. <strong>Cuando el token llegue al email, AutoKufe lo asociará automáticamente</strong> con la entidad.
+                  Desde el portal <strong>catalogo-vpfe.dian.gov.co</strong>, solicita un token para cada entidad registrada. <strong>Cuando llegue al email, AutoKufe lo asociará automáticamente</strong> con la entidad.
                 </p>
               </div>
             </div>
@@ -361,7 +349,7 @@ export default function DianEmailsPage() {
             </p>
             <ol className="list-decimal list-inside space-y-1 text-xs mb-3">
               <li>Ve a <Link href="/entities" className="underline font-medium">Entidades</Link> y registra tus empresas/personas</li>
-              <li>Ve al portal Catálogo DIAN y solicita un token manualmente para cada entidad</li>
+              <li>Desde <strong>catalogo-vpfe.dian.gov.co</strong> solicita un token para cada entidad</li>
               <li>AutoKufe asociará automáticamente el email cuando llegue el token</li>
             </ol>
             <div className="flex gap-2">

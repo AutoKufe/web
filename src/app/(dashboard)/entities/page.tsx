@@ -445,7 +445,7 @@ export default function EntitiesPage() {
               <div>
                 <p className="font-medium">Autoriza tu email DIAN</p>
                 <p className="text-muted-foreground text-xs">
-                  Ve a <strong>Configuración → Emails DIAN</strong> y autoriza el email donde recibes los tokens
+                  Ve a <Link href="/dian-emails" className="underline">Emails DIAN</Link> y autoriza el email donde recibes los tokens
                 </p>
               </div>
             </div>
@@ -455,9 +455,9 @@ export default function EntitiesPage() {
                 2
               </div>
               <div>
-                <p className="font-medium">Solicita un token desde el portal DIAN</p>
+                <p className="font-medium">Solicita un token DIAN para esta entidad</p>
                 <p className="text-muted-foreground text-xs">
-                  Ve al Catálogo DIAN y solicita manualmente un token para esta entidad
+                  Desde el portal <strong>catalogo-vpfe.dian.gov.co</strong> solicita un token para esta entidad
                 </p>
               </div>
             </div>
@@ -491,7 +491,7 @@ export default function EntitiesPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
               <strong>Importante:</strong> Si cambias el email de la DIAN donde recibes los tokens,
-              simplemente solicita un nuevo token desde el portal DIAN y el sistema actualizará la asociación automáticamente.
+              simplemente solicita un nuevo token desde <strong>catalogo-vpfe.dian.gov.co</strong> y el sistema actualizará la asociación automáticamente.
             </AlertDescription>
           </Alert>
         </CardContent>
