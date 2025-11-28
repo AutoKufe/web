@@ -54,6 +54,8 @@ interface DianEmail {
   authorized_at?: string
   deactivated_at?: string
   has_filter: boolean
+  has_associated_entities?: boolean
+  associated_entities_count?: number
 }
 
 const getStatusBadge = (status: string) => {
@@ -258,16 +260,121 @@ export default function DianEmailsPage() {
         </Dialog>
       </div>
 
-      {/* Info Alert */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>¿Qué son los DIAN emails?</AlertTitle>
-        <AlertDescription>
-          Los DIAN emails son las cuentas de correo donde recibes los tokens de autenticación
-          de la DIAN. Al registrar y autorizar un email, AutoKufe puede detectar automáticamente
-          cuando llega un token y vincularlo a la entidad correspondiente.
-        </AlertDescription>
-      </Alert>
+      {/* Educational Section - How it Works */}
+      <Card className="border-blue-200 bg-blue-50/30">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Info className="h-5 w-5 text-blue-600" />
+            ¿Cómo funciona la Gestión Automática de Tokens?
+          </CardTitle>
+          <CardDescription>
+            Entiende el flujo completo para habilitar la gestión automática en tus entidades
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
+                1
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Registra tu email DIAN</p>
+                <p className="text-muted-foreground text-xs">
+                  El email donde <strong>recibes tokens DIAN de tus entidades</strong>. AutoKufe escuchará este email 24/7.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
+                2
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Autoriza el acceso OAuth</p>
+                <p className="text-muted-foreground text-xs">
+                  Da permisos a AutoKufe para leer emails y crear filtros automáticos en Gmail.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
+                3
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Registra tu(s) entidad(es)</p>
+                <p className="text-muted-foreground text-xs">
+                  Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
+                4
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Solicita un token manual (una sola vez)</p>
+                <p className="text-muted-foreground text-xs">
+                  Crea un job manual para cada entidad. <strong>Cuando llegue el token al email, AutoKufe asociará automáticamente</strong> ese email DIAN con la entidad.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold shrink-0 mt-0.5">
+                ✓
+              </div>
+              <div>
+                <p className="font-medium text-green-600">¡Listo! Ya no necesitas solicitar tokens manualmente</p>
+                <p className="text-muted-foreground text-xs">
+                  Próximos jobs usarán gestión automática. AutoKufe solicitará y detectará tokens por ti.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-xs text-amber-900">
+              <strong>Importante:</strong> Un email DIAN solo se asocia a una entidad cuando <strong>llega un token de esa entidad a ese email</strong>.
+              Si cambias el email en la DIAN, simplemente solicita un nuevo token manual y AutoKufe actualizará la asociación automáticamente.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
+      {/* Contextual Alert - Active emails without entities */}
+      {dianEmails.some(email =>
+        email.status === 'active' &&
+        !email.has_associated_entities
+      ) && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900">¡Siguiente paso pendiente!</AlertTitle>
+          <AlertDescription className="text-sm text-amber-800">
+            <p className="mb-2">
+              Tienes {dianEmails.filter(e => e.status === 'active' && !e.has_associated_entities).length} email(s) DIAN autorizado(s) pero <strong>sin entidades asociadas</strong>.
+            </p>
+            <p className="mb-3">
+              Para habilitar la gestión automática:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-xs mb-3">
+              <li>Ve a <Link href="/entities" className="underline font-medium">Entidades</Link> y registra tus empresas/personas</li>
+              <li>Crea un job manual para cada entidad (solicita el token tú mismo)</li>
+              <li>AutoKufe asociará automáticamente el email cuando llegue el token</li>
+            </ol>
+            <div className="flex gap-2">
+              <Link href="/entities">
+                <Button size="sm" variant="outline" className="bg-white">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Registrar Entidades
+                </Button>
+              </Link>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* DIAN Emails List */}
       <Card>
@@ -307,6 +414,7 @@ export default function DianEmailsPage() {
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Entidades Asociadas</TableHead>
                   <TableHead>Filtro Gmail</TableHead>
                   <TableHead>Registrado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -323,6 +431,24 @@ export default function DianEmailsPage() {
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(dianEmail.status)}
+                    </TableCell>
+                    <TableCell>
+                      {dianEmail.has_associated_entities ? (
+                        <Badge variant="default" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {dianEmail.associated_entities_count} entidad{dianEmail.associated_entities_count !== 1 ? 'es' : ''}
+                        </Badge>
+                      ) : dianEmail.status === 'active' ? (
+                        <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+                          <AlertCircle className="h-3 w-3" />
+                          Sin asociar
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 text-muted-foreground">
+                          <XCircle className="h-3 w-3" />
+                          Sin asociar
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {dianEmail.has_filter ? (
