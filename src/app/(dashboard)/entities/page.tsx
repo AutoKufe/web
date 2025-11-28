@@ -455,9 +455,9 @@ export default function EntitiesPage() {
                 2
               </div>
               <div>
-                <p className="font-medium">Solicita un token manual para esta entidad</p>
+                <p className="font-medium">Solicita un token desde el portal DIAN</p>
                 <p className="text-muted-foreground text-xs">
-                  Crea un job manual (solicitando token tú mismo desde la DIAN)
+                  Ve al Catálogo DIAN y solicita manualmente un token para esta entidad
                 </p>
               </div>
             </div>
@@ -491,7 +491,7 @@ export default function EntitiesPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs">
               <strong>Importante:</strong> Si cambias el email de la DIAN donde recibes los tokens,
-              simplemente solicita un nuevo token manual y el sistema actualizará la asociación automáticamente.
+              simplemente solicita un nuevo token desde el portal DIAN y el sistema actualizará la asociación automáticamente.
             </AlertDescription>
           </Alert>
         </CardContent>

@@ -314,9 +314,9 @@ export default function DianEmailsPage() {
                 4
               </div>
               <div>
-                <p className="font-medium text-blue-900">Solicita un token manual (una sola vez)</p>
+                <p className="font-medium text-blue-900">Solicita un token desde el portal DIAN (una sola vez)</p>
                 <p className="text-muted-foreground text-xs">
-                  Crea un job manual para cada entidad. <strong>Cuando llegue el token al email, AutoKufe asociará automáticamente</strong> ese email DIAN con la entidad.
+                  Ve al <strong>Catálogo DIAN</strong> y solicita manualmente un token para cada entidad. <strong>Cuando el token llegue al email, AutoKufe lo asociará automáticamente</strong> con la entidad.
                 </p>
               </div>
             </div>
@@ -361,7 +361,7 @@ export default function DianEmailsPage() {
             </p>
             <ol className="list-decimal list-inside space-y-1 text-xs mb-3">
               <li>Ve a <Link href="/entities" className="underline font-medium">Entidades</Link> y registra tus empresas/personas</li>
-              <li>Crea un job manual para cada entidad (solicita el token tú mismo)</li>
+              <li>Ve al portal Catálogo DIAN y solicita un token manualmente para cada entidad</li>
               <li>AutoKufe asociará automáticamente el email cuando llegue el token</li>
             </ol>
             <div className="flex gap-2">
