@@ -198,7 +198,7 @@ export default function DianEmailsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">DIAN Emails</h1>
@@ -208,9 +208,9 @@ export default function DianEmailsPage() {
       </div>
 
       {/* 2-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left Column - Main Content (2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           {/* Register Button */}
           <div className="flex justify-end">
             <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
@@ -430,16 +430,16 @@ export default function DianEmailsPage() {
         </div>
 
         {/* Right Column - Educational Content (1/3 width) */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* How it Works Card */}
-          <Card className="border-blue-200 bg-blue-50/30 sticky top-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+          <Card className="border-blue-200 bg-blue-50/30 sticky top-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-600" />
                 ¿Cómo funciona?
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2.5">
               <div className="space-y-2 text-xs">
                 <div className="flex items-start gap-2">
                   <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
@@ -447,8 +447,8 @@ export default function DianEmailsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-blue-900">Registra y autoriza aquí</p>
-                    <p className="text-muted-foreground">
-                      Email donde recibes tokens DIAN
+                    <p className="text-muted-foreground text-[10px]">
+                      Email donde recibes tokens DIAN. AutoKufe creará filtros automáticos para detectar tokens.
                     </p>
                   </div>
                 </div>
@@ -459,8 +459,8 @@ export default function DianEmailsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-blue-900">Registra entidades</p>
-                    <p className="text-muted-foreground">
-                      Ve a <Link href="/entities" className="underline">Entidades</Link>
+                    <p className="text-muted-foreground text-[10px]">
+                      Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
                     </p>
                   </div>
                 </div>
@@ -470,9 +470,9 @@ export default function DianEmailsPage() {
                     3
                   </div>
                   <div>
-                    <p className="font-medium text-blue-900">Solicita token DIAN</p>
-                    <p className="text-muted-foreground">
-                      Desde <strong>catalogo-vpfe.dian.gov.co</strong>
+                    <p className="font-medium text-blue-900">Solicita token DIAN (solo una vez)</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      Desde el portal <strong>catalogo-vpfe.dian.gov.co</strong>, solicita un token para cada entidad registrada.
                     </p>
                   </div>
                 </div>
@@ -483,17 +483,17 @@ export default function DianEmailsPage() {
                   </div>
                   <div>
                     <p className="font-medium text-green-600">¡Automático!</p>
-                    <p className="text-muted-foreground">
-                      AutoKufe gestiona tokens por ti
+                    <p className="text-muted-foreground text-[10px]">
+                      Cuando llegue al email, AutoKufe lo asociará automáticamente y podrás crear jobs sin ingresar tokens.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <Alert className="bg-amber-50 border-amber-200 py-2">
+              <Alert className="bg-amber-50 border-amber-200 py-1.5">
                 <AlertCircle className="h-3 w-3 text-amber-600" />
                 <AlertDescription className="text-[10px] text-amber-900 ml-5">
-                  <strong>Importante:</strong> La asociación es automática cuando llega el token al email.
+                  <strong>Importante:</strong> La asociación entidad-email es automática cuando llega el token.
                 </AlertDescription>
               </Alert>
             </CardContent>

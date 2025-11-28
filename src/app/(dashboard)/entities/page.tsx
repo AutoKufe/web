@@ -178,16 +178,22 @@ export default function EntitiesPage() {
   const filteredEntities = entities
 
   return (
-    <div className="space-y-8 p-8">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Entidades</h1>
-          <p className="text-muted-foreground mt-1">
-            Gestiona tus entidades registradas
-          </p>
-        </div>
-        <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Entidades</h1>
+        <p className="text-muted-foreground mt-1">
+          Gestiona tus entidades registradas
+        </p>
+      </div>
+
+      {/* 2-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left Column - Main Content (2/3 width) */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Register Button */}
+          <div className="flex justify-end">
+            <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -233,10 +239,10 @@ export default function EntitiesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+          </div>
 
-      {/* Search and Filters */}
-      <Card>
+          {/* Search and Filters */}
+          <Card>
         <CardContent className="pt-6">
           <div className="flex gap-4">
             <div className="relative flex-1">
@@ -264,10 +270,10 @@ export default function EntitiesPage() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+          </Card>
 
-      {/* Entities Table */}
-      <Card>
+          {/* Entities Table */}
+          <Card>
         <CardHeader className="pb-4">
           <CardTitle className="text-xl">Entidades Registradas</CardTitle>
           <CardDescription>
@@ -423,79 +429,80 @@ export default function EntitiesPage() {
             </>
           )}
         </CardContent>
-      </Card>
+          </Card>
+        </div>
 
-      {/* Educational Section - How to associate DIAN email */}
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            ¿Cómo asociar un email DIAN a tu entidad?
-          </CardTitle>
-          <CardDescription>
-            Habilita la gestión automática de tokens para tus entidades
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
-                1
-              </div>
-              <div>
-                <p className="font-medium">Autoriza tu email DIAN</p>
-                <p className="text-muted-foreground text-xs">
-                  Ve a <Link href="/dian-emails" className="underline">Emails DIAN</Link> y autoriza el email donde recibes los tokens
-                </p>
-              </div>
-            </div>
+        {/* Right Column - Educational Content (1/3 width) */}
+        <div className="space-y-3">
+          {/* How to associate DIAN email */}
+          <Card className="border-blue-200 bg-blue-50/30 sticky top-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Mail className="h-4 w-4 text-blue-600" />
+                Gestión Automática
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    1
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">Autoriza tu email DIAN</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      Ve a <Link href="/dian-emails" className="underline">Emails DIAN</Link> y autoriza el email donde recibes tokens.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
-                2
-              </div>
-              <div>
-                <p className="font-medium">Solicita un token DIAN para esta entidad</p>
-                <p className="text-muted-foreground text-xs">
-                  Desde el portal <strong>catalogo-vpfe.dian.gov.co</strong> solicita un token para esta entidad
-                </p>
-              </div>
-            </div>
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    2
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">Solicita token DIAN</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      Desde <strong>catalogo-vpfe.dian.gov.co</strong> solicita un token para esta entidad.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
-                3
-              </div>
-              <div>
-                <p className="font-medium">¡Listo! La asociación es automática</p>
-                <p className="text-muted-foreground text-xs">
-                  Cuando llegue el token, el sistema detectará automáticamente qué email DIAN corresponde a esta entidad
-                </p>
-              </div>
-            </div>
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    3
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">¡Asociación automática!</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      Cuando llegue el token, el sistema detectará automáticamente qué email corresponde a esta entidad.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold shrink-0 mt-0.5">
-                ✓
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-600">Jobs sin tokens manuales</p>
+                    <p className="text-muted-foreground text-[10px]">
+                      Ya no necesitarás solicitar tokens manualmente - el sistema lo hará por ti.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-green-600">Próximos jobs usarán gestión automática</p>
-                <p className="text-muted-foreground text-xs">
-                  Ya no necesitarás solicitar tokens manualmente - el sistema lo hará por ti
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              <strong>Importante:</strong> Si cambias el email de la DIAN donde recibes los tokens,
-              simplemente solicita un nuevo token desde <strong>catalogo-vpfe.dian.gov.co</strong> y el sistema actualizará la asociación automáticamente.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+              <Alert className="bg-amber-50 border-amber-200 py-1.5">
+                <AlertCircle className="h-3 w-3 text-amber-600" />
+                <AlertDescription className="text-[10px] text-amber-900 ml-5">
+                  <strong>Importante:</strong> Si cambias el email DIAN, solicita un nuevo token y el sistema actualizará la asociación automáticamente.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
