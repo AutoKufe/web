@@ -191,64 +191,77 @@ function NewJobContent() {
     setTokenStatus('unknown')
     setAutoTokenStatus(null)
     setUseAutoToken(false)
+    setUseNewToken(false)
     setLoadingAutoTokenStatus(true)
 
     try {
-      // Consultar ambos endpoints en paralelo
-      const [tokenResponse, autoTokenResponse] = await Promise.all([
-        apiClient.getEntityTokenStatus(entity.id),
-        apiClient.getEntityAutoTokenStatus(entity.id)
-      ])
+      // Usar nuevo endpoint de opciones inteligentes
+      const optionsResponse = await apiClient.getEntityJobCreationOptions(entity.id)
 
-      // Procesar token status
-      if (tokenResponse && !tokenResponse.error) {
-        const data = tokenResponse as {
-          has_valid_token?: boolean
-          needs_new_token?: boolean
-          token_masked?: string
+      if (optionsResponse && !optionsResponse.error) {
+        const options = optionsResponse as {
+          auto_management: {
+            available: boolean
+            status: string
+            message: string
+            dian_email_masked?: string
+            should_be_default: boolean
+          }
+          saved_token: {
+            available: boolean
+            token_masked?: string
+            should_be_default: boolean
+          }
+          manual_token: {
+            available: boolean
+            should_be_default: boolean
+          }
+          recommended_option: 'auto' | 'saved' | 'manual'
         }
 
-        if (data.has_valid_token) {
+        // Configurar auto-token status
+        if (options.auto_management.available) {
+          setAutoTokenStatus({
+            available: true,
+            status: 'available',
+            dianEmailMasked: options.auto_management.dian_email_masked
+          })
+        } else {
+          setAutoTokenStatus({
+            available: false,
+            status: options.auto_management.status as any,
+            dianEmailMasked: options.auto_management.dian_email_masked
+          })
+        }
+
+        // Configurar token guardado status
+        if (options.saved_token.available) {
           setTokenStatus('valid')
-          setUseNewToken(false)
-          setTokenMasked(data.token_masked || null)
-        } else if (data.needs_new_token) {
-          setTokenStatus('expired')
-          setUseNewToken(true)
-          setTokenMasked(null)
+          setTokenMasked(options.saved_token.token_masked || null)
         } else {
           setTokenStatus('unknown')
-          setUseNewToken(true)
           setTokenMasked(null)
         }
-      } else {
-        setTokenStatus('unknown')
-        setUseNewToken(true)
-        setTokenMasked(null)
-      }
 
-      // Procesar auto-token status
-      if (autoTokenResponse && !autoTokenResponse.error) {
-        const autoData = autoTokenResponse as {
-          auto_token_available?: boolean
-          status?: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
-          dian_email_masked?: string
-        }
-
-        setAutoTokenStatus({
-          available: autoData.auto_token_available || false,
-          status: autoData.status || 'not_configured',
-          dianEmailMasked: autoData.dian_email_masked
-        })
-
-        // Pre-seleccionar auto-token si está disponible
-        if (autoData.auto_token_available) {
+        // Aplicar opción recomendada automáticamente
+        if (options.recommended_option === 'auto') {
           setUseAutoToken(true)
           setUseNewToken(false)
+        } else if (options.recommended_option === 'saved') {
+          setUseAutoToken(false)
+          setUseNewToken(false)
+        } else {
+          // manual
+          setUseAutoToken(false)
+          setUseNewToken(true)
         }
+      } else {
+        // Fallback a comportamiento anterior si falla
+        setTokenStatus('unknown')
+        setUseNewToken(true)
       }
     } catch (err) {
-      console.error('Error checking token status:', err)
+      console.error('Error checking job creation options:', err)
       setTokenStatus('unknown')
       setUseNewToken(true)
     } finally {
@@ -292,23 +305,18 @@ function NewJobContent() {
       return
     }
 
-    // Si usa auto-token, no necesita validación de token manual
-    if (!useAutoToken) {
-      // Si la entidad tiene token válido y no se pidió nuevo token
-      if (selectedEntity && tokenStatus === 'valid' && !useNewToken) {
-        // Usar token almacenado
-        if (!dianToken.trim()) {
-          toast.error('Token DIAN requerido')
-          return
-        }
-      }
-
-      // Si se requiere nuevo token
-      if (useNewToken || !selectedEntity) {
-        if (!dianToken.trim()) {
-          toast.error('Ingresa el token DIAN')
-          return
-        }
+    // Validación de token según modo seleccionado
+    if (useAutoToken) {
+      // Modo auto-token: no necesita token manual
+      // Sin validación adicional
+    } else if (tokenStatus === 'valid' && !useNewToken) {
+      // Modo token guardado: reutilizar token almacenado
+      // Sin validación adicional (ya tiene token guardado)
+    } else {
+      // Modo token manual: requiere nuevo token
+      if (!dianToken.trim()) {
+        toast.error('Ingresa el token DIAN')
+        return
       }
     }
 
@@ -717,26 +725,44 @@ function NewJobContent() {
                 <div className="space-y-3">
                   {/* Token válido guardado */}
                   {tokenStatus === 'valid' && (
-                    <Alert>
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      <AlertDescription className="ml-2">
-                        <div className="flex items-center justify-between">
-                          <span>
-                            Token DIAN válido guardado: {tokenMasked || '****'}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="use-new-manual-token"
-                              checked={useNewToken}
-                              onCheckedChange={(checked) => setUseNewToken(checked as boolean)}
-                            />
-                            <Label htmlFor="use-new-manual-token" className="text-sm cursor-pointer">
-                              Usar nuevo Token DIAN
-                            </Label>
+                    <Card className="border-green-200 bg-green-50/50">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 shrink-0">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <p className="text-sm font-medium text-green-900">
+                                Token DIAN guardado disponible
+                              </p>
+                              <p className="text-xs text-green-700 font-mono mt-1">
+                                {tokenMasked || '****'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <Checkbox
+                                id="use-new-manual-token"
+                                checked={useNewToken}
+                                onCheckedChange={(checked) => {
+                                  setUseNewToken(checked as boolean)
+                                  if (checked) {
+                                    // Si marca "usar nuevo token", resetear el campo
+                                    setDianToken('')
+                                  }
+                                }}
+                              />
+                              <Label
+                                htmlFor="use-new-manual-token"
+                                className="text-xs text-green-800 cursor-pointer font-normal"
+                              >
+                                Solicitar nuevo token en su lugar
+                              </Label>
+                            </div>
                           </div>
                         </div>
-                      </AlertDescription>
-                    </Alert>
+                      </CardContent>
+                    </Card>
                   )}
 
                   {/* Input para nuevo token */}
@@ -1127,9 +1153,18 @@ function NewJobContent() {
                 !selectedEntity ||
                 !startDate ||
                 !endDate ||
-                // Si usa auto-token, no necesita token manual
-                (!useAutoToken && useNewToken && !dianToken.trim()) ||
-                (!useAutoToken && tokenStatus !== 'valid' && !dianToken.trim())
+                // Validación según modo seleccionado
+                (
+                  !useAutoToken && // No usa auto-token
+                  tokenStatus !== 'valid' && // No tiene token guardado
+                  !dianToken.trim() // Y no proporcionó token manual
+                ) ||
+                (
+                  !useAutoToken && // No usa auto-token
+                  tokenStatus === 'valid' && // Tiene token guardado
+                  useNewToken && // Pero quiere usar nuevo token
+                  !dianToken.trim() // Y no lo proporcionó
+                )
               }
               className="flex-1"
               size="lg"
@@ -1144,10 +1179,15 @@ function NewJobContent() {
                   <Zap className="h-4 w-4 mr-2" />
                   Crear Job (Auto-Token)
                 </>
+              ) : tokenStatus === 'valid' && !useNewToken ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Crear Job (Token Guardado)
+                </>
               ) : (
                 <>
                   <FileText className="h-4 w-4 mr-2" />
-                  Crear Job
+                  Crear Job (Token Manual)
                 </>
               )}
             </Button>
