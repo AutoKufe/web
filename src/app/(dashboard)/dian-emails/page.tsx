@@ -200,20 +200,26 @@ export default function DianEmailsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">DIAN Emails</h1>
-          <p className="text-muted-foreground">
-            Gestiona los emails DIAN para recibir tokens automáticamente
-          </p>
-        </div>
-        <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Registrar Email DIAN
-            </Button>
-          </DialogTrigger>
+      <div>
+        <h1 className="text-3xl font-bold">DIAN Emails</h1>
+        <p className="text-muted-foreground">
+          Gestiona los emails DIAN para recibir tokens automáticamente
+        </p>
+      </div>
+
+      {/* 2-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Main Content (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Register Button */}
+          <div className="flex justify-end">
+            <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Registrar Email DIAN
+                </Button>
+              </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Registrar Email DIAN</DialogTitle>
@@ -258,113 +264,31 @@ export default function DianEmailsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Educational Section - How it Works */}
-      <Card className="border-blue-200 bg-blue-50/30">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Info className="h-5 w-5 text-blue-600" />
-            ¿Cómo funciona la Gestión Automática de Tokens?
-          </CardTitle>
-          <CardDescription>
-            Entiende el flujo completo para habilitar la gestión automática en tus entidades
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
-                1
-              </div>
-              <div>
-                <p className="font-medium text-blue-900">Registra y autoriza tu email DIAN aquí</p>
-                <p className="text-muted-foreground text-xs">
-                  Registra el email donde <strong>recibes tokens DIAN</strong> y autoriza el acceso OAuth para que AutoKufe pueda leer emails y crear filtros automáticos.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
-                2
-              </div>
-              <div>
-                <p className="font-medium text-blue-900">Registra tus entidades</p>
-                <p className="text-muted-foreground text-xs">
-                  Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0 mt-0.5">
-                3
-              </div>
-              <div>
-                <p className="font-medium text-blue-900">Solicita un token DIAN para cada entidad (una sola vez)</p>
-                <p className="text-muted-foreground text-xs">
-                  Desde el portal <strong>catalogo-vpfe.dian.gov.co</strong>, solicita un token para cada entidad registrada. <strong>Cuando llegue al email, AutoKufe lo asociará automáticamente</strong> con la entidad.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold shrink-0 mt-0.5">
-                ✓
-              </div>
-              <div>
-                <p className="font-medium text-green-600">¡Listo! Ya no necesitas solicitar tokens manualmente</p>
-                <p className="text-muted-foreground text-xs">
-                  Próximos jobs usarán gestión automática. AutoKufe solicitará y detectará tokens por ti.
-                </p>
-              </div>
-            </div>
           </div>
 
-          <Alert className="bg-amber-50 border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-xs text-amber-900">
-              <strong>Importante:</strong> Un email DIAN solo se asocia a una entidad cuando <strong>llega un token de esa entidad a ese email</strong>.
-              Si cambias el email en la DIAN, simplemente solicita un nuevo token manual y AutoKufe actualizará la asociación automáticamente.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+          {/* Contextual Alert - Active emails without entities */}
+          {dianEmails.some(email =>
+            email.status === 'active' &&
+            !email.has_associated_entities
+          ) && (
+            <Alert className="border-amber-200 bg-amber-50">
+              <Info className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-900 text-sm">¡Siguiente paso pendiente!</AlertTitle>
+              <AlertDescription className="text-xs text-amber-800">
+                <p className="mb-2">
+                  Tienes {dianEmails.filter(e => e.status === 'active' && !e.has_associated_entities).length} email(s) DIAN autorizado(s) pero <strong>sin entidades asociadas</strong>.
+                </p>
+                <Link href="/entities">
+                  <Button size="sm" variant="outline" className="bg-white text-xs h-8">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Registrar Entidades
+                  </Button>
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
 
-      {/* Contextual Alert - Active emails without entities */}
-      {dianEmails.some(email =>
-        email.status === 'active' &&
-        !email.has_associated_entities
-      ) && (
-        <Alert className="border-amber-200 bg-amber-50">
-          <Info className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-900">¡Siguiente paso pendiente!</AlertTitle>
-          <AlertDescription className="text-sm text-amber-800">
-            <p className="mb-2">
-              Tienes {dianEmails.filter(e => e.status === 'active' && !e.has_associated_entities).length} email(s) DIAN autorizado(s) pero <strong>sin entidades asociadas</strong>.
-            </p>
-            <p className="mb-3">
-              Para habilitar la gestión automática:
-            </p>
-            <ol className="list-decimal list-inside space-y-1 text-xs mb-3">
-              <li>Ve a <Link href="/entities" className="underline font-medium">Entidades</Link> y registra tus empresas/personas</li>
-              <li>Desde <strong>catalogo-vpfe.dian.gov.co</strong> solicita un token para cada entidad</li>
-              <li>AutoKufe asociará automáticamente el email cuando llegue el token</li>
-            </ol>
-            <div className="flex gap-2">
-              <Link href="/entities">
-                <Button size="sm" variant="outline" className="bg-white">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Registrar Entidades
-                </Button>
-              </Link>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* DIAN Emails List */}
+          {/* DIAN Emails List */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -503,6 +427,79 @@ export default function DianEmailsPage() {
           )}
         </CardContent>
       </Card>
+        </div>
+
+        {/* Right Column - Educational Content (1/3 width) */}
+        <div className="space-y-4">
+          {/* How it Works Card */}
+          <Card className="border-blue-200 bg-blue-50/30 sticky top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Info className="h-4 w-4 text-blue-600" />
+                ¿Cómo funciona?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    1
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">Registra y autoriza aquí</p>
+                    <p className="text-muted-foreground">
+                      Email donde recibes tokens DIAN
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    2
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">Registra entidades</p>
+                    <p className="text-muted-foreground">
+                      Ve a <Link href="/entities" className="underline">Entidades</Link>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    3
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-900">Solicita token DIAN</p>
+                    <p className="text-muted-foreground">
+                      Desde <strong>catalogo-vpfe.dian.gov.co</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-600">¡Automático!</p>
+                    <p className="text-muted-foreground">
+                      AutoKufe gestiona tokens por ti
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Alert className="bg-amber-50 border-amber-200 py-2">
+                <AlertCircle className="h-3 w-3 text-amber-600" />
+                <AlertDescription className="text-[10px] text-amber-900 ml-5">
+                  <strong>Importante:</strong> La asociación es automática cuando llega el token al email.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
