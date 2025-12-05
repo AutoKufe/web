@@ -94,6 +94,13 @@ function NewJobContent() {
   const [useAutoToken, setUseAutoToken] = useState(false)
   const [loadingAutoTokenStatus, setLoadingAutoTokenStatus] = useState(false)
 
+  // DIAN email OAuth status
+  const [dianEmailStatus, setDianEmailStatus] = useState<{
+    has_active_oauth: boolean
+    expired_emails: Array<{ email: string; expired_at: string }>
+    total_emails: number
+  } | null>(null)
+
   // Job config
   const [jobName, setJobName] = useState('')
   const [jobNameError, setJobNameError] = useState<string | null>(null)
@@ -392,8 +399,21 @@ function NewJobContent() {
         return
       }
 
-      const successData = response as { job_id?: string }
+      const successData = response as {
+        job_id?: string
+        dian_email_status?: {
+          has_active_oauth: boolean
+          expired_emails: Array<{ email: string; expired_at: string }>
+          total_emails: number
+        }
+      }
       setCreatedJobId(successData.job_id || null)
+
+      // Capture DIAN email status if present
+      if (successData.dian_email_status) {
+        setDianEmailStatus(successData.dian_email_status)
+      }
+
       setStep('success')
       toast.success('Job creado exitosamente')
     } catch (err) {
@@ -618,6 +638,40 @@ function NewJobContent() {
               </Button>
             </div>
           </div>
+
+          {/* DIAN Email OAuth Expired Warning */}
+          {selectedEntity && dianEmailStatus && !dianEmailStatus.has_active_oauth && (
+            <Alert className="border-orange-500/50 bg-orange-500/10">
+              <Mail className="h-4 w-4 text-orange-500" />
+              <AlertDescription className="ml-2">
+                <div className="space-y-2">
+                  <div>
+                    <span className="font-medium text-orange-600">Gmail OAuth expirado</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      La gestión automática de tokens DIAN está desactivada porque el OAuth de Gmail expiró.
+                      {dianEmailStatus.expired_emails.length > 0 && (
+                        <>
+                          {' '}Email afectado:{' '}
+                          {dianEmailStatus.expired_emails.map((e, idx) => (
+                            <span key={idx} className="font-mono">
+                              {e.email}
+                              {idx < dianEmailStatus.expired_emails.length - 1 ? ', ' : ''}
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <Link href="/dian-emails">
+                    <Button variant="outline" size="sm" className="h-8 text-xs">
+                      <Mail className="h-3 w-3 mr-1" />
+                      Reconectar Gmail OAuth
+                    </Button>
+                  </Link>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Token DIAN y Auto-Token Management */}
           {selectedEntity && (
