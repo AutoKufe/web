@@ -245,7 +245,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               className="gap-2"
               onClick={async () => {
                 try {
-                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${job.id}`, {
+                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${job.job_id}`, {
                     headers: {
                       'Authorization': `Bearer ${localStorage.getItem('access_token')}`
                     }
