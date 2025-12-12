@@ -242,8 +242,12 @@ export default function JobsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {jobs.map((job) => (
-                    <TableRow key={job.id}>
+                  {jobs.map((job) => {
+                    const jobId = job.id;  // Capture ID in closure
+                    const jobName = job.job_name;  // Capture name in closure
+
+                    return (
+                    <TableRow key={jobId}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(job.status)}
@@ -287,7 +291,7 @@ export default function JobsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/jobs/${job.id}`}>
+                              <Link href={`/jobs/${jobId}`}>
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Ver detalles
                               </Link>
@@ -296,7 +300,7 @@ export default function JobsPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${job.id}`, {
+                                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${jobId}`, {
                                       headers: {
                                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`
                                       }
@@ -310,7 +314,7 @@ export default function JobsPage() {
                                     const url = window.URL.createObjectURL(blob);
                                     const a = document.createElement('a');
                                     a.href = url;
-                                    a.download = `${job.job_name}.xlsx`;
+                                    a.download = `${jobName}.xlsx`;
                                     document.body.appendChild(a);
                                     a.click();
                                     window.URL.revokeObjectURL(url);
@@ -329,7 +333,7 @@ export default function JobsPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
 
