@@ -300,7 +300,7 @@ export default function JobsPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${jobId}`, {
+                                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/storage/download-excel/${jobId}`, {
                                       headers: {
                                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`
                                       }

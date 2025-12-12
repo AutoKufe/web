@@ -240,40 +240,45 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               {cancelling ? 'Cancelando...' : 'Cancelar Job'}
             </Button>
           )}
-          {job.status === 'completed' && (
-            <Button
-              className="gap-2"
-              onClick={async () => {
-                try {
-                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${job.job_id}`, {
-                    headers: {
-                      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          {job.status === 'completed' && (() => {
+            const jobId = job.job_id;  // Capture in closure
+            const jobName = job.job_name;
+
+            return (
+              <Button
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/storage/download-excel/${jobId}`, {
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                      }
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Error descargando Excel');
                     }
-                  });
 
-                  if (!response.ok) {
-                    throw new Error('Error descargando Excel');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${jobName}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch (error) {
+                    console.error('Error descargando Excel:', error);
+                    alert('Error al descargar el Excel. Por favor intenta de nuevo.');
                   }
-
-                  const blob = await response.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${job.job_name}.xlsx`;
-                  document.body.appendChild(a);
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-                  document.body.removeChild(a);
-                } catch (error) {
-                  console.error('Error descargando Excel:', error);
-                  alert('Error al descargar el Excel. Por favor intenta de nuevo.');
-                }
-              }}
-            >
-              <Download className="h-4 w-4" />
-              Descargar Excel
-            </Button>
-          )}
+                }}
+              >
+                <Download className="h-4 w-4" />
+                Descargar Excel
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
