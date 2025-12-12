@@ -241,7 +241,35 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </Button>
           )}
           {job.status === 'completed' && (
-            <Button className="gap-2">
+            <Button
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/storage/download-excel/${job.id}`, {
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    }
+                  });
+
+                  if (!response.ok) {
+                    throw new Error('Error descargando Excel');
+                  }
+
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${job.job_name}.xlsx`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } catch (error) {
+                  console.error('Error descargando Excel:', error);
+                  alert('Error al descargar el Excel. Por favor intenta de nuevo.');
+                }
+              }}
+            >
               <Download className="h-4 w-4" />
               Descargar Excel
             </Button>
