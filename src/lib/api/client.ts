@@ -224,6 +224,51 @@ export class ApiClient {
     return this.request('POST', `/api/jobs/${jobId}/cancel`)
   }
 
+  async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+    try {
+      const headers: HeadersInit = {}
+
+      if (this.accessToken) {
+        headers['Authorization'] = `Bearer ${this.accessToken}`
+      }
+
+      const response = await fetch(`${API_BASE}/api/storage/download-excel/${jobId}`, {
+        method: 'GET',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return {
+          success: false,
+          error: errorData.detail?.message || errorData.message || 'Error descargando Excel'
+        }
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'reporte.xlsx'
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+
+      return {
+        success: true,
+        blob,
+        filename
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error de red'
+      }
+    }
+  }
+
   // === SUBSCRIPTIONS ===
   async getSubscription() {
     return this.request('GET', '/subscriptions/me')

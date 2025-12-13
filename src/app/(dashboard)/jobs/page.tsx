@@ -300,28 +300,25 @@ export default function JobsPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/storage/download-excel/${jobId}`, {
-                                      headers: {
-                                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                                      }
-                                    });
+                                    const result = await apiClient.downloadExcel(jobId)
 
-                                    if (!response.ok) {
-                                      throw new Error('Error descargando Excel');
+                                    if (!result.success || !result.blob) {
+                                      toast.error(result.error || 'Error descargando Excel')
+                                      return
                                     }
 
-                                    const blob = await response.blob();
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${jobName}.xlsx`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    window.URL.revokeObjectURL(url);
-                                    document.body.removeChild(a);
+                                    const url = window.URL.createObjectURL(result.blob)
+                                    const a = document.createElement('a')
+                                    a.href = url
+                                    a.download = result.filename || `${jobName}.xlsx`
+                                    document.body.appendChild(a)
+                                    a.click()
+                                    window.URL.revokeObjectURL(url)
+                                    document.body.removeChild(a)
+                                    toast.success('Excel descargado correctamente')
                                   } catch (error) {
-                                    console.error('Error descargando Excel:', error);
-                                    alert('Error al descargar el Excel. Por favor intenta de nuevo.');
+                                    console.error('Error descargando Excel:', error)
+                                    toast.error('Error al descargar el Excel')
                                   }
                                 }}
                               >
