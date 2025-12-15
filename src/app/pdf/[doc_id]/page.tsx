@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
-import { Loader2, AlertCircle, Download } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -16,15 +16,9 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
 
   useEffect(() => {
     const fetchPDF = async () => {
-      console.log('[PDFViewer] Starting fetch, authLoading:', authLoading, 'user:', user)
-
-      if (authLoading) {
-        console.log('[PDFViewer] Still loading auth, waiting...')
-        return
-      }
+      if (authLoading) return
 
       if (!user) {
-        console.log('[PDFViewer] No user found')
         setError('Debes iniciar sesión para ver este PDF')
         setLoading(false)
         return
@@ -34,9 +28,7 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
         setLoading(true)
         setError(null)
 
-        // Get token from apiClient (uses Supabase session)
         const token = (apiClient as any).accessToken
-        console.log('[PDFViewer] Token found:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN')
 
         if (!token) {
           setError('No se encontró token de autenticación')
@@ -44,18 +36,12 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
           return
         }
 
-        const apiUrl = `https://api.autokufe.com/pdf/${doc_id}`
-        console.log('[PDFViewer] Fetching PDF from:', apiUrl)
-
-        // Fetch PDF from backend
-        const response = await fetch(apiUrl, {
+        const response = await fetch(`https://api.autokufe.com/pdf/${doc_id}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         })
-
-        console.log('[PDFViewer] Response status:', response.status)
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -69,44 +55,25 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
           return
         }
 
-        // Create blob URL for PDF
         const blob = await response.blob()
-        console.log('[PDFViewer] Blob created, size:', blob.size, 'type:', blob.type)
-
         const blobUrl = window.URL.createObjectURL(blob)
-        console.log('[PDFViewer] Object URL created:', blobUrl)
 
         setPdfUrl(blobUrl)
         setLoading(false)
-        console.log('[PDFViewer] PDF loaded successfully')
       } catch (err) {
-        console.error('[PDFViewer] Error loading PDF:', err)
         setError('Error de conexión al cargar el PDF')
         setLoading(false)
       }
     }
 
-    console.log('[PDFViewer] useEffect triggered, calling fetchPDF()')
     fetchPDF()
 
-    // Cleanup blob URL on unmount
     return () => {
       if (pdfUrl) {
         window.URL.revokeObjectURL(pdfUrl)
       }
     }
-  }, [doc_id, user, authLoading])
-
-  const handleDownload = () => {
-    if (!pdfUrl) return
-
-    const a = document.createElement('a')
-    a.href = pdfUrl
-    a.download = `${doc_id}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
+  }, [doc_id, user, authLoading, pdfUrl])
 
   if (authLoading || loading) {
     return (
@@ -137,29 +104,14 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header with download button */}
-      <div className="border-b bg-background sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Visualizador de PDF</h1>
-          <Button onClick={handleDownload} variant="outline" size="sm" className="gap-2">
-            <Download className="h-4 w-4" />
-            Descargar
-          </Button>
-        </div>
-      </div>
-
-      {/* PDF Viewer */}
-      <div className="flex-1 bg-gray-100">
-        {pdfUrl && (
-          <iframe
-            src={pdfUrl}
-            className="w-full h-full"
-            style={{ minHeight: 'calc(100vh - 60px)' }}
-            title="PDF Viewer"
-          />
-        )}
-      </div>
+    <div className="min-h-screen">
+      {pdfUrl && (
+        <iframe
+          src={pdfUrl}
+          className="w-full h-screen"
+          title="PDF Viewer"
+        />
+      )}
     </div>
   )
 }
