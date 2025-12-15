@@ -189,24 +189,12 @@ export class ApiClient {
       date_range: { start_date: string; end_date: string }
       document_categories: string | string[]
       consolidation_interval: string | { value: number; unit: string } | null
-    },
-    confirmEntity = false,
-    traceId?: string
+    }
   ) {
-    const data: Record<string, unknown> = {
+    return this.request('POST', '/api/jobs/create-with-token', {
       dian_token: dianToken,
       job_data: jobData,
-    }
-
-    if (confirmEntity) {
-      data.confirm_entity = true
-    }
-
-    if (traceId) {
-      data.trace_id = traceId
-    }
-
-    return this.request('POST', '/api/jobs/create-with-token', data)
+    })
   }
 
   async listJobs(page = 1, pageSize = 10) {

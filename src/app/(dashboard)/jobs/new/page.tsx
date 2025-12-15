@@ -122,10 +122,8 @@ function NewJobContent() {
 
   // Form states
   const [creating, setCreating] = useState(false)
-  const [step, setStep] = useState<'form' | 'confirming' | 'success'>('form')
+  const [step, setStep] = useState<'form' | 'success'>('form')
   const [createdJobId, setCreatedJobId] = useState<string | null>(null)
-  const [entityInfo, setEntityInfo] = useState<{ name: string; nit: string } | null>(null)
-  const [traceId, setTraceId] = useState<string | null>(null)
 
   // Load entities on mount
   useEffect(() => {
@@ -276,7 +274,7 @@ function NewJobContent() {
     }
   }
 
-  const handleSubmit = async (confirmEntity = false) => {
+  const handleSubmit = async () => {
     if (!selectedEntity && !dianToken.trim()) {
       toast.error('Selecciona una entidad o ingresa un token DIAN')
       return
@@ -373,27 +371,10 @@ function NewJobContent() {
           },
           document_categories: finalDocCategories,
           consolidation_interval: consolidationInterval,
-        },
-        confirmEntity,
-        traceId || undefined
+        }
       )
 
       if (response.error) {
-        if (response.error === 'ENTITY_CONFIRMATION_REQUIRED') {
-          const data = response as {
-            entity_info?: { display_name?: string; nit?: string }
-            trace_id?: string
-          }
-          setEntityInfo({
-            name: data.entity_info?.display_name || 'Desconocido',
-            nit: data.entity_info?.nit || 'N/A',
-          })
-          setTraceId(data.trace_id || null)
-          setStep('confirming')
-          setCreating(false)
-          return
-        }
-
         toast.error(response.message || 'Error creando job')
         setCreating(false)
         return
@@ -424,10 +405,6 @@ function NewJobContent() {
     }
   }
 
-  const handleConfirmEntity = () => {
-    handleSubmit(true)
-  }
-
   const resetForm = () => {
     setStep('form')
     setDianToken('')
@@ -443,8 +420,6 @@ function NewJobContent() {
     setTokenMasked(null)
     setAutoTokenStatus(null)
     setUseAutoToken(false)
-    setEntityInfo(null)
-    setTraceId(null)
     setCreatedJobId(null)
   }
 
@@ -469,61 +444,6 @@ function NewJobContent() {
                   Crear Otro Job
                 </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (step === 'confirming') {
-    return (
-      <div className="max-w-3xl mx-auto p-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-              Confirmar Entidad
-            </CardTitle>
-            <CardDescription>
-              Esta entidad no está registrada en tu cuenta. ¿Deseas registrarla y crear el job?
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-muted p-4 rounded-lg mb-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nombre</p>
-                  <p className="font-medium">{entityInfo?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Identificador</p>
-                  <p className="font-mono">****{entityInfo?.nit}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <Button
-                variant="outline"
-                onClick={() => setStep('form')}
-                disabled={creating}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleConfirmEntity}
-                disabled={creating}
-                className="flex-1"
-              >
-                {creating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Registrando...
-                  </>
-                ) : (
-                  'Confirmar y Crear Job'
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1201,7 +1121,7 @@ function NewJobContent() {
               </Button>
             </Link>
             <Button
-              onClick={() => handleSubmit(false)}
+              onClick={handleSubmit}
               disabled={
                 creating ||
                 !selectedEntity ||
