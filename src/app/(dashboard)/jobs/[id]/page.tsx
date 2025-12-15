@@ -27,7 +27,7 @@ import {
 import { toast } from 'sonner'
 
 interface JobDetails {
-  job_id: string
+  id: string
   entity_id: string
   job_name: string
   status: string
@@ -245,9 +245,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               className="gap-2"
               onClick={async () => {
                 try {
-                  console.log('Download Excel - job:', job)
-                  console.log('Download Excel - job.job_id:', job.job_id)
-                  const result = await apiClient.downloadExcel(job.job_id)
+                  const result = await apiClient.downloadExcel(job.id)
 
                   if (!result.success || !result.blob) {
                     toast.error(result.error || 'Error descargando Excel')
@@ -326,7 +324,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <h3 className="font-semibold text-destructive mb-1">Error en el procesamiento</h3>
                   <p className="text-sm text-muted-foreground">{job.error_message}</p>
                 </div>
-                <Link href={`/soporte?job_id=${job.job_id}`}>
+                <Link href={`/soporte?job_id=${job.id}`}>
                   <Button variant="outline" size="sm" className="gap-2">
                     <MessageCircle className="h-4 w-4" />
                     Contactar Soporte
