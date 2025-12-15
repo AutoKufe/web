@@ -43,11 +43,11 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
           return
         }
 
-        const url = `https://api.autokufe.com/pdf/${doc_id}`
-        console.log('[PDFViewer] Fetching PDF from:', url)
+        const apiUrl = `https://api.autokufe.com/pdf/${doc_id}`
+        console.log('[PDFViewer] Fetching PDF from:', apiUrl)
 
         // Fetch PDF from backend
-        const response = await fetch(url, {
+        const response = await fetch(apiUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -72,10 +72,10 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
         const blob = await response.blob()
         console.log('[PDFViewer] Blob created, size:', blob.size, 'type:', blob.type)
 
-        const url = window.URL.createObjectURL(blob)
-        console.log('[PDFViewer] Object URL created:', url)
+        const blobUrl = window.URL.createObjectURL(blob)
+        console.log('[PDFViewer] Object URL created:', blobUrl)
 
-        setPdfUrl(url)
+        setPdfUrl(blobUrl)
         setLoading(false)
         console.log('[PDFViewer] PDF loaded successfully')
       } catch (err) {
