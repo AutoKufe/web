@@ -148,9 +148,9 @@ function NewJobContent() {
       return null
     }
 
-    // Max 25 caracteres
-    if (name.length > 25) {
-      return 'El nombre no puede exceder 25 caracteres'
+    // Max 20 caracteres (límite de DB)
+    if (name.length > 20) {
+      return 'El nombre no puede exceder 20 caracteres'
     }
 
     // Solo letras minúsculas, números, guiones y guiones bajos
@@ -830,14 +830,14 @@ function NewJobContent() {
               placeholder="Ej: facturas_enero_2024"
               value={jobName}
               onChange={(e) => handleJobNameChange(e.target.value)}
-              maxLength={25}
+              maxLength={20}
               className={jobNameError ? 'border-red-500' : ''}
             />
             {jobNameError ? (
               <p className="text-xs text-red-500">{jobNameError}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Si no ingresas un nombre, se generará automáticamente. Máximo 25 caracteres.
+                Si no ingresas un nombre, se generará automáticamente. Máximo 20 caracteres.
               </p>
             )}
           </div>
