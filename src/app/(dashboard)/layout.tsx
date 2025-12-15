@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { AuthProvider, useAuth } from '@/lib/auth/context'
+import { useAuth } from '@/lib/auth/context'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -178,9 +178,5 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <AuthProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </AuthProvider>
-  )
+  return <DashboardContent>{children}</DashboardContent>
 }
