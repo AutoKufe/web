@@ -346,11 +346,8 @@ function NewJobContent() {
         }
       }
 
-      // Preparar categorías de documentos (enviar array o 'todos' si todos están seleccionados)
-      const allTypes = ['ingresos', 'egresos', 'nominas']
-      const finalDocCategories = selectedSheetTypes.length === allTypes.length
-        ? 'todos'
-        : selectedSheetTypes
+      // Preparar categorías de documentos (siempre enviar array explícito)
+      const finalDocCategories = selectedSheetTypes
 
       // Determinar token a enviar
       let tokenToSend = dianToken
@@ -360,7 +357,7 @@ function NewJobContent() {
         tokenToSend = 'use_stored_token'
       }
 
-      const response = await apiClient.createJobWithToken(
+      const response = await apiClient.createJob(
         tokenToSend,
         {
           entity_id: selectedEntity?.id,

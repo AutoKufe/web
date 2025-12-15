@@ -181,17 +181,17 @@ export class ApiClient {
   }
 
   // === JOBS ===
-  async createJobWithToken(
+  async createJob(
     dianToken: string,
     jobData: {
       entity_id?: string
       job_name?: string
       date_range: { start_date: string; end_date: string }
-      document_categories: string | string[]
+      document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
     }
   ) {
-    return this.request('POST', '/api/jobs/create-with-token', {
+    return this.request('POST', '/api/jobs/create-job', {
       dian_token: dianToken,
       job_data: jobData,
     })
