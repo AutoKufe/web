@@ -73,7 +73,7 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
         window.URL.revokeObjectURL(pdfUrl)
       }
     }
-  }, [doc_id, user, authLoading, pdfUrl])
+  }, [doc_id, user, authLoading])
 
   if (authLoading || loading) {
     return (
