@@ -245,6 +245,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               className="gap-2"
               onClick={async () => {
                 try {
+                  console.log('Download Excel - job:', job)
+                  console.log('Download Excel - job.job_id:', job.job_id)
                   const result = await apiClient.downloadExcel(job.job_id)
 
                   if (!result.success || !result.blob) {

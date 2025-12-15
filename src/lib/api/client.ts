@@ -226,13 +226,17 @@ export class ApiClient {
 
   async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
     try {
+      console.log('[apiClient.downloadExcel] jobId:', jobId)
       const headers: HeadersInit = {}
 
       if (this.accessToken) {
         headers['Authorization'] = `Bearer ${this.accessToken}`
       }
 
-      const response = await fetch(`${API_BASE}/api/storage/download-excel/${jobId}`, {
+      const url = `${API_BASE}/api/storage/download-excel/${jobId}`
+      console.log('[apiClient.downloadExcel] URL:', url)
+
+      const response = await fetch(url, {
         method: 'GET',
         headers,
       })
@@ -247,14 +251,17 @@ export class ApiClient {
 
       const blob = await response.blob()
       const contentDisposition = response.headers.get('Content-Disposition')
+      console.log('[apiClient.downloadExcel] Content-Disposition:', contentDisposition)
       let filename = 'reporte.xlsx'
 
       if (contentDisposition) {
         // Parse filename from Content-Disposition header
         // Format: attachment; filename="name.xlsx"
         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        console.log('[apiClient.downloadExcel] filenameMatch:', filenameMatch)
         if (filenameMatch && filenameMatch[1]) {
           filename = filenameMatch[1].replace(/['"]/g, '')
+          console.log('[apiClient.downloadExcel] Parsed filename:', filename)
         }
       }
 
