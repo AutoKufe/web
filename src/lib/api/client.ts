@@ -250,9 +250,11 @@ export class ApiClient {
       let filename = 'reporte.xlsx'
 
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/)
-        if (filenameMatch) {
-          filename = filenameMatch[1]
+        // Parse filename from Content-Disposition header
+        // Format: attachment; filename="name.xlsx"
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '')
         }
       }
 

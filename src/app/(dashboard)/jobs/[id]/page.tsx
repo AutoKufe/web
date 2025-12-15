@@ -240,42 +240,37 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               {cancelling ? 'Cancelando...' : 'Cancelar Job'}
             </Button>
           )}
-          {job.status === 'completed' && (() => {
-            const jobId = job.job_id;  // Capture in closure
-            const jobName = job.job_name;
+          {job.status === 'completed' && (
+            <Button
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  const result = await apiClient.downloadExcel(job.job_id)
 
-            return (
-              <Button
-                className="gap-2"
-                onClick={async () => {
-                  try {
-                    const result = await apiClient.downloadExcel(jobId)
-
-                    if (!result.success || !result.blob) {
-                      toast.error(result.error || 'Error descargando Excel')
-                      return
-                    }
-
-                    const url = window.URL.createObjectURL(result.blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = result.filename || `${jobName}.xlsx`
-                    document.body.appendChild(a)
-                    a.click()
-                    window.URL.revokeObjectURL(url)
-                    document.body.removeChild(a)
-                    toast.success('Excel descargado correctamente')
-                  } catch (error) {
-                    console.error('Error descargando Excel:', error)
-                    toast.error('Error al descargar el Excel')
+                  if (!result.success || !result.blob) {
+                    toast.error(result.error || 'Error descargando Excel')
+                    return
                   }
-                }}
-              >
-                <Download className="h-4 w-4" />
-                Descargar Excel
-              </Button>
-            );
-          })()}
+
+                  const url = window.URL.createObjectURL(result.blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = result.filename || `${job.job_name}.xlsx`
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                  toast.success('Excel descargado correctamente')
+                } catch (error) {
+                  console.error('Error descargando Excel:', error)
+                  toast.error('Error al descargar el Excel')
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Descargar Excel
+            </Button>
+          )}
         </div>
       </div>
 
