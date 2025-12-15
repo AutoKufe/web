@@ -16,9 +16,15 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
 
   useEffect(() => {
     const fetchPDF = async () => {
-      if (authLoading) return
+      console.log('[PDFViewer] Starting fetch, authLoading:', authLoading, 'user:', user)
+
+      if (authLoading) {
+        console.log('[PDFViewer] Still loading auth, waiting...')
+        return
+      }
 
       if (!user) {
+        console.log('[PDFViewer] No user found')
         setError('Debes iniciar sesión para ver este PDF')
         setLoading(false)
         return
@@ -29,19 +35,26 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
         setError(null)
 
         const token = localStorage.getItem('access_token')
+        console.log('[PDFViewer] Token found:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN')
+
         if (!token) {
           setError('No se encontró token de autenticación')
           setLoading(false)
           return
         }
 
+        const url = `https://api.autokufe.com/pdf/${doc_id}`
+        console.log('[PDFViewer] Fetching PDF from:', url)
+
         // Fetch PDF from backend
-        const response = await fetch(`https://api.autokufe.com/pdf/${doc_id}`, {
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         })
+
+        console.log('[PDFViewer] Response status:', response.status)
 
         if (!response.ok) {
           if (response.status === 404) {
@@ -57,16 +70,22 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
 
         // Create blob URL for PDF
         const blob = await response.blob()
+        console.log('[PDFViewer] Blob created, size:', blob.size, 'type:', blob.type)
+
         const url = window.URL.createObjectURL(blob)
+        console.log('[PDFViewer] Object URL created:', url)
+
         setPdfUrl(url)
         setLoading(false)
+        console.log('[PDFViewer] PDF loaded successfully')
       } catch (err) {
-        console.error('Error loading PDF:', err)
+        console.error('[PDFViewer] Error loading PDF:', err)
         setError('Error de conexión al cargar el PDF')
         setLoading(false)
       }
     }
 
+    console.log('[PDFViewer] useEffect triggered, calling fetchPDF()')
     fetchPDF()
 
     // Cleanup blob URL on unmount
