@@ -34,7 +34,8 @@ export default function PDFViewerPage({ params }: { params: Promise<{ doc_id: st
         setLoading(true)
         setError(null)
 
-        const token = localStorage.getItem('access_token')
+        // Get token from apiClient (uses Supabase session)
+        const token = (apiClient as any).accessToken
         console.log('[PDFViewer] Token found:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN')
 
         if (!token) {
