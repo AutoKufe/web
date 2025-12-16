@@ -153,22 +153,25 @@ function NewJobContent() {
       return 'El nombre no puede exceder 20 caracteres'
     }
 
-    // Solo letras minúsculas, números, guiones y guiones bajos
-    const validPattern = /^[a-z0-9_-]+$/
-    if (!validPattern.test(name)) {
-      return 'Solo se permiten letras minúsculas, números, guiones (-) y guiones bajos (_)'
+    // Verificar caracteres prohibidos en sistemas de archivos
+    // Prohibidos: < > : " / \ | ? * y espacios
+    const forbiddenChars = /[<>:"/\\|?*\s]/
+    if (forbiddenChars.test(name)) {
+      return 'No se permiten espacios ni estos caracteres: < > : " / \\ | ? *'
+    }
+
+    // Verificar caracteres peligrosos adicionales
+    const dangerousChars = /[$%#@!`~^{}[\]]/
+    if (dangerousChars.test(name)) {
+      return 'No se permiten caracteres especiales: $ % # @ ! ` ~ ^ { } [ ]'
     }
 
     return null
   }
 
   const handleJobNameChange = (value: string) => {
-    // Convertir a minúsculas automáticamente
-    const lowercaseValue = value.toLowerCase()
-    setJobName(lowercaseValue)
-
-    // Validar
-    const error = validateJobName(lowercaseValue)
+    setJobName(value)
+    const error = validateJobName(value)
     setJobNameError(error)
   }
 
