@@ -127,6 +127,10 @@ export class ApiClient {
     return this.request('DELETE', `/api/entities/${entityId}`)
   }
 
+  async regenerateEntityDisplayNames() {
+    return this.request('POST', '/api/entities/regenerate-display-names')
+  }
+
   async getEntityTokenStatus(entityId: string) {
     return this.request('GET', `/api/entities/${entityId}/token-status`)
   }

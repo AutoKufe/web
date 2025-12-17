@@ -423,6 +423,27 @@ export default function EntitiesPage() {
     }
   }
 
+  const handleRegenerateDisplayNames = async () => {
+    try {
+      toast.info('Regenerando nombres de entidades...')
+      const response = await apiClient.regenerateEntityDisplayNames()
+
+      if (response && !response.error) {
+        const data = response as any
+        toast.success(`${data.updated_count} de ${data.total_entities} entidades actualizadas`)
+
+        // Limpiar cache y recargar
+        clearEntitiesCache()
+        fetchEntities(page, true)
+      } else {
+        toast.error('Error regenerando nombres')
+      }
+    } catch (err) {
+      console.error('Error regenerating display names:', err)
+      toast.error('Error regenerando nombres')
+    }
+  }
+
   const handleRegisterEntity = async () => {
     if (!registerToken.trim()) {
       toast.error('Ingresa el token DIAN')
@@ -471,7 +492,17 @@ export default function EntitiesPage() {
         {/* Left Column - Main Content (2/3 width) */}
         <div className="lg:col-span-2 space-y-3">
           {/* Register Button */}
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {/* TEMPORAL: Botón para regenerar display_names */}
+            <Button
+              variant="outline"
+              onClick={handleRegenerateDisplayNames}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Regenerar Nombres (TEMP)
+            </Button>
+
             <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
