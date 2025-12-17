@@ -115,6 +115,10 @@ export class ApiClient {
     return this.request('GET', `/api/entities/${entityId}`)
   }
 
+  async deleteEntity(entityId: string) {
+    return this.request('DELETE', `/api/entities/${entityId}`)
+  }
+
   async getEntityTokenStatus(entityId: string) {
     return this.request('GET', `/api/entities/${entityId}/token-status`)
   }

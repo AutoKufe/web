@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -105,6 +106,7 @@ interface EntityMap {
 }
 
 export default function EntitiesPage() {
+  const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(true)
@@ -478,7 +480,11 @@ export default function EntitiesPage() {
                     const badgeInfo = dianEmail ? getDianEmailBadge(dianEmail.status) : null
 
                     return (
-                      <TableRow key={entity.id} className="hover:bg-muted/50">
+                      <TableRow
+                        key={entity.id}
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onClick={() => router.push(`/entities/${entity.id}`)}
+                      >
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
