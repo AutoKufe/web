@@ -90,6 +90,19 @@ const getDianEmailBadge = (status: string) => {
   }
 }
 
+const ENTITIES_CACHE_KEY = 'autokufe_entities_cache'
+const CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutos
+
+interface EntitiesCache {
+  entities: Entity[]
+  pagination: {
+    total_count: number
+    total_pages: number
+  }
+  timestamp: number
+  page: number
+}
+
 export default function EntitiesPage() {
   const { user, loading: authLoading } = useAuth()
   const [entities, setEntities] = useState<Entity[]>([])
@@ -100,9 +113,59 @@ export default function EntitiesPage() {
   const [registering, setRegistering] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
-  const fetchEntities = async (currentPage = 1) => {
-    setLoading(true)
+  const loadFromCache = (currentPage: number): boolean => {
+    try {
+      const cached = localStorage.getItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`)
+      if (!cached) return false
+
+      const data: EntitiesCache = JSON.parse(cached)
+      const age = Date.now() - data.timestamp
+
+      if (age > CACHE_DURATION_MS) {
+        localStorage.removeItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`)
+        return false
+      }
+
+      setEntities(data.entities)
+      setTotalPages(data.pagination.total_pages)
+      setTotalCount(data.pagination.total_count)
+      setLoading(false)
+      return true
+    } catch (err) {
+      console.error('Error loading cache:', err)
+      return false
+    }
+  }
+
+  const saveToCache = (currentPage: number, entities: Entity[], pagination: { total_count: number; total_pages: number }) => {
+    try {
+      const cache: EntitiesCache = {
+        entities,
+        pagination,
+        timestamp: Date.now(),
+        page: currentPage
+      }
+      localStorage.setItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`, JSON.stringify(cache))
+    } catch (err) {
+      console.error('Error saving cache:', err)
+    }
+  }
+
+  const fetchEntities = async (currentPage = 1, skipCache = false) => {
+    if (!skipCache) {
+      const hasCache = loadFromCache(currentPage)
+      if (hasCache) {
+        fetchEntities(currentPage, true)
+        return
+      }
+    }
+
+    if (!skipCache) {
+      setLoading(true)
+    }
+
     try {
       const response = await apiClient.listEntities(currentPage, 10)
       if (response && !response.error) {
@@ -114,17 +177,23 @@ export default function EntitiesPage() {
             total_pages: number;
           }
         }
-        setEntities(data.entities || [])
 
-        if (data.pagination) {
-          setTotalPages(data.pagination.total_pages)
-        } else {
-          setTotalPages(1)
-        }
+        const newEntities = data.entities || []
+        const newPagination = data.pagination
+          ? { total_count: data.pagination.total_count, total_pages: data.pagination.total_pages }
+          : { total_count: newEntities.length, total_pages: 1 }
+
+        setEntities(newEntities)
+        setTotalPages(newPagination.total_pages)
+        setTotalCount(newPagination.total_count)
+
+        saveToCache(currentPage, newEntities, newPagination)
       }
     } catch (err) {
       console.error('Error fetching entities:', err)
-      toast.error('Error cargando entidades')
+      if (!skipCache) {
+        toast.error('Error cargando entidades')
+      }
     } finally {
       setLoading(false)
     }
@@ -155,6 +224,19 @@ export default function EntitiesPage() {
     }
   }
 
+  const clearEntitiesCache = () => {
+    try {
+      const keys = Object.keys(localStorage)
+      keys.forEach(key => {
+        if (key.startsWith(ENTITIES_CACHE_KEY)) {
+          localStorage.removeItem(key)
+        }
+      })
+    } catch (err) {
+      console.error('Error clearing cache:', err)
+    }
+  }
+
   const handleRegisterEntity = async () => {
     if (!registerToken.trim()) {
       toast.error('Ingresa el token DIAN')
@@ -170,7 +252,8 @@ export default function EntitiesPage() {
         toast.success('Entidad registrada exitosamente')
         setRegisterDialogOpen(false)
         setRegisterToken('')
-        fetchEntities(1)
+        clearEntitiesCache()
+        fetchEntities(1, true)
       }
     } catch (err) {
       console.error('Error registering entity:', err)
@@ -287,7 +370,7 @@ export default function EntitiesPage() {
         <CardHeader className="pb-4">
           <CardTitle className="text-xl">Entidades Registradas</CardTitle>
           <CardDescription>
-            {entities.length} entidad{entities.length !== 1 ? 'es' : ''} encontrada{entities.length !== 1 ? 's' : ''}
+            {totalCount} entidad{totalCount !== 1 ? 'es' : ''} encontrada{totalCount !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0">
