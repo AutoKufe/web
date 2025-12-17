@@ -195,6 +195,14 @@ export default function EntitiesPage() {
             const changes = data.changes?.modified_or_added || []
             const newTotalCount = data.total_count || cached.total_count
 
+            // Detectar eliminación: total_count disminuyó
+            if (newTotalCount < cached.total_count) {
+              console.log('🗑️ Deletion detected, forcing full sync...')
+              clearEntitiesCache()
+              fetchEntities(currentPage, true)
+              return
+            }
+
             if (changes.length > 0 || newTotalCount !== cached.total_count) {
               console.log(`🔄 Incremental sync: ${changes.length} changes, total: ${newTotalCount}`)
 
