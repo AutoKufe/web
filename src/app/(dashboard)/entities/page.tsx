@@ -55,6 +55,7 @@ interface Entity {
   identifier_suffix: string
   entity_type: string
   created_at: string
+  updated_at?: string  // Timestamp de última actualización en DB
   dian_email?: {
     email_masked?: string
     status: 'active' | 'oauth_expired' | 'oauth_revoked' | 'inactive' | 'not_associated' | 'not_found' | 'error'
@@ -94,9 +95,8 @@ const getDianEmailBadge = (status: string) => {
 const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global'
 
 interface EntitiesCache {
-  entities: Entity[]
+  entities: Entity[]  // Cada entity tiene su propio updated_at
   total_count: number
-  last_sync: string
 }
 
 interface EntityMap {
@@ -130,14 +130,15 @@ export default function EntitiesPage() {
     }
   }
 
-  const saveToCache = (entities: Entity[], total_count: number, sync_timestamp: string) => {
+  const saveToCache = (entities: Entity[], total_count: number) => {
     try {
+      // Guardar entidades con sus updated_at individuales preservados
       const cache: EntitiesCache = {
         entities,
-        total_count,
-        last_sync: sync_timestamp
+        total_count
       }
       localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
+      console.log(`💾 Cache saved: ${entities.length} entities`)
     } catch (err) {
       console.error('Error saving cache:', err)
     }
@@ -202,16 +203,21 @@ export default function EntitiesPage() {
       setTotalPages(Math.ceil(cached.total_count / 10))
       setLoading(false)
 
-      // Extraer prefijos de IDs en cache
-      const cachedPrefixes = cached.entities.map(e => e.id.substring(0, 8))
+      // Extraer prefijos con sus timestamps individuales
+      // Formato: "prefix:timestamp" para cada entidad
+      const cachedPrefixesWithTimestamps = cached.entities.map(e => {
+        const prefix = e.id.substring(0, 8)
+        const timestamp = e.updated_at || e.created_at // Usar updated_at, fallback a created_at
+        return `${prefix}:${timestamp}`
+      })
 
-      // Sync incremental en background CON PREFIJOS
+      // Sync incremental en background CON PREFIJOS+TIMESTAMPS
       try {
         const response = await apiClient.listEntities(
           1,
           9999,
-          cached.last_sync || undefined,
-          cachedPrefixes
+          undefined,  // Ya no necesitamos since global
+          cachedPrefixesWithTimestamps
         )
 
         if (response && !response.error) {
@@ -263,7 +269,7 @@ export default function EntitiesPage() {
                 setTotalCount(data.total_count)
                 setTotalPages(Math.ceil(data.total_count / 10))
 
-                saveToCache(updatedEntities, data.total_count, verifyData.sync_timestamp)
+                saveToCache(updatedEntities, data.total_count)
               }
             } else if (collidingPrefixes.length > 0) {
               // Hay colisiones pero no hay prefijos faltantes
@@ -281,7 +287,7 @@ export default function EntitiesPage() {
               setTotalCount(data.total_count)
               setTotalPages(Math.ceil(data.total_count / 10))
 
-              saveToCache(updatedEntities, data.total_count, data.sync_timestamp)
+              saveToCache(updatedEntities, data.total_count)
             } else {
               // No hay colisiones ni prefijos faltantes → detección perfecta
               const cachedPrefixSet = new Set(cachedPrefixes)
@@ -306,7 +312,7 @@ export default function EntitiesPage() {
               setTotalCount(data.total_count)
               setTotalPages(Math.ceil(data.total_count / 10))
 
-              saveToCache(updatedEntities, data.total_count, data.sync_timestamp)
+              saveToCache(updatedEntities, data.total_count)
             }
           }
 
@@ -340,7 +346,7 @@ export default function EntitiesPage() {
               setTotalCount(newTotalCount)
               setTotalPages(Math.ceil(newTotalCount / 10))
 
-              saveToCache(updatedEntities, newTotalCount, data.sync_timestamp)
+              saveToCache(updatedEntities, newTotalCount)
             } else {
               console.log('✅ No changes detected')
             }
@@ -374,10 +380,10 @@ export default function EntitiesPage() {
 
         if (pagination) {
           // Guardar todas las entities en cache
+          // NO pasar sync_timestamp - dejar que calcule desde created_at de entities
           saveToCache(
             allEntities,
-            pagination.total_count,
-            data.sync_timestamp || new Date().toISOString()
+            pagination.total_count
           )
 
           // Mostrar solo la página actual
