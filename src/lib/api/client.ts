@@ -79,7 +79,7 @@ export class ApiClient {
   }
 
   // === ENTITIES ===
-  async listEntities(page = 1, pageSize = 10, since?: string) {
+  async listEntities(page = 1, pageSize = 10, since?: string, cachedPrefixes?: string[], verifyIds?: string[]) {
     const params: Record<string, string> = {
       page: page.toString(),
       page_size: pageSize.toString(),
@@ -87,6 +87,14 @@ export class ApiClient {
 
     if (since) {
       params.since = since
+    }
+
+    if (cachedPrefixes && cachedPrefixes.length > 0) {
+      params.cached_prefixes = cachedPrefixes.join(',')
+    }
+
+    if (verifyIds && verifyIds.length > 0) {
+      params.verify_ids = verifyIds.join(',')
     }
 
     return this.request('GET', '/api/entities/', undefined, params)

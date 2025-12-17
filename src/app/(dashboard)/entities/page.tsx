@@ -91,14 +91,12 @@ const getDianEmailBadge = (status: string) => {
   }
 }
 
-const ENTITIES_CACHE_KEY = 'autokufe_entities_cache'
-const ENTITIES_SYNC_KEY = 'autokufe_entities_sync'
+const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global'
 
 interface EntitiesCache {
   entities: Entity[]
   total_count: number
   last_sync: string
-  page: number
 }
 
 interface EntityMap {
@@ -118,111 +116,221 @@ export default function EntitiesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  const loadFromCache = (currentPage: number): { entities: Entity[], total_count: number, last_sync: string | null } | null => {
+  const loadFromCache = (): EntitiesCache | null => {
     try {
-      const cached = localStorage.getItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`)
+      const cached = localStorage.getItem(ENTITIES_CACHE_KEY)
       if (!cached) return null
 
       const data: EntitiesCache = JSON.parse(cached)
-
-      setEntities(data.entities)
-      setTotalCount(data.total_count)
-      setTotalPages(Math.ceil(data.total_count / 10))
-      setLoading(false)
-
-      return {
-        entities: data.entities,
-        total_count: data.total_count,
-        last_sync: data.last_sync
-      }
+      return data
     } catch (err) {
       console.error('Error loading cache:', err)
       return null
     }
   }
 
-  const saveToCache = (currentPage: number, entities: Entity[], total_count: number, sync_timestamp: string) => {
+  const saveToCache = (entities: Entity[], total_count: number, sync_timestamp: string) => {
     try {
       const cache: EntitiesCache = {
         entities,
         total_count,
-        last_sync: sync_timestamp,
-        page: currentPage
+        last_sync: sync_timestamp
       }
-      localStorage.setItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`, JSON.stringify(cache))
+      localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
     } catch (err) {
       console.error('Error saving cache:', err)
     }
   }
 
+  const getEntitiesForPage = (allEntities: Entity[], pageNum: number, pageSize: number = 10): Entity[] => {
+    // Sort by created_at DESC (más recientes primero)
+    const sorted = [...allEntities].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+
+    const start = (pageNum - 1) * pageSize
+    const end = start + pageSize
+    return sorted.slice(start, end)
+  }
+
   const applyIncrementalChanges = (
     cachedEntities: Entity[],
     changes: Entity[],
-    newTotalCount: number
+    deletedIds: string[]
   ): Entity[] => {
     const entityMap: EntityMap = {}
 
+    // Agregar entities del cache
     cachedEntities.forEach(entity => {
       entityMap[entity.id] = entity
     })
 
+    // Aplicar cambios (modificaciones y adiciones)
     changes.forEach(entity => {
       entityMap[entity.id] = entity
     })
 
-    let result = Object.values(entityMap)
+    // Eliminar entities borradas
+    deletedIds.forEach(id => {
+      delete entityMap[id]
+    })
 
-    if (result.length > newTotalCount) {
-      result = result.slice(0, newTotalCount)
-    }
-
-    return result
+    return Object.values(entityMap)
   }
 
   const fetchEntities = async (currentPage = 1, forceFullSync = false) => {
-    const cached = loadFromCache(currentPage)
+    const cached = loadFromCache()
 
+    // Si hay cache y no es full sync forzado
     if (cached && !forceFullSync) {
-      console.log(`📦 Cache loaded for page ${currentPage}, syncing changes...`)
+      console.log(`📦 Global cache loaded (${cached.entities.length} entities), syncing with prefixes...`)
 
+      // Mostrar página actual desde cache inmediatamente
+      const pageEntities = getEntitiesForPage(cached.entities, currentPage)
+      setEntities(pageEntities)
+      setTotalCount(cached.total_count)
+      setTotalPages(Math.ceil(cached.total_count / 10))
+      setLoading(false)
+
+      // Extraer prefijos de IDs en cache
+      const cachedPrefixes = cached.entities.map(e => e.id.substring(0, 8))
+
+      // Sync incremental en background CON PREFIJOS
       try {
-        const response = await apiClient.listEntities(currentPage, 10, cached.last_sync || undefined)
+        const response = await apiClient.listEntities(
+          1,
+          9999,
+          cached.last_sync || undefined,
+          cachedPrefixes
+        )
 
         if (response && !response.error) {
           const data = response as any
 
-          if (data.sync_mode === 'incremental') {
+          // MODO 1: Respuesta con prefijos (primera request con prefijos)
+          if (data.sync_mode === 'incremental_prefixes') {
+            const changes = data.changes?.modified_or_added || []
+            const allValidPrefixes = data.changes?.all_valid_prefixes || []
+            const collidingPrefixes = data.changes?.colliding_prefixes || []
+            const needsFullIds = data.needs_full_ids_for_prefixes || []
+
+            console.log(`📊 Prefix sync: ${changes.length} changes, ${collidingPrefixes.length} collisions, ${needsFullIds.length} need verification`)
+
+            // Si hay prefijos faltantes, hacer segunda request con IDs completos
+            if (needsFullIds.length > 0) {
+              console.log(`🔍 Verifying ${needsFullIds.length} missing prefixes...`)
+
+              // Encontrar IDs completos que corresponden a esos prefijos
+              const idsToVerify = cached.entities
+                .filter(e => needsFullIds.includes(e.id.substring(0, 8)))
+                .map(e => e.id)
+
+              // Segunda request con IDs completos
+              const verifyResponse = await apiClient.listEntities(
+                1,
+                9999,
+                cached.last_sync || undefined,
+                undefined,
+                idsToVerify
+              )
+
+              if (verifyResponse && !verifyResponse.error) {
+                const verifyData = verifyResponse as any
+                const confirmedDeletions = verifyData.changes?.confirmed_deletions || []
+
+                console.log(`✅ Confirmed ${confirmedDeletions.length} deletions`)
+
+                // Aplicar cambios con eliminaciones confirmadas
+                const updatedEntities = applyIncrementalChanges(
+                  cached.entities,
+                  changes,
+                  confirmedDeletions
+                )
+
+                // Actualizar UI
+                const pageEntities = getEntitiesForPage(updatedEntities, currentPage)
+                setEntities(pageEntities)
+                setTotalCount(data.total_count)
+                setTotalPages(Math.ceil(data.total_count / 10))
+
+                saveToCache(updatedEntities, data.total_count, verifyData.sync_timestamp)
+              }
+            } else if (collidingPrefixes.length > 0) {
+              // Hay colisiones pero no hay prefijos faltantes
+              console.log(`⚠️ Collisions detected but no deletions`)
+
+              // Aplicar solo cambios (no eliminaciones)
+              const updatedEntities = applyIncrementalChanges(
+                cached.entities,
+                changes,
+                []
+              )
+
+              const pageEntities = getEntitiesForPage(updatedEntities, currentPage)
+              setEntities(pageEntities)
+              setTotalCount(data.total_count)
+              setTotalPages(Math.ceil(data.total_count / 10))
+
+              saveToCache(updatedEntities, data.total_count, data.sync_timestamp)
+            } else {
+              // No hay colisiones ni prefijos faltantes → detección perfecta
+              const cachedPrefixSet = new Set(cachedPrefixes)
+              const validPrefixSet = new Set(allValidPrefixes)
+
+              // Prefijos que desaparecieron
+              const deletedPrefixes = Array.from(cachedPrefixSet).filter(p => !validPrefixSet.has(p))
+              const deletedIds = cached.entities
+                .filter(e => deletedPrefixes.includes(e.id.substring(0, 8)))
+                .map(e => e.id)
+
+              console.log(`🔄 Clean sync: ${changes.length} changes, ${deletedIds.length} deletions (no collisions)`)
+
+              const updatedEntities = applyIncrementalChanges(
+                cached.entities,
+                changes,
+                deletedIds
+              )
+
+              const pageEntities = getEntitiesForPage(updatedEntities, currentPage)
+              setEntities(pageEntities)
+              setTotalCount(data.total_count)
+              setTotalPages(Math.ceil(data.total_count / 10))
+
+              saveToCache(updatedEntities, data.total_count, data.sync_timestamp)
+            }
+          }
+
+          // MODO 2: Respuesta verificada (segunda request con IDs completos)
+          else if (data.sync_mode === 'incremental_verified') {
+            // Ya manejado arriba en el flujo de verificación
+            console.log('✅ Verification complete')
+          }
+
+          // MODO 3 (fallback): Sync con IDs completos (backward compatibility)
+          else if (data.sync_mode === 'incremental') {
             const changes = data.changes?.modified_or_added || []
             const allValidIds = data.changes?.all_valid_ids || []
             const newTotalCount = data.total_count || cached.total_count
 
-            // Detectar eliminaciones comparando IDs
+            // Detectar eliminaciones
             const cachedIds = cached.entities.map(e => e.id)
             const deletedIds = cachedIds.filter(id => !allValidIds.includes(id))
 
-            if (deletedIds.length > 0 || changes.length > 0 || newTotalCount !== cached.total_count) {
-              console.log(`🔄 Incremental sync: ${changes.length} changes, ${deletedIds.length} deletions, total: ${newTotalCount}`)
+            if (deletedIds.length > 0 || changes.length > 0) {
+              console.log(`🔄 Standard incremental sync: ${changes.length} changes, ${deletedIds.length} deletions`)
 
-              // Si hay eliminaciones, las páginas cambian → invalidar todo y hacer full sync
-              if (deletedIds.length > 0) {
-                console.log(`🗑️ ${deletedIds.length} entities deleted, pages shifted → forcing full sync`)
-                clearEntitiesCache()
-                fetchEntities(currentPage, true)
-                return
-              }
-
-              // Solo cambios/adiciones (no eliminaciones) → incremental sync seguro
               const updatedEntities = applyIncrementalChanges(
                 cached.entities,
                 changes,
-                newTotalCount
+                deletedIds
               )
 
-              setEntities(updatedEntities)
+              const pageEntities = getEntitiesForPage(updatedEntities, currentPage)
+              setEntities(pageEntities)
               setTotalCount(newTotalCount)
               setTotalPages(Math.ceil(newTotalCount / 10))
 
-              saveToCache(currentPage, updatedEntities, newTotalCount, data.sync_timestamp)
+              saveToCache(updatedEntities, newTotalCount, data.sync_timestamp)
             } else {
               console.log('✅ No changes detected')
             }
@@ -235,10 +343,11 @@ export default function EntitiesPage() {
       return
     }
 
+    // Full sync: cargar TODAS las entities
     setLoading(true)
 
     try {
-      const response = await apiClient.listEntities(currentPage, 10)
+      const response = await apiClient.listEntities(1, 9999)
       if (response && !response.error) {
         const data = response as {
           entities?: Entity[];
@@ -250,20 +359,22 @@ export default function EntitiesPage() {
           sync_timestamp?: string;
         }
 
-        const newEntities = data.entities || []
+        const allEntities = data.entities || []
         const pagination = data.pagination
 
         if (pagination) {
-          setEntities(newEntities)
-          setTotalPages(pagination.total_pages)
-          setTotalCount(pagination.total_count)
-
+          // Guardar todas las entities en cache
           saveToCache(
-            currentPage,
-            newEntities,
+            allEntities,
             pagination.total_count,
             data.sync_timestamp || new Date().toISOString()
           )
+
+          // Mostrar solo la página actual
+          const pageEntities = getEntitiesForPage(allEntities, currentPage)
+          setEntities(pageEntities)
+          setTotalPages(Math.ceil(pagination.total_count / 10))
+          setTotalCount(pagination.total_count)
         }
       }
     } catch (err) {
