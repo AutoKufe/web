@@ -290,7 +290,9 @@ export default function EntitiesPage() {
               saveToCache(updatedEntities, data.total_count)
             } else {
               // No hay colisiones ni prefijos faltantes → detección perfecta
-              const cachedPrefixSet = new Set(cachedPrefixes)
+              // Extraer solo prefijos (sin timestamps) para comparar
+              const cachedPrefixesOnly = cachedPrefixesWithTimestamps.map(pt => pt.split(':')[0])
+              const cachedPrefixSet = new Set(cachedPrefixesOnly)
               const validPrefixSet = new Set(allValidPrefixes)
 
               // Prefijos que desaparecieron
