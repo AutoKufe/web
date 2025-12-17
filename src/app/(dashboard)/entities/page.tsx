@@ -203,18 +203,20 @@ export default function EntitiesPage() {
             if (deletedIds.length > 0 || changes.length > 0 || newTotalCount !== cached.total_count) {
               console.log(`🔄 Incremental sync: ${changes.length} changes, ${deletedIds.length} deletions, total: ${newTotalCount}`)
 
-              // Aplicar cambios: agregar/actualizar entities
-              let updatedEntities = applyIncrementalChanges(
+              // Si hay eliminaciones, las páginas cambian → invalidar todo y hacer full sync
+              if (deletedIds.length > 0) {
+                console.log(`🗑️ ${deletedIds.length} entities deleted, pages shifted → forcing full sync`)
+                clearEntitiesCache()
+                fetchEntities(currentPage, true)
+                return
+              }
+
+              // Solo cambios/adiciones (no eliminaciones) → incremental sync seguro
+              const updatedEntities = applyIncrementalChanges(
                 cached.entities,
                 changes,
                 newTotalCount
               )
-
-              // Filtrar entities eliminadas
-              if (deletedIds.length > 0) {
-                console.log(`🗑️ Removing deleted entities: ${deletedIds.join(', ')}`)
-                updatedEntities = updatedEntities.filter(e => !deletedIds.includes(e.id))
-              }
 
               setEntities(updatedEntities)
               setTotalCount(newTotalCount)
