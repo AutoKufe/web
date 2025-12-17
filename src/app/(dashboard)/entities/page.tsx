@@ -125,6 +125,7 @@ export default function EntitiesPage() {
 
       setEntities(data.entities)
       setTotalCount(data.total_count)
+      setTotalPages(Math.ceil(data.total_count / 10))
       setLoading(false)
 
       return {
