@@ -106,11 +106,21 @@ export default function EntitiesPage() {
     try {
       const response = await apiClient.listEntities(currentPage, 10)
       if (response && !response.error) {
-        const data = response as { entities?: Entity[]; total?: number; page_size?: number }
+        const data = response as {
+          entities?: Entity[];
+          pagination?: {
+            total_count: number;
+            page_size: number;
+            total_pages: number;
+          }
+        }
         setEntities(data.entities || [])
-        const total = data.total || 0
-        const pageSize = data.page_size || 10
-        setTotalPages(Math.ceil(total / pageSize))
+
+        if (data.pagination) {
+          setTotalPages(data.pagination.total_pages)
+        } else {
+          setTotalPages(1)
+        }
       }
     } catch (err) {
       console.error('Error fetching entities:', err)
