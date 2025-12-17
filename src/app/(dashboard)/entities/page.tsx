@@ -183,7 +183,7 @@ export default function EntitiesPage() {
       console.log(`📦 Cache loaded for page ${currentPage}, syncing changes...`)
 
       try {
-        const response = await apiClient.listEntities(currentPage, 10, cached.last_sync)
+        const response = await apiClient.listEntities(currentPage, 10, cached.last_sync || undefined)
 
         if (response && !response.error) {
           const data = response as any
