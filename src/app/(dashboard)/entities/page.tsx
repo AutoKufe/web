@@ -245,7 +245,7 @@ export default function EntitiesPage() {
               const verifyResponse = await apiClient.listEntities(
                 1,
                 9999,
-                cached.last_sync || undefined,
+                undefined,  // Ya no usamos since global
                 undefined,
                 idsToVerify
               )
