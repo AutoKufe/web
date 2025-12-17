@@ -79,11 +79,17 @@ export class ApiClient {
   }
 
   // === ENTITIES ===
-  async listEntities(page = 1, pageSize = 10) {
-    return this.request('GET', '/api/entities/', undefined, {
+  async listEntities(page = 1, pageSize = 10, since?: string) {
+    const params: Record<string, string> = {
       page: page.toString(),
       page_size: pageSize.toString(),
-    })
+    }
+
+    if (since) {
+      params.since = since
+    }
+
+    return this.request('GET', '/api/entities/', undefined, params)
   }
 
   async searchEntities(params: {

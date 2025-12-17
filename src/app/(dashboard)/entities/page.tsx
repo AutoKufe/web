@@ -91,16 +91,17 @@ const getDianEmailBadge = (status: string) => {
 }
 
 const ENTITIES_CACHE_KEY = 'autokufe_entities_cache'
-const CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutos
+const ENTITIES_SYNC_KEY = 'autokufe_entities_sync'
 
 interface EntitiesCache {
   entities: Entity[]
-  pagination: {
-    total_count: number
-    total_pages: number
-  }
-  timestamp: number
+  total_count: number
+  last_sync: string
   page: number
+}
+
+interface EntityMap {
+  [id: string]: Entity
 }
 
 export default function EntitiesPage() {
@@ -115,36 +116,34 @@ export default function EntitiesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  const loadFromCache = (currentPage: number): boolean => {
+  const loadFromCache = (currentPage: number): { entities: Entity[], total_count: number, last_sync: string | null } | null => {
     try {
       const cached = localStorage.getItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`)
-      if (!cached) return false
+      if (!cached) return null
 
       const data: EntitiesCache = JSON.parse(cached)
-      const age = Date.now() - data.timestamp
-
-      if (age > CACHE_DURATION_MS) {
-        localStorage.removeItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`)
-        return false
-      }
 
       setEntities(data.entities)
-      setTotalPages(data.pagination.total_pages)
-      setTotalCount(data.pagination.total_count)
+      setTotalCount(data.total_count)
       setLoading(false)
-      return true
+
+      return {
+        entities: data.entities,
+        total_count: data.total_count,
+        last_sync: data.last_sync
+      }
     } catch (err) {
       console.error('Error loading cache:', err)
-      return false
+      return null
     }
   }
 
-  const saveToCache = (currentPage: number, entities: Entity[], pagination: { total_count: number; total_pages: number }) => {
+  const saveToCache = (currentPage: number, entities: Entity[], total_count: number, sync_timestamp: string) => {
     try {
       const cache: EntitiesCache = {
         entities,
-        pagination,
-        timestamp: Date.now(),
+        total_count,
+        last_sync: sync_timestamp,
         page: currentPage
       }
       localStorage.setItem(`${ENTITIES_CACHE_KEY}_page_${currentPage}`, JSON.stringify(cache))
@@ -153,18 +152,73 @@ export default function EntitiesPage() {
     }
   }
 
-  const fetchEntities = async (currentPage = 1, skipCache = false) => {
-    if (!skipCache) {
-      const hasCache = loadFromCache(currentPage)
-      if (hasCache) {
-        fetchEntities(currentPage, true)
-        return
-      }
+  const applyIncrementalChanges = (
+    cachedEntities: Entity[],
+    changes: Entity[],
+    newTotalCount: number
+  ): Entity[] => {
+    const entityMap: EntityMap = {}
+
+    cachedEntities.forEach(entity => {
+      entityMap[entity.id] = entity
+    })
+
+    changes.forEach(entity => {
+      entityMap[entity.id] = entity
+    })
+
+    let result = Object.values(entityMap)
+
+    if (result.length > newTotalCount) {
+      result = result.slice(0, newTotalCount)
     }
 
-    if (!skipCache) {
-      setLoading(true)
+    return result
+  }
+
+  const fetchEntities = async (currentPage = 1, forceFullSync = false) => {
+    const cached = loadFromCache(currentPage)
+
+    if (cached && !forceFullSync) {
+      console.log(`📦 Cache loaded for page ${currentPage}, syncing changes...`)
+
+      try {
+        const response = await apiClient.listEntities(currentPage, 10, cached.last_sync)
+
+        if (response && !response.error) {
+          const data = response as any
+
+          if (data.sync_mode === 'incremental') {
+            const changes = data.changes?.modified_or_added || []
+            const newTotalCount = data.total_count || cached.total_count
+
+            if (changes.length > 0 || newTotalCount !== cached.total_count) {
+              console.log(`🔄 Incremental sync: ${changes.length} changes, total: ${newTotalCount}`)
+
+              const updatedEntities = applyIncrementalChanges(
+                cached.entities,
+                changes,
+                newTotalCount
+              )
+
+              setEntities(updatedEntities)
+              setTotalCount(newTotalCount)
+              setTotalPages(Math.ceil(newTotalCount / 10))
+
+              saveToCache(currentPage, updatedEntities, newTotalCount, data.sync_timestamp)
+            } else {
+              console.log('✅ No changes detected')
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error in incremental sync:', err)
+      }
+
+      return
     }
+
+    setLoading(true)
 
     try {
       const response = await apiClient.listEntities(currentPage, 10)
@@ -175,25 +229,29 @@ export default function EntitiesPage() {
             total_count: number;
             page_size: number;
             total_pages: number;
-          }
+          };
+          sync_timestamp?: string;
         }
 
         const newEntities = data.entities || []
-        const newPagination = data.pagination
-          ? { total_count: data.pagination.total_count, total_pages: data.pagination.total_pages }
-          : { total_count: newEntities.length, total_pages: 1 }
+        const pagination = data.pagination
 
-        setEntities(newEntities)
-        setTotalPages(newPagination.total_pages)
-        setTotalCount(newPagination.total_count)
+        if (pagination) {
+          setEntities(newEntities)
+          setTotalPages(pagination.total_pages)
+          setTotalCount(pagination.total_count)
 
-        saveToCache(currentPage, newEntities, newPagination)
+          saveToCache(
+            currentPage,
+            newEntities,
+            pagination.total_count,
+            data.sync_timestamp || new Date().toISOString()
+          )
+        }
       }
     } catch (err) {
       console.error('Error fetching entities:', err)
-      if (!skipCache) {
-        toast.error('Error cargando entidades')
-      }
+      toast.error('Error cargando entidades')
     } finally {
       setLoading(false)
     }
