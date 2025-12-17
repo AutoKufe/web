@@ -193,24 +193,28 @@ export default function EntitiesPage() {
 
           if (data.sync_mode === 'incremental') {
             const changes = data.changes?.modified_or_added || []
+            const allValidIds = data.changes?.all_valid_ids || []
             const newTotalCount = data.total_count || cached.total_count
 
-            // Detectar eliminación: total_count disminuyó
-            if (newTotalCount < cached.total_count) {
-              console.log('🗑️ Deletion detected, forcing full sync...')
-              clearEntitiesCache()
-              fetchEntities(currentPage, true)
-              return
-            }
+            // Detectar eliminaciones comparando IDs
+            const cachedIds = cached.entities.map(e => e.id)
+            const deletedIds = cachedIds.filter(id => !allValidIds.includes(id))
 
-            if (changes.length > 0 || newTotalCount !== cached.total_count) {
-              console.log(`🔄 Incremental sync: ${changes.length} changes, total: ${newTotalCount}`)
+            if (deletedIds.length > 0 || changes.length > 0 || newTotalCount !== cached.total_count) {
+              console.log(`🔄 Incremental sync: ${changes.length} changes, ${deletedIds.length} deletions, total: ${newTotalCount}`)
 
-              const updatedEntities = applyIncrementalChanges(
+              // Aplicar cambios: agregar/actualizar entities
+              let updatedEntities = applyIncrementalChanges(
                 cached.entities,
                 changes,
                 newTotalCount
               )
+
+              // Filtrar entities eliminadas
+              if (deletedIds.length > 0) {
+                console.log(`🗑️ Removing deleted entities: ${deletedIds.join(', ')}`)
+                updatedEntities = updatedEntities.filter(e => !deletedIds.includes(e.id))
+              }
 
               setEntities(updatedEntities)
               setTotalCount(newTotalCount)
