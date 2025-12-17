@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth/context'
@@ -115,6 +115,7 @@ export default function EntitiesPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const fetchingRef = useRef(false)  // Prevenir llamadas duplicadas
 
   const loadFromCache = (): EntitiesCache | null => {
     try {
@@ -179,10 +180,19 @@ export default function EntitiesPage() {
   }
 
   const fetchEntities = async (currentPage = 1, forceFullSync = false) => {
-    const cached = loadFromCache()
+    // Prevenir llamadas duplicadas concurrentes
+    if (fetchingRef.current) {
+      console.log('⏭️ Fetch already in progress, skipping...')
+      return
+    }
 
-    // Si hay cache y no es full sync forzado
-    if (cached && !forceFullSync) {
+    fetchingRef.current = true
+
+    try {
+      const cached = loadFromCache()
+
+      // Si hay cache y no es full sync forzado
+      if (cached && !forceFullSync) {
       console.log(`📦 Global cache loaded (${cached.entities.length} entities), syncing with prefixes...`)
 
       // Mostrar página actual desde cache inmediatamente
@@ -382,6 +392,11 @@ export default function EntitiesPage() {
       toast.error('Error cargando entidades')
     } finally {
       setLoading(false)
+      fetchingRef.current = false  // Liberar lock
+    }
+    } catch (err) {
+      console.error('Error in fetchEntities wrapper:', err)
+      fetchingRef.current = false  // Liberar lock en caso de error
     }
   }
 
@@ -425,6 +440,10 @@ export default function EntitiesPage() {
 
   const handleRegenerateDisplayNames = async () => {
     try {
+      // IMPORTANTE: Limpiar cache ANTES de regenerar
+      // Si no, el timestamp del cache será posterior a los cambios
+      clearEntitiesCache()
+
       toast.info('Regenerando nombres de entidades...')
       const response = await apiClient.regenerateEntityDisplayNames()
 
@@ -432,8 +451,7 @@ export default function EntitiesPage() {
         const data = response as any
         toast.success(`${data.updated_count} de ${data.total_entities} entidades actualizadas`)
 
-        // Limpiar cache y recargar
-        clearEntitiesCache()
+        // Recargar con full sync (sin cache)
         fetchEntities(page, true)
       } else {
         toast.error('Error regenerando nombres')
@@ -473,7 +491,10 @@ export default function EntitiesPage() {
   useEffect(() => {
     if (authLoading || !user) return
     fetchEntities(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, authLoading, user])
+  // fetchEntities no está en deps intencionalmente para evitar loops
+  // Se ejecuta solo cuando cambia page, authLoading, o user
 
   const filteredEntities = entities
 
