@@ -560,36 +560,26 @@ function NewJobContent() {
               </Button>
             </div>
           </div>
-
-          {/* DIAN Email OAuth Expired Warning - Alerta prominente */}
-          {selectedEntity && dianEmailStatus && !dianEmailStatus.has_active_oauth && (
-            <Alert className="border-orange-500/50 bg-orange-500/10">
-              <Mail className="h-4 w-4 text-orange-500" />
+          {/* Alerta urgente: Email DIAN OAuth expirado */}
+          {selectedEntity && autoTokenStatus?.status === 'oauth_expired' && (
+            <Alert className="border-red-600/70 bg-red-50">
+              <XCircle className="h-5 w-5 text-red-600" />
               <AlertDescription className="ml-2">
                 <div className="space-y-2">
                   <div>
-                    <p className="text-sm font-medium text-orange-700">
-                      ⚠️ Gmail OAuth expirado - Gestión automática no disponible
+                    <p className="text-base font-semibold text-red-700">
+                      Email DIAN expirado
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      El acceso a tu correo DIAN expiró. <strong>No podrás usar gestión automática de tokens</strong> hasta que reautorices.
-                      {dianEmailStatus.expired_emails.length > 0 && (
-                        <>
-                          {' '}Email afectado:{' '}
-                          {dianEmailStatus.expired_emails.map((e, idx) => (
-                            <span key={idx} className="font-mono font-medium">
-                              {e.email}
-                              {idx < dianEmailStatus.expired_emails.length - 1 ? ', ' : ''}
-                            </span>
-                          ))}
-                        </>
-                      )}
+                    <p className="text-sm text-red-600 mt-1">
+                      El email DIAN {autoTokenStatus.dianEmailMasked && (
+                        <span className="font-mono font-medium">({autoTokenStatus.dianEmailMasked})</span>
+                      )} perdió acceso. <strong>Debes re-autorizar para usar gestión automática.</strong>
                     </p>
                   </div>
                   <Link href="/dian-emails">
-                    <Button variant="outline" size="sm" className="h-8 text-xs">
-                      <Mail className="h-3 w-3 mr-1" />
-                      Reconectar Gmail OAuth ahora
+                    <Button variant="destructive" size="sm" className="h-9">
+                      <Mail className="h-4 w-4 mr-1.5" />
+                      Re-autorizar ahora
                     </Button>
                   </Link>
                 </div>
@@ -597,22 +587,28 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Recordatorio cuando entidad tenía auto-token pero email expiró */}
-          {selectedEntity && autoTokenStatus?.status === 'oauth_expired' && !dianEmailStatus?.has_active_oauth && (
-            <Alert className="border-amber-500/50 bg-amber-500/10">
-              <AlertCircle className="h-4 w-4 text-amber-500" />
+          {/* Alerta: Email DIAN pendiente de autorización */}
+          {selectedEntity && autoTokenStatus?.status === 'oauth_pending' && (
+            <Alert className="border-yellow-600/70 bg-yellow-50">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
               <AlertDescription className="ml-2">
-                <div>
-                  <p className="text-sm font-medium text-amber-700">
-                    💡 Recordatorio: Esta entidad tenía gestión automática activada
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    AutoKufe gestionaba tokens automáticamente para esta entidad
-                    {autoTokenStatus.dianEmailMasked && (
-                      <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
-                    )}
-                    , pero el OAuth Gmail expiró. <strong>Deberás ingresar tokens manualmente</strong> hasta que reautorices el acceso.
-                  </p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-base font-semibold text-yellow-700">
+                      Email DIAN pendiente de autorización
+                    </p>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      El email DIAN {autoTokenStatus.dianEmailMasked && (
+                        <span className="font-mono font-medium">({autoTokenStatus.dianEmailMasked})</span>
+                      )} está configurado pero <strong>falta completar la autorización OAuth.</strong>
+                    </p>
+                  </div>
+                  <Link href="/dian-emails">
+                    <Button variant="outline" size="sm" className="h-9 border-yellow-600 text-yellow-700 hover:bg-yellow-100">
+                      <Mail className="h-4 w-4 mr-1.5" />
+                      Completar autorización
+                    </Button>
+                  </Link>
                 </div>
               </AlertDescription>
             </Alert>
@@ -656,40 +652,6 @@ function NewJobContent() {
                     <li>La DIAN no ha enviado el token todavía</li>
                     <li>El token llegó a otro email</li>
                   </ul>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Alerta cuando hay emails DIAN pendientes de autorización */}
-          {selectedEntity && dianEmailStatus && dianEmailStatus.pending_emails && dianEmailStatus.pending_emails.length > 0 && (
-            <Alert className="border-yellow-500/50 bg-yellow-500/10">
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-              <AlertDescription className="ml-2">
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-sm font-medium text-yellow-700">
-                      ⏳ Email DIAN pendiente de autorización
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Tienes {dianEmailStatus.pending_emails.length} email{dianEmailStatus.pending_emails.length > 1 ? 's' : ''} DIAN pendiente{dianEmailStatus.pending_emails.length > 1 ? 's' : ''} de completar autorización OAuth:
-                      {dianEmailStatus.pending_emails.map((e, idx) => (
-                        <span key={idx} className="font-mono font-medium ml-1">
-                          {e.email}
-                          {idx < dianEmailStatus.pending_emails.length - 1 ? ', ' : ''}
-                        </span>
-                      ))}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      <strong>Impacto:</strong> No podrás usar gestión automática de tokens hasta que completes el proceso de autorización.
-                    </p>
-                  </div>
-                  <Link href="/dian-emails">
-                    <Button variant="outline" size="sm" className="h-8 text-xs">
-                      <Mail className="h-3 w-3 mr-1" />
-                      Completar autorización
-                    </Button>
-                  </Link>
                 </div>
               </AlertDescription>
             </Alert>
@@ -771,44 +733,6 @@ function NewJobContent() {
                       <p className="text-xs text-muted-foreground">
                         La última solicitud automática de token no llegó. Por favor verifica que el
                         email DIAN esté correctamente configurado y tiene acceso para solicitar tokens.
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Auto-token email expired */}
-              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'oauth_expired' && (
-                <Alert className="border-red-500/50 bg-red-500/10">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <AlertDescription className="ml-2">
-                    <div className="space-y-1">
-                      <span className="font-medium text-red-600">Email DIAN expirado</span>
-                      <p className="text-xs text-muted-foreground">
-                        El email que gestionaba tokens para esta entidad ya no está disponible
-                        {autoTokenStatus.dianEmailMasked && (
-                          <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
-                        )}
-                        . Configura un nuevo email DIAN para reactivar la gestión automática.
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Auto-token OAuth pending */}
-              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'oauth_pending' && (
-                <Alert className="border-yellow-500/50 bg-yellow-500/10">
-                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                  <AlertDescription className="ml-2">
-                    <div className="space-y-1">
-                      <span className="font-medium text-yellow-600">Gmail OAuth pendiente</span>
-                      <p className="text-xs text-muted-foreground">
-                        El email DIAN está configurado
-                        {autoTokenStatus.dianEmailMasked && (
-                          <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
-                        )}
-                        , pero el acceso Gmail OAuth está pendiente de completar. Completa la autorización para activar gestión automática.
                       </p>
                     </div>
                   </AlertDescription>

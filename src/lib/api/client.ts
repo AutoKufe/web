@@ -146,16 +146,10 @@ export class ApiClient {
         status: string
         message: string
         dian_email_masked?: string
-        should_be_default: boolean
       }
       saved_token: {
         available: boolean
         token_masked?: string
-        should_be_default: boolean
-      }
-      manual_token: {
-        available: boolean
-        should_be_default: boolean
       }
       recommended_option: 'auto' | 'saved' | 'manual'
     }>('GET', `/api/entities/${entityId}/job-creation-options`)
