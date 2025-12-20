@@ -88,7 +88,7 @@ function NewJobContent() {
   // Auto-token management
   const [autoTokenStatus, setAutoTokenStatus] = useState<{
     available: boolean
-    status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
+    status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired' | 'oauth_expired' | 'oauth_pending'
     dianEmailMasked?: string
   } | null>(null)
   const [useAutoToken, setUseAutoToken] = useState(false)
@@ -598,7 +598,7 @@ function NewJobContent() {
           )}
 
           {/* Recordatorio cuando entidad tenía auto-token pero email expiró */}
-          {selectedEntity && autoTokenStatus?.status === 'email_expired' && !dianEmailStatus?.has_active_oauth && (
+          {selectedEntity && autoTokenStatus?.status === 'oauth_expired' && !dianEmailStatus?.has_active_oauth && (
             <Alert className="border-amber-500/50 bg-amber-500/10">
               <AlertCircle className="h-4 w-4 text-amber-500" />
               <AlertDescription className="ml-2">
@@ -612,6 +612,27 @@ function NewJobContent() {
                       <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
                     )}
                     , pero el OAuth Gmail expiró. <strong>Deberás ingresar tokens manualmente</strong> hasta que reautorices el acceso.
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Alerta cuando OAuth está pendiente de autorización */}
+          {selectedEntity && autoTokenStatus?.status === 'oauth_pending' && (
+            <Alert className="border-yellow-500/50 bg-yellow-500/10">
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+              <AlertDescription className="ml-2">
+                <div>
+                  <p className="text-sm font-medium text-yellow-700">
+                    ⏳ Gmail OAuth pendiente de autorización
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Esta entidad tiene un email DIAN configurado
+                    {autoTokenStatus.dianEmailMasked && (
+                      <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
+                    )}
+                    , pero el acceso Gmail OAuth está pendiente de completar. <strong>Deberás ingresar tokens manualmente</strong> hasta que completes la autorización.
                   </p>
                 </div>
               </AlertDescription>
@@ -757,7 +778,7 @@ function NewJobContent() {
               )}
 
               {/* Auto-token email expired */}
-              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'email_expired' && (
+              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'oauth_expired' && (
                 <Alert className="border-red-500/50 bg-red-500/10">
                   <XCircle className="h-4 w-4 text-red-500" />
                   <AlertDescription className="ml-2">
@@ -769,6 +790,25 @@ function NewJobContent() {
                           <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
                         )}
                         . Configura un nuevo email DIAN para reactivar la gestión automática.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Auto-token OAuth pending */}
+              {!loadingAutoTokenStatus && autoTokenStatus?.status === 'oauth_pending' && (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                  <AlertDescription className="ml-2">
+                    <div className="space-y-1">
+                      <span className="font-medium text-yellow-600">Gmail OAuth pendiente</span>
+                      <p className="text-xs text-muted-foreground">
+                        El email DIAN está configurado
+                        {autoTokenStatus.dianEmailMasked && (
+                          <span className="font-mono"> ({autoTokenStatus.dianEmailMasked})</span>
+                        )}
+                        , pero el acceso Gmail OAuth está pendiente de completar. Completa la autorización para activar gestión automática.
                       </p>
                     </div>
                   </AlertDescription>
