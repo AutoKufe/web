@@ -21,6 +21,13 @@ export interface Job {
   docs_total?: number
   created_at: string
   updated_at?: string
+  technical_review_status?: string
+  reported_error_at?: string
+  reviewed_at?: string
+  resolved_at?: string
+  reviewed_by?: string
+  resolution_notes?: string
+  error_category?: string
   completed_at?: string
 }
 
