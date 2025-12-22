@@ -45,8 +45,10 @@ import {
   AlertTitle,
 } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import { useDianEmailsCache } from '@/lib/hooks/use-dian-emails-cache'
 
-interface DianEmail {
+// Map cache DianEmail to page DianEmail for display
+interface PageDianEmail {
   dian_email_id: string
   email: string
   status: string
@@ -78,31 +80,30 @@ const getStatusBadge = (status: string) => {
 
 export default function DianEmailsPage() {
   const { user, loading: authLoading } = useAuth()
-  const [dianEmails, setDianEmails] = useState<DianEmail[]>([])
-  const [loading, setLoading] = useState(true)
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
   const [registerEmail, setRegisterEmail] = useState('')
   const [registering, setRegistering] = useState(false)
 
-  const fetchDianEmails = async () => {
-    setLoading(true)
-    try {
-      const response = await apiClient.listDianEmails()
-      if (response && 'success' in response && response.success && 'dian_emails' in response) {
-        setDianEmails(response.dian_emails as DianEmail[])
-      }
-    } catch (err) {
-      console.error('Error fetching DIAN emails:', err)
-      toast.error('Error cargando DIAN emails')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Use cache hook for DIAN emails
+  const { emails: cachedEmails, loading, syncDianEmails } = useDianEmailsCache()
+
+  // Map cache emails to page format
+  const dianEmails: PageDianEmail[] = cachedEmails.map(email => ({
+    dian_email_id: email.id,
+    email: email.email_masked,
+    status: email.auth_status,
+    requested_at: email.created_at,
+    authorized_at: email.authorized_at || undefined,
+    deactivated_at: email.deactivated_at || undefined,
+    has_filter: false, // TODO: Add to cache if needed
+    has_associated_entities: email.associated_entities_count > 0,
+    associated_entities_count: email.associated_entities_count
+  }))
 
   useEffect(() => {
     if (authLoading || !user) return
-    fetchDianEmails()
-  }, [authLoading, user])
+    syncDianEmails()
+  }, [authLoading, user, syncDianEmails])
 
   const handleRegister = async () => {
     if (!registerEmail.trim()) {
@@ -128,7 +129,7 @@ export default function DianEmailsPage() {
 
       setRegisterDialogOpen(false)
       setRegisterEmail('')
-      fetchDianEmails()
+      syncDianEmails()
     } catch (err) {
       console.error('Error registering DIAN email:', err)
       toast.error('Error registrando DIAN email')
@@ -166,7 +167,7 @@ export default function DianEmailsPage() {
       }
 
       toast.success('DIAN email desactivado')
-      fetchDianEmails()
+      syncDianEmails()
     } catch (err) {
       console.error('Error deactivating:', err)
       toast.error('Error desactivando DIAN email')
@@ -182,7 +183,7 @@ export default function DianEmailsPage() {
       }
 
       toast.success('DIAN email reactivado')
-      fetchDianEmails()
+      syncDianEmails()
     } catch (err) {
       console.error('Error reactivating:', err)
       toast.error('Error reactivando DIAN email')
