@@ -289,6 +289,40 @@ export class ApiClient {
   async getPlans() {
     return this.request('GET', '/subscriptions/plans')
   }
+  async syncDianEmails(cachedPrefixesWithTimestamps?: string[]) {
+    const params = new URLSearchParams()
+    if (cachedPrefixesWithTimestamps && cachedPrefixesWithTimestamps.length > 0) {
+      params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
+    }
+
+    const url = `/api/dian-emails/sync${params.toString() ? `?${params.toString()}` : ''}`
+
+    return this.request<{
+      status: string
+      sync_mode: string
+      collision_detected: boolean
+      changes: {
+        modified_or_added: Array<{
+          id: string
+          email_masked: string
+          auth_status: string
+          authorized_at?: string | null
+          deactivated_at?: string | null
+          failed_at?: string | null
+          expired_at?: string | null
+          updated_at?: string
+          created_at: string
+          associated_entities_count: number
+        }>
+        all_valid_prefixes: string[]
+        colliding_prefixes: string[]
+        count: number
+      }
+      needs_full_ids_for_prefixes: string[]
+      total_count: number
+    }>('GET', url)
+  }
+
 }
 
 export const apiClient = new ApiClient()

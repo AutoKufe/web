@@ -48,6 +48,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
+import { useDianEmailsCache } from '@/lib/hooks/use-dian-emails-cache'
+import { getDianEmailFromCache } from '@/lib/cache/dian-emails-cache'
 
 interface Entity {
   id: string
@@ -56,12 +58,7 @@ interface Entity {
   entity_type: string
   created_at: string
   updated_at?: string  // Timestamp de última actualización en DB
-  dian_email?: {
-    email_masked?: string
-    status: 'active' | 'oauth_expired' | 'oauth_revoked' | 'inactive' | 'not_associated' | 'not_found' | 'error'
-    message: string
-    auth_failed_at?: string | null
-  }
+  dian_email_id?: string | null  // Reference to dian_email - lookup in cache
 }
 
 const getEntityTypeLabel = (type: string): string => {
@@ -79,14 +76,18 @@ const getDianEmailBadge = (status: string) => {
   switch (status) {
     case 'active':
       return { variant: 'default' as const, icon: '✅', label: 'Auto activa' }
+    case 'pending':
+      return { variant: 'secondary' as const, icon: '⏳', label: 'Pendiente' }
+    case 'expired':
     case 'oauth_expired':
       return { variant: 'destructive' as const, icon: '⚠️', label: 'OAuth expirado' }
+    case 'revoked':
     case 'oauth_revoked':
       return { variant: 'destructive' as const, icon: '❌', label: 'OAuth revocado' }
-    case 'not_associated':
-      return { variant: 'secondary' as const, icon: '📧', label: 'Sin email' }
-    case 'not_found':
-      return { variant: 'outline' as const, icon: '⚠️', label: 'Email no encontrado' }
+    case 'inactive':
+      return { variant: 'secondary' as const, icon: '⭕', label: 'Inactivo' }
+    case 'failed':
+      return { variant: 'destructive' as const, icon: '❗', label: 'Falló' }
     default:
       return { variant: 'outline' as const, icon: '❓', label: 'Desconocido' }
   }
@@ -116,6 +117,7 @@ export default function EntitiesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const fetchingRef = useRef(false)  // Prevenir llamadas duplicadas
+  const { syncDianEmails } = useDianEmailsCache()
 
   const loadFromCache = (): EntitiesCache | null => {
     try {
@@ -475,10 +477,14 @@ export default function EntitiesPage() {
 
   useEffect(() => {
     if (authLoading || !user) return
+
+    // Sync both entities and dian_emails caches
     fetchEntities(page)
+    syncDianEmails()
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, authLoading, user])
-  // fetchEntities no está en deps intencionalmente para evitar loops
+  // fetchEntities and syncDianEmails no están en deps intencionalmente para evitar loops
   // Se ejecuta solo cuando cambia page, authLoading, o user
 
   const filteredEntities = entities
@@ -628,8 +634,9 @@ export default function EntitiesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredEntities.map((entity) => {
-                    const dianEmail = entity.dian_email
-                    const badgeInfo = dianEmail ? getDianEmailBadge(dianEmail.status) : null
+                    // Lookup dian_email from cache
+                    const dianEmailFromCache = getDianEmailFromCache(entity.dian_email_id)
+                    const badgeInfo = dianEmailFromCache ? getDianEmailBadge(dianEmailFromCache.auth_status) : null
 
                     return (
                       <TableRow
