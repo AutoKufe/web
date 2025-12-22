@@ -666,14 +666,14 @@ export default function EntitiesPage() {
                               <Badge variant={badgeInfo.variant} className="font-normal">
                                 {badgeInfo.icon} {badgeInfo.label}
                               </Badge>
-                              {dianEmail?.email_masked && dianEmail.status === 'active' && (
+                              {dianEmailFromCache?.email_masked && dianEmailFromCache.auth_status === 'active' && (
                                 <p className="text-xs text-muted-foreground">
-                                  {dianEmail.email_masked}
+                                  {dianEmailFromCache.email_masked}
                                 </p>
                               )}
-                              {(dianEmail?.status === 'oauth_expired' || dianEmail?.status === 'oauth_revoked') && dianEmail.email_masked && (
+                              {(dianEmailFromCache?.auth_status === 'oauth_expired' || dianEmailFromCache?.auth_status === 'oauth_revoked') && dianEmailFromCache.email_masked && (
                                 <p className="text-xs text-muted-foreground">
-                                  {dianEmail.email_masked}
+                                  {dianEmailFromCache.email_masked}
                                 </p>
                               )}
                             </div>
