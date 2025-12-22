@@ -6,7 +6,7 @@
  * Usuarios CON rol = admin/soporte/técnico
  */
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 
 export type AdminRole = 'super_admin' | 'technical_support' | 'support_agent'
 
@@ -23,7 +23,10 @@ export interface UserRole {
  * Obtener roles activos de un usuario
  */
 export async function getUserRoles(userId: string): Promise<AdminRole[]> {
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const { data, error } = await supabase
     .from('user_roles')

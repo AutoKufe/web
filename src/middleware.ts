@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 
 // Domain configuration
 const APP_DOMAIN = 'app.autokufe.com'
@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Landing domain (autokufe.com) - only allow landing pages
-  const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && \!hostname.includes('app.') && \!hostname.includes('admin.')
+  const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.') && !hostname.includes('admin.')
 
   if (isLandingDomain) {
     // Allow landing routes
@@ -27,13 +27,13 @@ export async function middleware(request: NextRequest) {
     const isLandingRoute = landingRoutes.includes(pathname) || pathname.startsWith('/api/')
 
     // Redirect dashboard routes to app subdomain
-    if (\!isLandingRoute) {
+    if (!isLandingRoute) {
       const appUrl = new URL(request.url)
       appUrl.host = APP_DOMAIN
       return NextResponse.redirect(appUrl, 302)
     }
 
-    // Landing pages don'''t need auth - just continue
+    // Landing pages don't need auth - just continue
     return NextResponse.next()
   }
 
@@ -41,9 +41,27 @@ export async function middleware(request: NextRequest) {
   const isAdminDomain = hostname.includes(ADMIN_DOMAIN) || hostname.includes('localhost:3001')
   const isAppDomain = hostname.includes(APP_DOMAIN) || hostname.includes('localhost:3000')
 
-  // Check user roles for domain routing
-  const response = NextResponse.next()
-  const supabase = createMiddlewareClient({ req: request, res: response })
+  // Create Supabase client for checking roles
+  let supabaseResponse = NextResponse.next({ request })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
@@ -58,7 +76,7 @@ export async function middleware(request: NextRequest) {
 
     // Admin domain - only allow admin users
     if (isAdminDomain) {
-      if (\!isAdmin) {
+      if (!isAdmin) {
         // Non-admin trying to access admin - redirect to app
         const appUrl = new URL(request.url)
         appUrl.host = APP_DOMAIN
@@ -98,6 +116,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files
      */
-    '''/((?\!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)''',
+    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

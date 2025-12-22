@@ -52,7 +52,7 @@ export default function AdminLayout({
                 Soporte
               </Link>
               <Link
-                href="/jobs"
+                href="/admin-jobs"
                 className="flex items-center gap-2 hover:text-red-100 transition-colors"
               >
                 <Briefcase className="h-4 w-4" />
