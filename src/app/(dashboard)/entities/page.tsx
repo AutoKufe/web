@@ -671,7 +671,7 @@ export default function EntitiesPage() {
                                   {dianEmailFromCache.email_masked}
                                 </p>
                               )}
-                              {(dianEmailFromCache?.auth_status === 'oauth_expired' || dianEmailFromCache?.auth_status === 'oauth_revoked') && dianEmailFromCache.email_masked && (
+                              {(dianEmailFromCache?.auth_status === 'expired' || dianEmailFromCache?.auth_status === 'revoked') && dianEmailFromCache.email_masked && (
                                 <p className="text-xs text-muted-foreground">
                                   {dianEmailFromCache.email_masked}
                                 </p>
