@@ -55,7 +55,6 @@ interface PageDianEmail {
   requested_at: string
   authorized_at?: string
   deactivated_at?: string
-  has_filter: boolean
   has_associated_entities?: boolean
   associated_entities_count?: number
 }
@@ -95,7 +94,6 @@ export default function DianEmailsPage() {
     requested_at: email.created_at,
     authorized_at: email.authorized_at || undefined,
     deactivated_at: email.deactivated_at || undefined,
-    has_filter: false, // TODO: Add to cache if needed
     has_associated_entities: email.associated_entities_count > 0,
     associated_entities_count: email.associated_entities_count
   }))
@@ -328,7 +326,6 @@ export default function DianEmailsPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Entidades Asociadas</TableHead>
-                  <TableHead>Filtro Gmail</TableHead>
                   <TableHead>Registrado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>

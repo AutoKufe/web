@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 // Domain configuration
 const APP_DOMAIN = 'app.autokufe.com'
+const ADMIN_DOMAIN = 'admin.autokufe.com'
 const LANDING_DOMAINS = ['autokufe.com', 'www.autokufe.com']
 
 export async function middleware(request: NextRequest) {
@@ -17,7 +19,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Landing domain (autokufe.com) - only allow landing pages
-  const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.')
+  const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && \!hostname.includes('app.') && \!hostname.includes('admin.')
 
   if (isLandingDomain) {
     // Allow landing routes
@@ -25,25 +27,65 @@ export async function middleware(request: NextRequest) {
     const isLandingRoute = landingRoutes.includes(pathname) || pathname.startsWith('/api/')
 
     // Redirect dashboard routes to app subdomain
-    if (!isLandingRoute) {
+    if (\!isLandingRoute) {
       const appUrl = new URL(request.url)
       appUrl.host = APP_DOMAIN
       return NextResponse.redirect(appUrl, 302)
     }
 
-    // Landing pages don't need auth - just continue
+    // Landing pages don'''t need auth - just continue
     return NextResponse.next()
   }
 
-  // App domain (app.autokufe.com) - full dashboard functionality
-  // Redirect root to dashboard
-  if (pathname === '/') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url, 302)
+  // Detect admin vs app domain
+  const isAdminDomain = hostname.includes(ADMIN_DOMAIN) || hostname.includes('localhost:3001')
+  const isAppDomain = hostname.includes(APP_DOMAIN) || hostname.includes('localhost:3000')
+
+  // Check user roles for domain routing
+  const response = NextResponse.next()
+  const supabase = createMiddlewareClient({ req: request, res: response })
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    // Check if user has admin role
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .is('revoked_at', null)
+
+    const isAdmin = roles && roles.length > 0
+
+    // Admin domain - only allow admin users
+    if (isAdminDomain) {
+      if (\!isAdmin) {
+        // Non-admin trying to access admin - redirect to app
+        const appUrl = new URL(request.url)
+        appUrl.host = APP_DOMAIN
+        appUrl.pathname = '/dashboard'
+        return NextResponse.redirect(appUrl, 302)
+      }
+      // Admin accessing admin domain - redirect root to support queue
+      if (pathname === '/') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/support'
+        return NextResponse.redirect(url, 302)
+      }
+    }
+
+    // App domain - admins should use admin domain for admin tasks
+    if (isAppDomain) {
+      // Allow normal users to use app domain freely
+      // Redirect root to dashboard
+      if (pathname === '/') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url, 302)
+      }
+    }
   }
 
-  // Continue with session management for app domain
+  // Continue with session management
   return await updateSession(request)
 }
 
@@ -56,6 +98,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '''/((?\!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)''',
   ],
 }
