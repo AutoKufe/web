@@ -323,6 +323,46 @@ export class ApiClient {
     }>('GET', url)
   }
 
+
+  async syncJobs(cachedPrefixesWithTimestamps?: string[]) {
+    const params = new URLSearchParams()
+    if (cachedPrefixesWithTimestamps && cachedPrefixesWithTimestamps.length > 0) {
+      params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
+    }
+
+    const url = `/api/jobs/sync${params.toString() ? `?${params.toString()}` : ''}`
+
+    return this.request<{
+      status: string
+      sync_mode: string
+      collision_detected: boolean
+      changes: {
+        modified_or_added: Array<{
+          id: string
+          job_name: string
+          status: string
+          entity_id?: string
+          entity_name?: string
+          entity_nit?: string
+          date_range?: {
+            start_date: string
+            end_date: string
+          }
+          document_filter?: string
+          docs_processed?: number
+          docs_total?: number
+          created_at: string
+          updated_at?: string
+          completed_at?: string
+        }>
+        all_valid_prefixes: string[]
+        colliding_prefixes: string[]
+        count: number
+      }
+      needs_full_ids_for_prefixes: string[]
+      total_count: number
+    }>('GET', url)
+  }
 }
 
 export const apiClient = new ApiClient()
