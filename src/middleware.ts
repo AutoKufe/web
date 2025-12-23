@@ -37,9 +37,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Detect admin vs app domain
-  const isAdminDomain = hostname.includes(ADMIN_DOMAIN) || hostname.includes('localhost:3001')
-  const isAppDomain = hostname.includes(APP_DOMAIN) || hostname.includes('localhost:3000')
+  // Detect admin vs app access
+  const isLocalhost = hostname.includes('localhost')
+  const isAdminDomain = hostname.includes(ADMIN_DOMAIN)
+  const isAppDomain = hostname.includes(APP_DOMAIN)
+  
+  // Admin routes detection
+  const adminRoutes = ['/support', '/admin-jobs', '/users']
+  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
+  
+  // In localhost, detect by route path. In production, detect by subdomain
+  const isAdminAccess = isLocalhost ? isAdminRoute : isAdminDomain
 
   // Create Supabase client for checking roles
   let supabaseResponse = NextResponse.next({ request })
@@ -66,7 +74,7 @@ export async function middleware(request: NextRequest) {
 
   if (user) {
     // Check if user has admin role
-    const { data: roles } = await supabase
+    const { data: roles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
@@ -74,16 +82,33 @@ export async function middleware(request: NextRequest) {
 
     const isAdmin = roles && roles.length > 0
 
-    // Admin domain - only allow admin users
-    if (isAdminDomain) {
+    // Debug logs (remove in production)
+    console.log('🔍 Middleware Debug:', {
+      hostname,
+      pathname,
+      isLocalhost,
+      isAdminRoute,
+      isAdminAccess,
+      userId: user.id,
+      userEmail: user.email,
+      roles,
+      rolesError,
+      isAdmin
+    })
+
+    // Admin access - only allow admin users
+    if (isAdminAccess) {
       if (!isAdmin) {
-        // Non-admin trying to access admin - redirect to app
-        const appUrl = new URL(request.url)
-        appUrl.host = APP_DOMAIN
-        appUrl.pathname = '/dashboard'
-        return NextResponse.redirect(appUrl, 302)
+        // Non-admin trying to access admin - redirect to dashboard
+        console.log('❌ Non-admin trying to access admin route, redirecting to dashboard')
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url, 302)
       }
-      // Admin accessing admin domain - redirect root to support queue
+      
+      console.log('✅ Admin user accessing admin route')
+      
+      // Admin accessing admin - redirect root to support queue
       if (pathname === '/') {
         const url = request.nextUrl.clone()
         url.pathname = '/support'
@@ -91,15 +116,11 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // App domain - admins should use admin domain for admin tasks
-    if (isAppDomain) {
-      // Allow normal users to use app domain freely
-      // Redirect root to dashboard
-      if (pathname === '/') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url, 302)
-      }
+    // Regular app access - redirect root to dashboard
+    if (!isAdminAccess && pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url, 302)
     }
   }
 
