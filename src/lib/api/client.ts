@@ -97,7 +97,7 @@ export class ApiClient {
       params.verify_ids = verifyIds.join(',')
     }
 
-    return this.request('GET', '/api/entities/', undefined, params)
+    return this.request('GET', '/entities/', undefined, params)
   }
 
   async searchEntities(params: {
@@ -112,23 +112,23 @@ export class ApiClient {
     if (params.entity_type) searchParams.entity_type = params.entity_type
     if (params.page_size) searchParams.page_size = params.page_size.toString()
 
-    return this.request('GET', '/api/entities/search', undefined, searchParams)
+    return this.request('GET', '/entities/search', undefined, searchParams)
   }
 
   async registerEntity(dianToken: string) {
-    return this.request('POST', '/api/entities/register', { dian_token: dianToken })
+    return this.request('POST', '/entities/register', { dian_token: dianToken })
   }
 
   async getEntity(entityId: string) {
-    return this.request('GET', `/api/entities/${entityId}`)
+    return this.request('GET', `/entities/${entityId}`)
   }
 
   async deleteEntity(entityId: string) {
-    return this.request('DELETE', `/api/entities/${entityId}`)
+    return this.request('DELETE', `/entities/${entityId}`)
   }
 
   async getEntityTokenStatus(entityId: string) {
-    return this.request('GET', `/api/entities/${entityId}/token-status`)
+    return this.request('GET', `/entities/${entityId}/token-status`)
   }
 
   async getEntityAutoTokenStatus(entityId: string) {
@@ -136,7 +136,7 @@ export class ApiClient {
       auto_token_available: boolean
       status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
       dian_email_masked?: string
-    }>('GET', `/api/entities/${entityId}/auto-token-status`)
+    }>('GET', `/entities/${entityId}/auto-token-status`)
   }
 
   async getEntityJobCreationOptions(entityId: string) {
@@ -152,7 +152,7 @@ export class ApiClient {
         token_masked?: string
       }
       recommended_option: 'auto' | 'saved' | 'manual'
-    }>('GET', `/api/entities/${entityId}/job-creation-options`)
+    }>('GET', `/entities/${entityId}/job-creation-options`)
   }
 
   // === DIAN EMAILS ===
@@ -169,27 +169,27 @@ export class ApiClient {
         has_filter: boolean
       }>
       total: number
-    }>('GET', '/api/dian-emails/list')
+    }>('GET', '/dian-emails/list')
   }
 
   async registerDianEmail(dianEmail: string) {
-    return this.request('POST', '/api/dian-emails/register', { dian_email: dianEmail })
+    return this.request('POST', '/dian-emails/register', { dian_email: dianEmail })
   }
 
   async getDianEmailDetails(dianEmailId: string) {
-    return this.request('GET', `/api/dian-emails/${dianEmailId}/details`)
+    return this.request('GET', `/dian-emails/${dianEmailId}/details`)
   }
 
   async deactivateDianEmail(dianEmailId: string) {
-    return this.request('POST', `/api/dian-emails/${dianEmailId}/deactivate`)
+    return this.request('POST', `/dian-emails/${dianEmailId}/deactivate`)
   }
 
   async reactivateDianEmail(dianEmailId: string) {
-    return this.request('POST', `/api/dian-emails/${dianEmailId}/reactivate`)
+    return this.request('POST', `/dian-emails/${dianEmailId}/reactivate`)
   }
 
   async regenerateOAuthUrl(dianEmailId: string) {
-    return this.request('POST', `/api/dian-emails/${dianEmailId}/regenerate-oauth`)
+    return this.request('POST', `/dian-emails/${dianEmailId}/regenerate-oauth`)
   }
 
   // === JOBS ===
@@ -203,25 +203,25 @@ export class ApiClient {
       consolidation_interval: string | { value: number; unit: string } | null
     }
   ) {
-    return this.request('POST', '/api/jobs/create-job', {
+    return this.request('POST', '/jobs/create-job', {
       dian_token: dianToken,
       job_data: jobData,
     })
   }
 
   async listJobs(page = 1, pageSize = 10) {
-    return this.request('GET', '/api/jobs/list', undefined, {
+    return this.request('GET', '/jobs/list', undefined, {
       page: page.toString(),
       page_size: pageSize.toString(),
     })
   }
 
   async getJobStatus(jobId: string) {
-    return this.request('GET', `/api/jobs/${jobId}/status`)
+    return this.request('GET', `/jobs/${jobId}/status`)
   }
 
   async cancelJob(jobId: string) {
-    return this.request('POST', `/api/jobs/${jobId}/cancel`)
+    return this.request('POST', `/jobs/${jobId}/cancel`)
   }
 
   async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
@@ -232,7 +232,7 @@ export class ApiClient {
         headers['Authorization'] = `Bearer ${this.accessToken}`
       }
 
-      const response = await fetch(`${API_BASE}/api/storage/download-excel/${jobId}`, {
+      const response = await fetch(`${API_BASE}/storage/download-excel/${jobId}`, {
         method: 'GET',
         headers,
       })
@@ -295,7 +295,7 @@ export class ApiClient {
       params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
     }
 
-    const url = `/api/dian-emails/sync${params.toString() ? `?${params.toString()}` : ''}`
+    const url = `/dian-emails/sync${params.toString() ? `?${params.toString()}` : ''}`
 
     return this.request<{
       status: string
@@ -330,7 +330,7 @@ export class ApiClient {
       params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
     }
 
-    const url = `/api/jobs/sync${params.toString() ? `?${params.toString()}` : ''}`
+    const url = `/jobs/sync${params.toString() ? `?${params.toString()}` : ''}`
 
     return this.request<{
       status: string
