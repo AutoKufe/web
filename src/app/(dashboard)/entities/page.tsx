@@ -140,7 +140,6 @@ export default function EntitiesPage() {
         total_count
       }
       localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
-      console.log(`💾 Cache saved: ${entities.length} entities`)
     } catch (err) {
       console.error('Error saving cache:', err)
     }
@@ -185,7 +184,6 @@ export default function EntitiesPage() {
   const fetchEntities = async (currentPage = 1, forceFullSync = false) => {
     // Prevenir llamadas duplicadas concurrentes
     if (fetchingRef.current) {
-      console.log('⏭️ Fetch already in progress, skipping...')
       return
     }
 
@@ -196,7 +194,6 @@ export default function EntitiesPage() {
 
       // Si hay cache y no es full sync forzado
       if (cached && !forceFullSync) {
-      console.log(`📦 Global cache loaded (${cached.entities.length} entities), syncing with prefixes...`)
 
       // Mostrar página actual desde cache inmediatamente
       const pageEntities = getEntitiesForPage(cached.entities, currentPage)
@@ -232,11 +229,9 @@ export default function EntitiesPage() {
             const collidingPrefixes = data.changes?.colliding_prefixes || []
             const needsFullIds = data.needs_full_ids_for_prefixes || []
 
-            console.log(`📊 Prefix sync: ${changes.length} changes, ${collidingPrefixes.length} collisions, ${needsFullIds.length} need verification`)
 
             // Si hay prefijos faltantes, hacer segunda request con IDs completos
             if (needsFullIds.length > 0) {
-              console.log(`🔍 Verifying ${needsFullIds.length} missing prefixes...`)
 
               // Encontrar IDs completos que corresponden a esos prefijos
               const idsToVerify = cached.entities
@@ -256,7 +251,6 @@ export default function EntitiesPage() {
                 const verifyData = verifyResponse as any
                 const confirmedDeletions = verifyData.changes?.confirmed_deletions || []
 
-                console.log(`✅ Confirmed ${confirmedDeletions.length} deletions`)
 
                 // Aplicar cambios con eliminaciones confirmadas
                 const updatedEntities = applyIncrementalChanges(
@@ -275,7 +269,6 @@ export default function EntitiesPage() {
               }
             } else if (collidingPrefixes.length > 0) {
               // Hay colisiones pero no hay prefijos faltantes
-              console.log(`⚠️ Collisions detected but no deletions`)
 
               // Aplicar solo cambios (no eliminaciones)
               const updatedEntities = applyIncrementalChanges(
@@ -303,7 +296,6 @@ export default function EntitiesPage() {
                 .filter(e => deletedPrefixes.includes(e.id.substring(0, 8)))
                 .map(e => e.id)
 
-              console.log(`🔄 Clean sync: ${changes.length} changes, ${deletedIds.length} deletions (no collisions)`)
 
               const updatedEntities = applyIncrementalChanges(
                 cached.entities,
@@ -323,7 +315,6 @@ export default function EntitiesPage() {
           // MODO 2: Respuesta verificada (segunda request con IDs completos)
           else if (data.sync_mode === 'incremental_verified') {
             // Ya manejado arriba en el flujo de verificación
-            console.log('✅ Verification complete')
           }
 
           // MODO 3 (fallback): Sync con IDs completos (backward compatibility)
@@ -337,7 +328,6 @@ export default function EntitiesPage() {
             const deletedIds = cachedIds.filter(id => !allValidIds.includes(id))
 
             if (deletedIds.length > 0 || changes.length > 0) {
-              console.log(`🔄 Standard incremental sync: ${changes.length} changes, ${deletedIds.length} deletions`)
 
               const updatedEntities = applyIncrementalChanges(
                 cached.entities,
@@ -352,7 +342,6 @@ export default function EntitiesPage() {
 
               saveToCache(updatedEntities, newTotalCount)
             } else {
-              console.log('✅ No changes detected')
             }
           }
         }

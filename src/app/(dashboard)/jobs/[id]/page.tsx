@@ -120,12 +120,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const responseData = response as any
         const jobData = responseData.job_data as JobDetails
         setJob(jobData)
-        // Debug: Check what we're getting
-        console.log("🔍 Job data received:", {
-          document_categories: jobData.document_categories,
-          start_date: jobData.start_date,
-          end_date: jobData.end_date
-        })
 
         // Fetch entity data separately
         if (jobData.entity_id) {
@@ -512,25 +506,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
-          {/* Documents Processed */}
-          {job.status === 'completed' && job.total_documents && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  Resultado
-                </h3>
-                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-4 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    <p className="font-medium text-green-700 dark:text-green-300">
-                      {job.processed_documents || job.total_documents} documentos procesados
-                    </p>
-                  </div>
-                </div>
+          <Separator />
+
+          {/* Documents Statistics */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Documentos
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-xs text-muted-foreground">Total de documentos</p>
+                <p className="font-medium text-lg">
+                  {job.total_documents !== undefined && job.total_documents !== null
+                    ? job.total_documents.toLocaleString()
+                    : 'Calculando...'}
+                </p>
               </div>
-            </>
-          )}
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-xs text-muted-foreground">Procesados</p>
+                <p className="font-medium text-lg">
+                  {job.processed_documents !== undefined && job.processed_documents !== null
+                    ? job.processed_documents.toLocaleString()
+                    : '0'}
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
