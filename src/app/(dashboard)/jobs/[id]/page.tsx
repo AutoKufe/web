@@ -109,6 +109,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const responseData = response as any
         const jobData = responseData.job_data as JobDetails
         setJob(jobData)
+        // Debug: Check what we're getting
+        console.log("🔍 Job data received:", {
+          document_categories: jobData.document_categories,
+          start_date: jobData.start_date,
+          end_date: jobData.end_date
+        })
 
         // Fetch entity data separately
         if (jobData.entity_id) {
