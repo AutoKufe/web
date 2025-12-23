@@ -27,9 +27,11 @@ import {
 import { toast } from 'sonner'
 
 
-// Helper: Format document categories from "ingresosegresosnominas" to "Ingresos, Egresos, Nóminas"
-function formatDocumentCategories(categories: string | undefined | null): string {
-  if (!categories || typeof categories !== 'string') return 'Todos'
+// Helper: Format document categories
+// Input: ['ingresos', 'egresos', 'nominas'] or "ingresosegresosnominas"
+// Output: "Ingresos, Egresos, Nóminas"
+function formatDocumentCategories(categories: string | string[] | undefined | null): string {
+  if (!categories) return 'Todos'
 
   const categoryMap: Record<string, string> = {
     'ingresos': 'Ingresos',
@@ -37,18 +39,27 @@ function formatDocumentCategories(categories: string | undefined | null): string
     'nominas': 'Nóminas'
   }
 
-  // Split by known keywords
-  const parts: string[] = []
-  let remaining = categories.toLowerCase()
-
-  for (const [key, label] of Object.entries(categoryMap)) {
-    if (remaining.includes(key)) {
-      parts.push(label)
-      remaining = remaining.replace(key, '')
-    }
+  // If it's an array, map directly
+  if (Array.isArray(categories)) {
+    const formatted = categories.map(cat => categoryMap[cat.toLowerCase()] || cat)
+    return formatted.join(', ')
   }
 
-  return parts.length > 0 ? parts.join(', ') : categories
+  // If it's a string, parse it
+  if (typeof categories === 'string') {
+    const parts: string[] = []
+    const remaining = categories.toLowerCase()
+
+    for (const [key, label] of Object.entries(categoryMap)) {
+      if (remaining.includes(key)) {
+        parts.push(label)
+      }
+    }
+
+    return parts.length > 0 ? parts.join(', ') : categories
+  }
+
+  return 'Todos'
 }
 
 // Helper: Format date without timezone shift (fix -1 day bug)
@@ -70,7 +81,7 @@ interface JobDetails {
   status: string
   start_date: string
   end_date: string
-  document_categories?: string
+  document_categories?: string | string[]
   consolidation_interval?: string
   processed_documents?: number
   total_documents?: number
