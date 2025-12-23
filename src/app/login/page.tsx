@@ -33,7 +33,10 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    // Redirect based on domain
+    const hostname = window.location.hostname
+    const isAdminDomain = hostname.includes('admin.')
+    router.push(isAdminDomain ? '/support' : '/dashboard')
     router.refresh()
   }
 

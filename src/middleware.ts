@@ -99,16 +99,17 @@ export async function middleware(request: NextRequest) {
     // Admin access - only allow admin users
     if (isAdminAccess) {
       if (!isAdmin) {
-        // Non-admin trying to access admin - redirect to dashboard
-        console.log('❌ Non-admin trying to access admin route, redirecting to dashboard')
-        const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url, 302)
+        // Non-admin trying to access admin - show access denied
+        console.log('❌ Non-admin trying to access admin route, showing 403')
+        return new NextResponse(
+          '<html><body><h1>403 - Acceso Denegado</h1><p>Esta área está restringida solo para personal autorizado de AutoKufe.</p><p><a href="/">Volver al inicio</a></p></body></html>',
+          { status: 403, headers: { 'content-type': 'text/html' } }
+        )
       }
-      
+
       console.log('✅ Admin user accessing admin route')
-      
-      // Admin accessing admin - redirect root to support queue
+
+      // Admin accessing admin root - redirect to support queue
       if (pathname === '/') {
         const url = request.nextUrl.clone()
         url.pathname = '/support'
