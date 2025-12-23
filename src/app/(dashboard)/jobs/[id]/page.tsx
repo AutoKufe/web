@@ -27,9 +27,9 @@ import {
 import { toast } from 'sonner'
 
 
-// Helper: Format document categories
+// Helper: Format document categories with proper "y" conjunction
 // Input: ['ingresos', 'egresos', 'nominas'] or "ingresosegresosnominas"
-// Output: "Ingresos, Egresos, Nóminas"
+// Output: "Ingresos, Egresos y Nóminas"
 function formatDocumentCategories(categories: string | string[] | undefined | null): string {
   if (!categories) return 'Todos'
 
@@ -39,10 +39,20 @@ function formatDocumentCategories(categories: string | string[] | undefined | nu
     'nominas': 'Nóminas'
   }
 
+  const joinWithY = (items: string[]): string => {
+    if (items.length === 0) return ''
+    if (items.length === 1) return items[0]
+    if (items.length === 2) return items.join(' y ')
+
+    const lastItem = items[items.length - 1]
+    const beforeLast = items.slice(0, -1)
+    return beforeLast.join(', ') + ' y ' + lastItem
+  }
+
   // If it's an array, map directly
   if (Array.isArray(categories)) {
     const formatted = categories.map(cat => categoryMap[cat.toLowerCase()] || cat)
-    return formatted.join(', ')
+    return joinWithY(formatted)
   }
 
   // If it's a string, parse it
@@ -56,7 +66,7 @@ function formatDocumentCategories(categories: string | string[] | undefined | nu
       }
     }
 
-    return parts.length > 0 ? parts.join(', ') : categories
+    return parts.length > 0 ? joinWithY(parts) : categories
   }
 
   return 'Todos'
@@ -85,6 +95,7 @@ interface JobDetails {
   consolidation_interval?: string
   processed_documents?: number
   total_documents?: number
+  unique_documents?: number
   created_at: string
   processing_start_time?: string
   completed_at?: string
@@ -514,13 +525,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <FileText className="h-4 w-4" />
               Documentos
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Total de documentos</p>
+                <p className="text-xs text-muted-foreground">Total encontrados</p>
                 <p className="font-medium text-lg">
                   {job.total_documents !== undefined && job.total_documents !== null
                     ? job.total_documents.toLocaleString()
                     : 'Calculando...'}
+                </p>
+              </div>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-xs text-muted-foreground">Únicos (cobrados)</p>
+                <p className="font-medium text-lg">
+                  {job.unique_documents !== undefined && job.unique_documents !== null
+                    ? job.unique_documents.toLocaleString()
+                    : job.total_documents !== undefined && job.total_documents !== null
+                      ? job.total_documents.toLocaleString()
+                      : 'Calculando...'}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
@@ -533,6 +554,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               </div>
             </div>
           </div>
+        </CardContent>
         </CardContent>
       </Card>
     </div>
