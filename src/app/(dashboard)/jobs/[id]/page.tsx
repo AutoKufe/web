@@ -28,8 +28,8 @@ import { toast } from 'sonner'
 
 
 // Helper: Format document categories from "ingresosegresosnominas" to "Ingresos, Egresos, Nóminas"
-function formatDocumentCategories(categories: string | undefined): string {
-  if (!categories) return 'Todos'
+function formatDocumentCategories(categories: string | undefined | null): string {
+  if (!categories || typeof categories !== 'string') return 'Todos'
 
   const categoryMap: Record<string, string> = {
     'ingresos': 'Ingresos',
@@ -53,8 +53,8 @@ function formatDocumentCategories(categories: string | undefined): string {
 
 // Helper: Format date without timezone shift (fix -1 day bug)
 // Input: "2025-01-01" from DB → Output: "1/1/2025"
-function formatDateOnly(dateString: string): string {
-  if (!dateString) return 'N/A'
+function formatDateOnly(dateString: string | undefined | null): string {
+  if (!dateString || typeof dateString !== 'string') return 'N/A'
 
   // Parse as local date (not UTC) to avoid timezone shift
   const [year, month, day] = dateString.split('T')[0].split('-')
