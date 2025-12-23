@@ -57,6 +57,7 @@ interface PageDianEmail {
   deactivated_at?: string
   has_associated_entities?: boolean
   associated_entities_count?: number
+  has_filter?: boolean
 }
 
 const getStatusBadge = (status: string) => {
