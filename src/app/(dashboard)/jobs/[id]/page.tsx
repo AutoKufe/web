@@ -26,6 +26,43 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+
+// Helper: Format document categories from "ingresosegresosnominas" to "Ingresos, Egresos, Nóminas"
+function formatDocumentCategories(categories: string | undefined): string {
+  if (!categories) return 'Todos'
+
+  const categoryMap: Record<string, string> = {
+    'ingresos': 'Ingresos',
+    'egresos': 'Egresos',
+    'nominas': 'Nóminas'
+  }
+
+  // Split by known keywords
+  const parts: string[] = []
+  let remaining = categories.toLowerCase()
+
+  for (const [key, label] of Object.entries(categoryMap)) {
+    if (remaining.includes(key)) {
+      parts.push(label)
+      remaining = remaining.replace(key, '')
+    }
+  }
+
+  return parts.length > 0 ? parts.join(', ') : categories
+}
+
+// Helper: Format date without timezone shift (fix -1 day bug)
+// Input: "2025-01-01" from DB → Output: "1/1/2025"
+function formatDateOnly(dateString: string): string {
+  if (!dateString) return 'N/A'
+
+  // Parse as local date (not UTC) to avoid timezone shift
+  const [year, month, day] = dateString.split('T')[0].split('-')
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+
+  return date.toLocaleDateString()
+}
+
 interface JobDetails {
   id: string
   entity_id: string
@@ -387,7 +424,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="text-xs text-muted-foreground">Inicio</p>
                 <p className="font-medium">
                   {job.start_date
-                    ? new Date(job.start_date).toLocaleDateString()
+                    ? formatDateOnly(job.start_date)
                     : 'N/A'}
                 </p>
               </div>
@@ -395,7 +432,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="text-xs text-muted-foreground">Fin</p>
                 <p className="font-medium">
                   {job.end_date
-                    ? new Date(job.end_date).toLocaleDateString()
+                    ? formatDateOnly(job.end_date)
                     : 'N/A'}
                 </p>
               </div>
@@ -413,7 +450,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Categorías de documentos</p>
-                <p className="font-medium capitalize">{job.document_categories || 'Todos'}</p>
+                <p className="font-medium capitalize">{formatDocumentCategories(job.document_categories)}</p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Intervalo</p>
