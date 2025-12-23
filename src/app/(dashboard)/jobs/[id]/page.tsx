@@ -555,7 +555,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           </div>
         </CardContent>
-        </CardContent>
       </Card>
     </div>
   )
