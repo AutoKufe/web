@@ -68,6 +68,40 @@ const getColombiaMonth = () => {
   const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
   return colombiaTime.toISOString().slice(0, 7)
 }
+// Cache configuration for entity selector
+const ENTITIES_SELECTOR_CACHE_KEY = 'entities_selector_cache'
+const ENTITIES_CACHE_TTL = 60000 // 60 seconds
+
+interface EntityCache {
+  entities: Array<{ id: string; display_name: string; identifier_suffix: string }>
+  timestamp: number
+}
+
+const getEntitiesCache = (): EntityCache | null => {
+  if (typeof window === 'undefined') return null
+  const cached = localStorage.getItem(ENTITIES_SELECTOR_CACHE_KEY)
+  if (!cached) return null
+  try {
+    const data: EntityCache = JSON.parse(cached)
+    if (Date.now() - data.timestamp > ENTITIES_CACHE_TTL) {
+      localStorage.removeItem(ENTITIES_SELECTOR_CACHE_KEY)
+      return null
+    }
+    return data
+  } catch {
+    return null
+  }
+}
+
+const setEntitiesCache = (entities: Array<{ id: string; display_name: string; identifier_suffix: string }>) => {
+  if (typeof window === 'undefined') return
+  const cache: EntityCache = {
+    entities,
+    timestamp: Date.now()
+  }
+  localStorage.setItem(ENTITIES_SELECTOR_CACHE_KEY, JSON.stringify(cache))
+}
+
 
 function NewJobContent() {
   const router = useRouter()
@@ -177,12 +211,50 @@ function NewJobContent() {
   }
 
   const fetchEntities = async () => {
+    // Check cache first
+    const cached = getEntitiesCache()
+    if (cached) {
+      // Show cached entities immediately (eliminates flicker)
+      setEntities(cached.entities as Entity[])
+      setLoadingEntities(false)
+
+      // Fetch fresh data in background to update cache
+      try {
+        const response = await apiClient.listEntities(1, 100)
+        if (response && !response.error) {
+          const data = response as { entities?: Entity[] }
+          const freshEntities = data.entities || []
+          // Only keep basic fields for cache (display_name and identifier_suffix)
+          const cacheEntities = freshEntities.map(e => ({
+            id: e.id,
+            display_name: e.display_name,
+            identifier_suffix: e.identifier_suffix
+          }))
+          setEntitiesCache(cacheEntities)
+          setEntities(freshEntities)
+        }
+      } catch (err) {
+        console.error('Error updating entities:', err)
+        // Keep using cached data silently
+      }
+      return
+    }
+
+    // No cache - fetch normally
     setLoadingEntities(true)
     try {
       const response = await apiClient.listEntities(1, 100)
       if (response && !response.error) {
         const data = response as { entities?: Entity[] }
-        setEntities(data.entities || [])
+        const freshEntities = data.entities || []
+        // Store basic fields in cache
+        const cacheEntities = freshEntities.map(e => ({
+          id: e.id,
+          display_name: e.display_name,
+          identifier_suffix: e.identifier_suffix
+        }))
+        setEntitiesCache(cacheEntities)
+        setEntities(freshEntities)
       }
     } catch (err) {
       console.error('Error loading entities:', err)
