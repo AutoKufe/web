@@ -35,6 +35,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Cache configuration
+const JOBS_CACHE_KEY = 'jobs_list_cache'
+const JOBS_CACHE_TTL = 30000 // 30 seconds cache
+const POLLING_INTERVAL = 30000 // Poll every 30 seconds (reduced from 10s)
+
 interface Job {
   id: string
   job_name: string
@@ -52,6 +57,59 @@ interface Job {
   completed_at?: string
 }
 
+interface JobsCache {
+  jobs: Job[]
+  totalPages: number
+  page: number
+  timestamp: number
+}
+
+// Cache helpers
+const getJobsCache = (page: number): JobsCache | null => {
+  try {
+    const cached = localStorage.getItem(`${JOBS_CACHE_KEY}_page_${page}`)
+    if (!cached) return null
+
+    const data: JobsCache = JSON.parse(cached)
+    const now = Date.now()
+
+    // Check if cache is still valid
+    if (now - data.timestamp > JOBS_CACHE_TTL) {
+      localStorage.removeItem(`${JOBS_CACHE_KEY}_page_${page}`)
+      return null
+    }
+
+    return data
+  } catch {
+    return null
+  }
+}
+
+const setJobsCache = (page: number, jobs: Job[], totalPages: number) => {
+  try {
+    const data: JobsCache = {
+      jobs,
+      totalPages,
+      page,
+      timestamp: Date.now()
+    }
+    localStorage.setItem(`${JOBS_CACHE_KEY}_page_${page}`, JSON.stringify(data))
+  } catch (error) {
+    console.warn('Failed to cache jobs:', error)
+  }
+}
+
+const clearJobsCache = () => {
+  try {
+    // Clear all job cache pages
+    Object.keys(localStorage)
+      .filter(key => key.startsWith(JOBS_CACHE_KEY))
+      .forEach(key => localStorage.removeItem(key))
+  } catch (error) {
+    console.warn('Failed to clear jobs cache:', error)
+  }
+}
+
 export default function JobsPage() {
   const { user, loading: authLoading } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
@@ -59,44 +117,77 @@ export default function JobsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  // Track entity data cache separately to avoid N+1 queries
+  const [entityCache, setEntityCache] = useState<Map<string, { name: string; nit?: string }>>(new Map())
 
-  const fetchJobs = async (currentPage = 1, showRefreshing = false) => {
+  const fetchJobs = async (currentPage = 1, showRefreshing = false, skipCache = false) => {
     if (showRefreshing) {
       setRefreshing(true)
     } else {
       setLoading(true)
     }
 
+    // Check cache first (unless skipCache=true)
+    if (!skipCache) {
+      const cached = getJobsCache(currentPage)
+      if (cached) {
+        setJobs(cached.jobs)
+        setTotalPages(cached.totalPages)
+        setLoading(false)
+        setRefreshing(false)
+        // Still fetch in background to update cache
+        fetchJobsFromAPI(currentPage, false)
+        return
+      }
+    }
+
+    await fetchJobsFromAPI(currentPage, showRefreshing)
+  }
+
+  const fetchJobsFromAPI = async (currentPage: number, showRefreshing: boolean) => {
     try {
       const response = await apiClient.listJobs(currentPage, 10)
       if (response && !response.error) {
         const data = response as any
         const jobsList = data.jobs || []
 
-        // Map backend response to frontend Job interface
-        const mappedJobs = await Promise.all(jobsList.map(async (job: any) => {
-          // Fetch entity data for each job
-          let entityName = 'N/A'
-          let entityNit = undefined
+        // Collect all unique entity IDs
+        const entityIds = Array.from(new Set(
+          jobsList.map((job: any) => job.entity_id).filter(Boolean)
+        )) as string[]
 
-          if (job.entity_id) {
-            try {
-              const entityResponse = await apiClient.getEntity(job.entity_id) as any
-              if (entityResponse && !entityResponse.error && entityResponse.entity) {
-                entityName = entityResponse.entity.name || 'N/A'
-                entityNit = entityResponse.entity.identifier?.slice(-4)
+        // Fetch all entities in a single pass (batch request if API supports it)
+        // For now, we'll fetch them individually but in parallel
+        const newEntityCache = new Map(entityCache)
+        await Promise.all(
+          entityIds
+            .filter(id => !newEntityCache.has(id)) // Only fetch if not cached
+            .map(async (entityId) => {
+              try {
+                const entityResponse = await apiClient.getEntity(entityId) as any
+                if (entityResponse && !entityResponse.error && entityResponse.entity) {
+                  newEntityCache.set(entityId, {
+                    name: entityResponse.entity.name || 'N/A',
+                    nit: entityResponse.entity.identifier?.slice(-4)
+                  })
+                }
+              } catch {
+                // Silently fail, entity will show as N/A
               }
-            } catch {
-              // Silently fail, use N/A
-            }
-          }
+            })
+        )
+        setEntityCache(newEntityCache)
+
+        // Map backend response to frontend Job interface using cached entity data
+        const mappedJobs = jobsList.map((job: any) => {
+          const entityData = job.entity_id ? newEntityCache.get(job.entity_id) : undefined
 
           return {
-            id: job.job_id || job.id,  // Backend uses job_id in JobProgressResponse
+            id: job.job_id || job.id,
             job_name: job.job_name,
             status: job.status,
-            entity_name: entityName,
-            entity_nit: entityNit ? `****${entityNit}` : undefined,
+            entity_name: entityData?.name || 'N/A',
+            entity_nit: entityData?.nit ? `****${entityData.nit}` : undefined,
             date_range: {
               start_date: job.start_date,
               end_date: job.end_date
@@ -106,12 +197,16 @@ export default function JobsPage() {
             created_at: job.created_at,
             completed_at: job.completed_at
           }
-        }))
+        })
 
         setJobs(mappedJobs)
         const total = data.total_count || 0
         const pageSize = data.per_page || 10
-        setTotalPages(Math.ceil(total / pageSize))
+        const pages = Math.ceil(total / pageSize)
+        setTotalPages(pages)
+
+        // Cache the result
+        setJobsCache(currentPage, mappedJobs, pages)
       }
     } catch (err) {
       console.error('Error fetching jobs:', err)
@@ -120,6 +215,11 @@ export default function JobsPage() {
       setLoading(false)
       setRefreshing(false)
     }
+  }
+
+  const handleRefresh = () => {
+    clearJobsCache()
+    fetchJobs(page, true, true)
   }
 
   useEffect(() => {
@@ -134,8 +234,9 @@ export default function JobsPage() {
 
     if (hasActiveJobs) {
       const interval = setInterval(() => {
-        fetchJobs(page, true)
-      }, 10000)
+        // Use skipCache=true during polling to get fresh data
+        fetchJobs(page, true, true)
+      }, POLLING_INTERVAL)
       return () => clearInterval(interval)
     }
   }, [jobs, page])
@@ -187,7 +288,7 @@ export default function JobsPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => fetchJobs(page, true)}
+            onClick={handleRefresh}
             disabled={refreshing}
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -243,8 +344,8 @@ export default function JobsPage() {
                 </TableHeader>
                 <TableBody>
                   {jobs.map((job) => {
-                    const jobId = job.id;  // Capture ID in closure
-                    const jobName = job.job_name;  // Capture name in closure
+                    const jobId = job.id;
+                    const jobName = job.job_name;
 
                     return (
                     <TableRow key={jobId}>
