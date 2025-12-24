@@ -215,46 +215,27 @@ function NewJobContent() {
     const cached = getEntitiesCache()
     if (cached) {
       // Show cached entities immediately (eliminates flicker)
+      // Selector only needs id, display_name, identifier_suffix
       setEntities(cached.entities as Entity[])
-      setLoadingEntities(false)
-
-      // Fetch fresh data in background to update cache
-      try {
-        const response = await apiClient.listEntities(1, 100)
-        if (response && !response.error) {
-          const data = response as { entities?: Entity[] }
-          const freshEntities = data.entities || []
-          // Only keep basic fields for cache (display_name and identifier_suffix)
-          const cacheEntities = freshEntities.map(e => ({
-            id: e.id,
-            display_name: e.display_name,
-            identifier_suffix: e.identifier_suffix
-          }))
-          setEntitiesCache(cacheEntities)
-          setEntities(freshEntities)
-        }
-      } catch (err) {
-        console.error('Error updating entities:', err)
-        // Keep using cached data silently
-      }
+      // No loading state - instant display
       return
     }
 
-    // No cache - fetch normally
+    // No cache - fetch only basic fields needed for selector
     setLoadingEntities(true)
     try {
       const response = await apiClient.listEntities(1, 100)
       if (response && !response.error) {
         const data = response as { entities?: Entity[] }
         const freshEntities = data.entities || []
-        // Store basic fields in cache
+        // Store only basic fields in cache (selector doesn't need entity_type, etc.)
         const cacheEntities = freshEntities.map(e => ({
           id: e.id,
           display_name: e.display_name,
           identifier_suffix: e.identifier_suffix
         }))
         setEntitiesCache(cacheEntities)
-        setEntities(freshEntities)
+        setEntities(cacheEntities as Entity[])
       }
     } catch (err) {
       console.error('Error loading entities:', err)
