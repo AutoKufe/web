@@ -118,6 +118,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [jobNotFound, setJobNotFound] = useState(false)
 
   const fetchJobStatus = async (showRefreshing = false) => {
     if (showRefreshing) {
@@ -131,6 +132,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const responseData = response as any
         const jobData = responseData.job_data as JobDetails
         setJob(jobData)
+        setJobNotFound(false)
 
         // Fetch entity data separately
         if (jobData.entity_id) {
@@ -144,11 +146,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           }
         }
       } else {
-        toast.error('Error cargando estado del job')
+        // Job no encontrado o error - no seguir haciendo polling
+        setJobNotFound(true)
+        if (!showRefreshing) {
+          toast.error('Job no encontrado o no tienes acceso')
+        }
       }
     } catch (err) {
       console.error('Error fetching job status:', err)
-      toast.error('Error cargando estado del job')
+      setJobNotFound(true)
+      if (!showRefreshing) {
+        toast.error('Error cargando estado del job')
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -161,13 +170,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }, [id, authLoading, user])
 
   useEffect(() => {
-    if (job && (job.status === 'processing' || job.status === 'pending')) {
+    // Solo hacer polling si el job existe, no está en estado final, y no hubo error 404
+    if (job && !jobNotFound && (job.status === 'processing' || job.status === 'pending')) {
       const interval = setInterval(() => {
         fetchJobStatus(true)
       }, 5000)
       return () => clearInterval(interval)
     }
-  }, [job])
+  }, [job, jobNotFound])
 
   const getStatusIcon = (status: string, size = 'h-5 w-5') => {
     switch (status) {
