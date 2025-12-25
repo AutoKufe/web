@@ -100,6 +100,8 @@ interface JobDetails {
   processing_start_time?: string
   completed_at?: string
   error_message?: string
+  error_code?: string
+  error_category?: string
   stage?: string
   progress_percentage?: number
 }
@@ -390,7 +392,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 space-y-3">
                 <div>
-                  <h3 className="font-semibold text-destructive mb-1">Error en el procesamiento</h3>
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-destructive">Error en el procesamiento</h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {job.error_message.split("
+
+")[0]}
+                    </p>
+                    {job.error_code && (
+                      <p className="text-xs text-muted-foreground font-mono">
+                        Código de error: <span className="font-semibold">{job.error_code}</span>
+                      </p>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">{job.error_message}</p>
                 </div>
                 <Link href={`/soporte?job_id=${job.id}`}>
