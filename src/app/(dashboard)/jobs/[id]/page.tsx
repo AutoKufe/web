@@ -395,9 +395,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <div className="space-y-2">
                     <h3 className="font-semibold text-destructive">Error en el procesamiento</h3>
                     <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {job.error_message.split("
-
-")[0]}
+                      {job.error_message.split("\n\n")[0]}
                     </p>
                     {job.error_code && (
                       <p className="text-xs text-muted-foreground font-mono">
