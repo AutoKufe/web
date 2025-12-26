@@ -112,6 +112,66 @@ interface EntityDetails {
   type: string
 }
 
+
+const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global' // Same key as entities page
+
+interface Entity {
+  id: string
+  display_name: string
+  identifier_suffix: string
+  entity_type: string
+  updated_at?: string
+}
+
+interface EntitiesCache {
+  entities: Entity[]
+  total_count: number
+}
+
+// Entity cache helpers
+const getEntitiesCache = (): EntitiesCache | null => {
+  try {
+    const cached = localStorage.getItem(ENTITIES_CACHE_KEY)
+    if (!cached) return null
+    return JSON.parse(cached)
+  } catch {
+    return null
+  }
+}
+
+const updateEntityInCache = (entity: Entity) => {
+  try {
+    const cache = getEntitiesCache()
+    if (!cache) {
+      localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify({
+        entities: [entity],
+        total_count: 1
+      }))
+      return
+    }
+
+    const existingIndex = cache.entities.findIndex(e => e.id === entity.id)
+    if (existingIndex >= 0) {
+      cache.entities[existingIndex] = entity
+    } else {
+      cache.entities.push(entity)
+      cache.total_count = cache.entities.length
+    }
+
+    localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
+  } catch (error) {
+    console.warn('Failed to update entity cache:', error)
+  }
+}
+
+const getEntityFromCache = (entityId: string): Entity | null => {
+  const cache = getEntitiesCache()
+  if (!cache) return null
+  return cache.entities.find(e => e.id === entityId) || null
+}
+
+
+
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, loading: authLoading } = useAuth()
@@ -136,14 +196,34 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         setJob(jobData)
         setJobNotFound(false)
 
-        // Fetch entity data separately
+        // Get entity data from cache, fetch if missing
         if (jobData.entity_id) {
-          const entityResponse = await apiClient.getEntity(jobData.entity_id) as any
-          if (entityResponse && !entityResponse.error && entityResponse.entity) {
+          let entity = getEntityFromCache(jobData.entity_id)
+          
+          // Fetch from backend if not in cache
+          if (!entity) {
+            try {
+              const entityResponse = await apiClient.getEntity(jobData.entity_id) as any
+              if (entityResponse && !entityResponse.error && entityResponse.entity) {
+                entity = {
+                  id: entityResponse.entity.id,
+                  display_name: entityResponse.entity.display_name,
+                  identifier_suffix: entityResponse.entity.identifier?.slice(-4) || '',
+                  entity_type: entityResponse.entity.type_code,
+                  updated_at: entityResponse.entity.updated_at
+                }
+                updateEntityInCache(entity)
+              }
+            } catch (err) {
+              console.warn('Failed to fetch entity:', err)
+            }
+          }
+
+          if (entity) {
             setEntity({
-              full_name: entityResponse.entity.name || 'N/A',
-              identifier_suffix: entityResponse.entity.identifier?.slice(-4) || 'N/A',
-              type: entityResponse.entity.type_code || 'N/A'
+              full_name: entity.display_name || 'N/A',
+              identifier_suffix: entity.identifier_suffix || 'N/A',
+              type: entity.entity_type || 'N/A'
             })
           }
         }
