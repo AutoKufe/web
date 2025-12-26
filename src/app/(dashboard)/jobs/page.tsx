@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
@@ -317,8 +317,16 @@ export default function JobsPage() {
   useEffect(() => {
     if (jobs.length === 0) return
 
+    // Check if any job is missing entity data but has entity_id
+    const needsEntityData = jobs.some(job => 
+      job.entity_id && !job.entity_name
+    )
+
+    if (!needsEntityData) return
+
     const jobsWithEntities = jobs.map(job => {
-      if (!job.entity_id) return job
+      // Skip if already has entity data or no entity_id
+      if (!job.entity_id || job.entity_name) return job
 
       const entity = getEntityFromCache(job.entity_id)
       if (!entity) return job
@@ -330,16 +338,8 @@ export default function JobsPage() {
       }
     })
 
-    // Only update if there are changes
-    const hasChanges = jobsWithEntities.some((job, idx) => 
-      job.entity_name !== jobs[idx].entity_name ||
-      job.entity_nit !== jobs[idx].entity_nit
-    )
-
-    if (hasChanges) {
-      setJobs(jobsWithEntities)
-    }
-  }, [jobs.map(j => j.entity_id).join(',')]) // Depend on entity_ids, not full jobs to avoid loop
+    setJobs(jobsWithEntities)
+  }, [jobs.length, jobs.filter(j => j.entity_id && !j.entity_name).length]) // Re-run when jobs change and have missing entity data
 
   const getStatusIcon = (status: string) => {
     switch (status) {
