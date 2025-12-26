@@ -39,11 +39,13 @@ import { toast } from 'sonner'
 const JOBS_CACHE_KEY = 'jobs_list_cache'
 const JOBS_CACHE_TTL = 30000 // 30 seconds cache
 const POLLING_INTERVAL = 30000 // Poll every 30 seconds (reduced from 10s)
+const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global' // Same key as entities page
 
 interface Job {
   id: string
   job_name: string
   status: string
+  entity_id?: string  // Store entity_id to lookup in entities cache
   entity_name?: string
   entity_nit?: string
   date_range?: {
@@ -55,6 +57,20 @@ interface Job {
   docs_total?: number
   created_at: string
   completed_at?: string
+}
+
+
+interface Entity {
+  id: string
+  display_name: string
+  identifier_suffix: string
+  entity_type: string
+  updated_at?: string
+}
+
+interface EntitiesCache {
+  entities: Entity[]
+  total_count: number
 }
 
 interface JobsCache {
@@ -110,6 +126,60 @@ const clearJobsCache = () => {
   }
 }
 
+
+// Entity cache helpers
+const getEntitiesCache = (): EntitiesCache | null => {
+  try {
+    const cached = localStorage.getItem(ENTITIES_CACHE_KEY)
+    if (!cached) return null
+    return JSON.parse(cached)
+  } catch {
+    return null
+  }
+}
+
+const updateEntityInCache = (entity: Entity) => {
+  try {
+    const cache = getEntitiesCache()
+    if (!cache) {
+      // Create new cache with this entity
+      localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify({
+        entities: [entity],
+        total_count: 1
+      }))
+      return
+    }
+
+    // Update or add entity
+    const existingIndex = cache.entities.findIndex(e => e.id === entity.id)
+    if (existingIndex >= 0) {
+      cache.entities[existingIndex] = entity
+    } else {
+      cache.entities.push(entity)
+      cache.total_count = cache.entities.length
+    }
+
+    localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
+  } catch (error) {
+    console.warn('Failed to update entity cache:', error)
+  }
+}
+
+const getEntityFromCache = (entityId: string): Entity | null => {
+  const cache = getEntitiesCache()
+  if (!cache) return null
+  return cache.entities.find(e => e.id === entityId) || null
+}
+
+// Helper: Format date without timezone shift (fix -1 day bug)
+const formatDateOnly = (dateString: string): string => {
+  if (!dateString) return 'N/A'
+  // Parse as local date (not UTC) to avoid timezone shift
+  const [year, month, day] = dateString.split('T')[0].split('-')
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  return date.toLocaleDateString()
+}
+
 export default function JobsPage() {
   const { user, loading: authLoading } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
@@ -117,8 +187,7 @@ export default function JobsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  // Track entity data cache separately to avoid N+1 queries
-  const [entityCache, setEntityCache] = useState<Map<string, { name: string; nit?: string }>>(new Map())
+
 
   const fetchJobs = async (currentPage = 1, showRefreshing = false, skipCache = false) => {
     if (showRefreshing) {
@@ -156,48 +225,51 @@ export default function JobsPage() {
           jobsList.map((job: any) => job.entity_id).filter(Boolean)
         )) as string[]
 
-        // Fetch all entities in a single pass (batch request if API supports it)
-        // For now, we'll fetch them individually but in parallel
-        const newEntityCache = new Map(entityCache)
+        // Check entities cache and fetch only missing or outdated ones
         await Promise.all(
-          entityIds
-            .filter(id => !newEntityCache.has(id)) // Only fetch if not cached
-            .map(async (entityId) => {
+          entityIds.map(async (entityId) => {
+            const cachedEntity = getEntityFromCache(entityId)
+            
+            // Fetch if not in cache or if we want to refresh
+            // (similar logic to /entities page)
+            if (!cachedEntity) {
               try {
                 const entityResponse = await apiClient.getEntity(entityId) as any
                 if (entityResponse && !entityResponse.error && entityResponse.entity) {
-                  newEntityCache.set(entityId, {
-                    name: entityResponse.entity.name || 'N/A',
-                    nit: entityResponse.entity.identifier?.slice(-4)
-                  })
+                  const entity: Entity = {
+                    id: entityResponse.entity.id,
+                    display_name: entityResponse.entity.display_name,
+                    identifier_suffix: entityResponse.entity.identifier?.slice(-4) || '',
+                    entity_type: entityResponse.entity.type_code,
+                    updated_at: entityResponse.entity.updated_at
+                  }
+                  updateEntityInCache(entity)
                 }
-              } catch {
-                // Silently fail, entity will show as N/A
+              } catch (err) {
+                console.warn(`Failed to fetch entity ${entityId}:`, err)
               }
-            })
+            }
+          })
         )
-        setEntityCache(newEntityCache)
 
-        // Map backend response to frontend Job interface using cached entity data
-        const mappedJobs = jobsList.map((job: any) => {
-          const entityData = job.entity_id ? newEntityCache.get(job.entity_id) : undefined
-
-          return {
-            id: job.job_id || job.id,
-            job_name: job.job_name,
-            status: job.status,
-            entity_name: entityData?.name || 'N/A',
-            entity_nit: entityData?.nit ? `****${entityData.nit}` : undefined,
-            date_range: {
-              start_date: job.start_date,
-              end_date: job.end_date
-            },
-            docs_processed: job.processed_documents,
-            docs_total: job.total_documents,
-            created_at: job.created_at,
-            completed_at: job.completed_at
-          }
-        })
+        // Map backend response to frontend Job interface
+        // Entity data will be populated later from cache in useEffect
+        const mappedJobs = jobsList.map((job: any) => ({
+          id: job.job_id || job.id,
+          job_name: job.job_name,
+          status: job.status,
+          entity_id: job.entity_id,  // Store entity_id for cache lookup
+          entity_name: undefined,  // Will be populated from cache
+          entity_nit: undefined,
+          date_range: {
+            start_date: job.start_date,
+            end_date: job.end_date
+          },
+          docs_processed: job.processed_documents,
+          docs_total: job.total_documents,
+          created_at: job.created_at,
+          completed_at: job.completed_at
+        }))
 
         setJobs(mappedJobs)
         const total = data.total_count || 0
@@ -241,6 +313,34 @@ export default function JobsPage() {
     }
   }, [jobs, page])
 
+  // Populate entity data from cache whenever jobs change
+  useEffect(() => {
+    if (jobs.length === 0) return
+
+    const jobsWithEntities = jobs.map(job => {
+      if (!job.entity_id) return job
+
+      const entity = getEntityFromCache(job.entity_id)
+      if (!entity) return job
+
+      return {
+        ...job,
+        entity_name: entity.display_name,
+        entity_nit: entity.identifier_suffix ? `****${entity.identifier_suffix}` : undefined
+      }
+    })
+
+    // Only update if there are changes
+    const hasChanges = jobsWithEntities.some((job, idx) => 
+      job.entity_name !== jobs[idx].entity_name ||
+      job.entity_nit !== jobs[idx].entity_nit
+    )
+
+    if (hasChanges) {
+      setJobs(jobsWithEntities)
+    }
+  }, [jobs.map(j => j.entity_id).join(',')]) // Depend on entity_ids, not full jobs to avoid loop
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -269,8 +369,8 @@ export default function JobsPage() {
 
   const formatDateRange = (job: Job) => {
     if (!job.date_range) return 'N/A'
-    const start = new Date(job.date_range.start_date).toLocaleDateString()
-    const end = new Date(job.date_range.end_date).toLocaleDateString()
+    const start = formatDateOnly(job.date_range.start_date)
+    const end = formatDateOnly(job.date_range.end_date)
     return `${start} - ${end}`
   }
 
