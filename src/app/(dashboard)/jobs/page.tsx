@@ -102,7 +102,7 @@ interface Job {
   docs_total?: number
   created_at: string
   completed_at?: string
-  creation_error_code?: string
+  error_code?: string
 }
 
 
@@ -315,7 +315,7 @@ export default function JobsPage() {
           docs_total: job.total_documents,
           created_at: job.created_at,
           completed_at: job.completed_at,
-          creation_error_code: job.creation_error_code,
+          error_code: job.error_code,
         }))
 
         setJobs(mappedJobs)
@@ -505,15 +505,15 @@ export default function JobsPage() {
                             {getStatusIcon(job.status)}
                             <span className="font-medium">{job.job_name}</span>
                           </div>
-                          {job.status === 'creation_failed' && job.creation_error_code && (
+                          {job.status === 'creation_failed' && job.error_code && (
                             <div className="ml-6 mt-1">
                               <p className="text-xs text-red-600">
-                                {ERROR_CODES[job.creation_error_code]?.message || `Error desconocido: ${job.creation_error_code}`}
+                                {ERROR_CODES[job.error_code]?.message || `Error desconocido: ${job.error_code}`}
                               </p>
-                              {ERROR_CODES[job.creation_error_code]?.actionLabel && ERROR_CODES[job.creation_error_code]?.getActionUrl && (
-                                <Link href={ERROR_CODES[job.creation_error_code].getActionUrl!(job)} className="inline-block mt-1">
+                              {ERROR_CODES[job.error_code]?.actionLabel && ERROR_CODES[job.error_code]?.getActionUrl && (
+                                <Link href={ERROR_CODES[job.error_code].getActionUrl!(job)} className="inline-block mt-1">
                                   <Button size="sm" variant="outline" className="h-6 text-xs">
-                                    {ERROR_CODES[job.creation_error_code].actionLabel}
+                                    {ERROR_CODES[job.error_code].actionLabel}
                                   </Button>
                                 </Link>
                               )}
