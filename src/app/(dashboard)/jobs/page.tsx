@@ -41,6 +41,51 @@ const JOBS_CACHE_TTL = 30000 // 30 seconds cache
 const POLLING_INTERVAL = 30000 // Poll every 30 seconds (reduced from 10s)
 const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global' // Same key as entities page
 
+// Error code translations and actions
+interface ErrorCodeInfo {
+  message: string
+  actionLabel?: string
+  getActionUrl?: (job: Job) => string
+}
+
+const ERROR_CODES: Record<string, ErrorCodeInfo> = {
+  DIAN_EMAIL_AUTH_EXPIRED: {
+    message: 'La autorización para acceder al correo DIAN asociado a esta entidad ha expirado. Las entidades vinculadas a este correo no pueden usar gestión automática.',
+    actionLabel: 'Reautorizar email DIAN',
+    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+  },
+  DIAN_EMAIL_NOT_AUTHORIZED: {
+    message: 'El correo DIAN asociado a esta entidad no está autorizado para gestión automática.',
+    actionLabel: 'Autorizar email DIAN',
+    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+  },
+  DIAN_EMAIL_NOT_FOUND: {
+    message: 'No se encontró un correo DIAN asociado a esta entidad.',
+    actionLabel: 'Configurar email DIAN',
+    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+  },
+  ENTITY_NOT_FOUND: {
+    message: 'La entidad asociada a este job no fue encontrada.'
+  },
+  INVALID_DATE_RANGE: {
+    message: 'El rango de fechas especificado no es válido.'
+  },
+  TOKEN_REQUEST_FAILED: {
+    message: 'La solicitud de token DIAN falló. Verifica que el correo DIAN esté correctamente autorizado.',
+    actionLabel: 'Verificar autorización',
+    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+  },
+  TOKEN_REQUEST_TIMEOUT: {
+    message: 'La solicitud de token DIAN excedió el tiempo de espera.',
+  },
+  BACKGROUND_TASK_ERROR: {
+    message: 'Error interno al procesar la solicitud de token DIAN.'
+  },
+  WORKFLOW_ERROR: {
+    message: 'Error inesperado durante la creación del job.'
+  }
+}
+
 interface Job {
   id: string
   job_name: string
@@ -57,6 +102,7 @@ interface Job {
   docs_total?: number
   created_at: string
   completed_at?: string
+  creation_error_code?: string
 }
 
 
@@ -268,7 +314,8 @@ export default function JobsPage() {
           docs_processed: job.processed_documents,
           docs_total: job.total_documents,
           created_at: job.created_at,
-          completed_at: job.completed_at
+          completed_at: job.completed_at,
+          creation_error_code: job.creation_error_code,
         }))
 
         setJobs(mappedJobs)
@@ -350,6 +397,8 @@ export default function JobsPage() {
       case 'pending':
         return <Clock className="h-4 w-4 text-yellow-500" />
       case 'failed':
+      case 'creation_failed':
+        return <XCircle className="h-4 w-4 text-red-500" />
         return <XCircle className="h-4 w-4 text-red-500" />
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />
@@ -362,6 +411,7 @@ export default function JobsPage() {
       processing: { variant: 'secondary', label: 'Procesando' },
       pending: { variant: 'outline', label: 'Pendiente' },
       failed: { variant: 'destructive', label: 'Fallido' },
+      creation_failed: { variant: 'destructive', label: 'Error en creación' },
     }
     const { variant, label } = config[status] || { variant: 'outline' as const, label: status }
     return <Badge variant={variant}>{label}</Badge>
@@ -450,9 +500,25 @@ export default function JobsPage() {
                     return (
                     <TableRow key={jobId}>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(job.status)}
-                          <span className="font-medium">{job.job_name}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(job.status)}
+                            <span className="font-medium">{job.job_name}</span>
+                          </div>
+                          {job.status === 'creation_failed' && job.creation_error_code && (
+                            <div className="ml-6 mt-1">
+                              <p className="text-xs text-red-600">
+                                {ERROR_CODES[job.creation_error_code]?.message || `Error desconocido: ${job.creation_error_code}`}
+                              </p>
+                              {ERROR_CODES[job.creation_error_code]?.actionLabel && ERROR_CODES[job.creation_error_code]?.getActionUrl && (
+                                <Link href={ERROR_CODES[job.creation_error_code].getActionUrl!(job)} className="inline-block mt-1">
+                                  <Button size="sm" variant="outline" className="h-6 text-xs">
+                                    {ERROR_CODES[job.creation_error_code].actionLabel}
+                                  </Button>
+                                </Link>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
