@@ -363,6 +363,67 @@ export class ApiClient {
       total_count: number
     }>('GET', url)
   }
+
+  // === LOGS (Admin Only) ===
+  async downloadJobLogs(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+    try {
+      const headers: HeadersInit = {}
+
+      if (this.accessToken) {
+        headers['Authorization'] = `Bearer ${this.accessToken}`
+      }
+
+      const response = await fetch(`${API_BASE}/logs/jobs/${jobId}`, {
+        method: 'GET',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+
+        if (response.status === 403) {
+          return {
+            success: false,
+            error: 'No tienes permisos para descargar logs. Requiere rol: super_admin o technical_support'
+          }
+        }
+
+        if (response.status === 404) {
+          return {
+            success: false,
+            error: errorData.detail || 'Logs no encontrados (pueden haber expirado o el job no completó)'
+          }
+        }
+
+        return {
+          success: false,
+          error: errorData.detail || errorData.message || 'Error descargando logs'
+        }
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'job.log'
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '')
+        }
+      }
+
+      return {
+        success: true,
+        blob,
+        filename
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error de red'
+      }
+    }
+  }
 }
 
 export const apiClient = new ApiClient()

@@ -14,9 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, XCircle, Download } from 'lucide-react'
 import { toast } from 'sonner'
-import { canResolveJobs } from '@/lib/auth/roles'
+import { canResolveJobs, canViewTechnicalLogs } from '@/lib/auth/roles'
 
 interface JobWithError {
   id: string
@@ -33,7 +33,9 @@ export default function SupportQueuePage() {
   const { roles, loading: rolesLoading } = useUserRoles()
   const [jobs, setJobs] = useState<JobWithError[]>([])
   const [loading, setLoading] = useState(true)
+  const [downloadingLogs, setDownloadingLogs] = useState<string | null>(null)
   const canResolve = canResolveJobs(roles)
+  const canViewLogs = canViewTechnicalLogs(roles)
 
   useEffect(() => {
     if (rolesLoading) return
@@ -63,6 +65,33 @@ export default function SupportQueuePage() {
       toast.error('Error cargando jobs con errores')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownloadLogs = async (jobId: string) => {
+    setDownloadingLogs(jobId)
+    try {
+      const result = await apiClient.downloadJobLogs(jobId)
+
+      if (result.success && result.blob && result.filename) {
+        const url = window.URL.createObjectURL(result.blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = result.filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        toast.success('Logs descargados correctamente')
+      } else {
+        toast.error(result.error || 'Error descargando logs')
+      }
+    } catch (err) {
+      console.error('Error downloading logs:', err)
+      toast.error('Error descargando logs')
+    } finally {
+      setDownloadingLogs(null)
     }
   }
 
@@ -180,6 +209,23 @@ export default function SupportQueuePage() {
                         >
                           Ver
                         </Button>
+                        {canViewLogs && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleDownloadLogs(job.id)}
+                            disabled={downloadingLogs === job.id}
+                          >
+                            {downloadingLogs === job.id ? (
+                              <>Descargando...</>
+                            ) : (
+                              <>
+                                <Download className="h-3 w-3 mr-1" />
+                                Logs
+                              </>
+                            )}
+                          </Button>
+                        )}
                         {canResolve && (
                           <Button
                             size="sm"
