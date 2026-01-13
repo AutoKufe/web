@@ -13,10 +13,19 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
 
+  console.log('🔍 [MIDDLEWARE DEBUG]', {
+    hostname,
+    pathname,
+    environment,
+    stagingDomain: STAGING_DOMAIN,
+    includesStaging: hostname.includes(STAGING_DOMAIN)
+  })
+
   // Redirect www to non-www
   if (hostname.startsWith('www.')) {
     const newUrl = new URL(request.url)
     newUrl.host = hostname.replace('www.', '')
+    console.log('↪️ [REDIRECT] www → non-www')
     return NextResponse.redirect(newUrl, 301)
   }
 
@@ -24,9 +33,11 @@ export async function middleware(request: NextRequest) {
   // Allow all routes, no redirects to other subdomains
   const isStagingDomain = hostname.includes(STAGING_DOMAIN)
   if (isStagingDomain || environment === 'staging') {
+    console.log('✅ [STAGING] Detected, skipping subdomain logic')
     // Skip subdomain logic - everything on same domain
     // Fall through to auth logic below
   } else {
+    console.log('🏭 [PRODUCTION] Using subdomain logic')
     // PRODUCTION: Separate landing and app domains
     // Landing domain (autokufe.com) - only allow landing pages
     const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.') && !hostname.includes('admin.')
@@ -40,10 +51,12 @@ export async function middleware(request: NextRequest) {
       if (!isLandingRoute) {
         const appUrl = new URL(request.url)
         appUrl.host = APP_DOMAIN
+        console.log('↪️ [REDIRECT] Landing domain → app.autokufe.com')
         return NextResponse.redirect(appUrl, 302)
       }
 
       // Landing pages don't need auth - just continue
+      console.log('✅ [CONTINUE] Landing route allowed')
       return NextResponse.next()
     }
   }
@@ -134,10 +147,12 @@ export async function middleware(request: NextRequest) {
     if (!isAdminAccess && pathname === '/' && isAppDomainProduction) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
+      console.log('↪️ [REDIRECT] app.autokufe.com/ → /dashboard')
       return NextResponse.redirect(url, 302)
     }
   }
 
+  console.log('✅ [CONTINUE] Proceeding to updateSession')
   // Continue with session management
   return await updateSession(request)
 }
