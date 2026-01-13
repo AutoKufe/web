@@ -5,12 +5,10 @@ import { Button } from '@/components/ui/button'
 import { FileText, Zap, Shield, Clock } from 'lucide-react'
 
 export default function LandingPage() {
-  const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
-
-  // In staging: use relative links (/login, /register) on same domain
-  // In production: use absolute links to app.autokufe.com
-  const loginUrl = environment === 'staging' ? '/login' : 'https://app.autokufe.com/login'
-  const registerUrl = environment === 'staging' ? '/register' : 'https://app.autokufe.com/register'
+  // Always link to production app domain
+  // Landing page (staging or production) should send users to the functional app
+  const loginUrl = 'https://app.autokufe.com/login'
+  const registerUrl = 'https://app.autokufe.com/register'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
