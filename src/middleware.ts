@@ -6,10 +6,12 @@ import { createServerClient } from '@supabase/ssr'
 const APP_DOMAIN = 'app.autokufe.com'
 const ADMIN_DOMAIN = 'admin.autokufe.com'
 const LANDING_DOMAINS = ['autokufe.com', 'www.autokufe.com']
+const STAGING_DOMAIN = 'dev.autokufe.com'
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
+  const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
 
   // Redirect www to non-www
   if (hostname.startsWith('www.')) {
@@ -18,23 +20,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(newUrl, 301)
   }
 
-  // Landing domain (autokufe.com) - only allow landing pages
-  const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.') && !hostname.includes('admin.')
+  // STAGING: dev.autokufe.com hosts everything (landing + dashboard)
+  // Allow all routes, no redirects to other subdomains
+  const isStagingDomain = hostname.includes(STAGING_DOMAIN)
+  if (isStagingDomain || environment === 'staging') {
+    // Skip subdomain logic - everything on same domain
+    // Fall through to auth logic below
+  } else {
+    // PRODUCTION: Separate landing and app domains
+    // Landing domain (autokufe.com) - only allow landing pages
+    const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.') && !hostname.includes('admin.')
 
-  if (isLandingDomain) {
-    // Allow landing routes
-    const landingRoutes = ['/', '/pricing', '/about', '/contact', '/terms', '/privacy']
-    const isLandingRoute = landingRoutes.includes(pathname) || pathname.startsWith('/api/')
+    if (isLandingDomain) {
+      // Allow landing routes
+      const landingRoutes = ['/', '/pricing', '/about', '/contact', '/terms', '/privacy']
+      const isLandingRoute = landingRoutes.includes(pathname) || pathname.startsWith('/api/')
 
-    // Redirect dashboard routes to app subdomain
-    if (!isLandingRoute) {
-      const appUrl = new URL(request.url)
-      appUrl.host = APP_DOMAIN
-      return NextResponse.redirect(appUrl, 302)
+      // Redirect dashboard routes to app subdomain
+      if (!isLandingRoute) {
+        const appUrl = new URL(request.url)
+        appUrl.host = APP_DOMAIN
+        return NextResponse.redirect(appUrl, 302)
+      }
+
+      // Landing pages don't need auth - just continue
+      return NextResponse.next()
     }
-
-    // Landing pages don't need auth - just continue
-    return NextResponse.next()
   }
 
   // Detect admin vs app access
@@ -118,7 +129,9 @@ export async function middleware(request: NextRequest) {
     }
 
     // Regular app access - redirect root to dashboard
-    if (!isAdminAccess && pathname === '/') {
+    // BUT: In staging, "/" shows landing page (handled by page.tsx), no redirect
+    const isAppDomainProduction = hostname.includes(APP_DOMAIN)
+    if (!isAdminAccess && pathname === '/' && isAppDomainProduction) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url, 302)
