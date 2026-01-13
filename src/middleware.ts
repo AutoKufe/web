@@ -31,9 +31,58 @@ export async function middleware(request: NextRequest) {
 
   // STAGING: dev.autokufe.com hosts everything (landing + dashboard)
   // Allow all routes, no redirects to other subdomains
+  // SECURITY: Only users with 'dev' or 'super_admin' role can access staging
   const isStagingDomain = hostname.includes(STAGING_DOMAIN)
   if (isStagingDomain || environment === 'staging') {
-    console.log('✅ [STAGING] Detected, skipping subdomain logic')
+    console.log('✅ [STAGING] Detected, verifying dev access')
+
+    // Create Supabase client to check user roles
+    let supabaseResponse = NextResponse.next({ request })
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            supabaseResponse = NextResponse.next({ request })
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
+            )
+          },
+        },
+      }
+    )
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // If logged in, verify they have dev access
+    if (user) {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .is('revoked_at', null)
+
+      const userRoles = roles?.map(r => r.role) || []
+      const hasDevAccess = userRoles.includes('dev') || userRoles.includes('super_admin')
+
+      if (!hasDevAccess) {
+        console.log('❌ [STAGING] User without dev role trying to access staging')
+        return new NextResponse(
+          '<html><body style="font-family: system-ui; max-width: 600px; margin: 100px auto; text-align: center;"><h1>🔒 Acceso Restringido</h1><p style="color: #666;">El ambiente de staging está reservado para desarrolladores.</p><p style="color: #666;">Si necesitas acceso, contacta al equipo de desarrollo.</p><p style="margin-top: 40px;"><a href="https://app.autokufe.com" style="color: #0070f3; text-decoration: none;">← Ir a producción</a></p></body></html>',
+          { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } }
+        )
+      }
+
+      console.log('✅ [STAGING] Dev user verified, allowing access')
+    } else {
+      console.log('ℹ️ [STAGING] No session, allowing landing/login access')
+    }
+
     // Skip subdomain logic - everything on same domain
     // Fall through to auth logic below
   } else {
@@ -43,8 +92,8 @@ export async function middleware(request: NextRequest) {
     const isLandingDomain = LANDING_DOMAINS.some(d => hostname.includes(d)) && !hostname.includes('app.') && !hostname.includes('admin.')
 
     if (isLandingDomain) {
-      // Allow landing routes
-      const landingRoutes = ['/', '/pricing', '/about', '/contact', '/terms', '/privacy']
+      // Allow landing routes (only routes that actually exist as pages)
+      const landingRoutes = ['/']  // Only root landing page exists for now
       const isLandingRoute = landingRoutes.includes(pathname) || pathname.startsWith('/api/')
 
       // Redirect dashboard routes to app subdomain
