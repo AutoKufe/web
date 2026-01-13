@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -33,8 +33,36 @@ export default function LoginPage() {
       return
     }
 
-    // Redirect based on domain
+    // STAGING SECURITY: Verify dev role before allowing session to persist
     const hostname = window.location.hostname
+    const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
+    const isStagingDomain = hostname.includes('dev.autokufe.com')
+
+    if (isStagingDomain || environment === 'staging') {
+      // User successfully authenticated, but we need to verify they have dev access
+      const userId = data.user?.id
+
+      if (userId) {
+        const { data: roles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .is('revoked_at', null)
+
+        const userRoles = roles?.map(r => r.role) || []
+        const hasDevAccess = userRoles.includes('dev') || userRoles.includes('super_admin')
+
+        if (!hasDevAccess) {
+          // User doesn't have dev role - sign them out immediately
+          await supabase.auth.signOut()
+          setError('El ambiente de staging está reservado para desarrolladores. Si necesitas acceso, contacta al equipo de desarrollo.')
+          setLoading(false)
+          return
+        }
+      }
+    }
+
+    // Redirect based on domain
     const isAdminDomain = hostname.includes('admin.')
     router.push(isAdminDomain ? '/support' : '/dashboard')
     router.refresh()
