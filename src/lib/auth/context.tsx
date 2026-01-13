@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_OUT' || !session) {
           setUser(null)
           apiClient.setAccessToken(null)
-          router.push('/login')
+          // Don't auto-redirect - let pages decide if they need auth
+          // Landing pages don't require auth, so shouldn't redirect
         } else if (session) {
           setUser({
             id: session.user.id,

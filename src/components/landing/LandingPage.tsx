@@ -7,10 +7,17 @@ import { FileText, Zap, Shield, Clock } from 'lucide-react'
 export default function LandingPage() {
   const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
 
+  console.log('🎨 [LANDING PAGE CLIENT]', {
+    environment,
+    windowLocation: typeof window !== 'undefined' ? window.location.href : 'SSR'
+  })
+
   // In staging: use relative links (/login, /register) on same domain
   // In production: use absolute links to app.autokufe.com
   const loginUrl = environment === 'staging' ? '/login' : 'https://app.autokufe.com/login'
   const registerUrl = environment === 'staging' ? '/register' : 'https://app.autokufe.com/register'
+
+  console.log('🔗 [LANDING PAGE LINKS]', { loginUrl, registerUrl })
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
