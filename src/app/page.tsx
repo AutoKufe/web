@@ -6,15 +6,24 @@ import LandingPage from '@/components/landing/LandingPage'
 export default async function Home() {
   const headersList = await headers()
   const hostname = headersList.get('host') || ''
+  const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
 
-  // Landing domain - show landing page
+  // STAGING (dev.autokufe.com):
+  // - "/" → Always show landing page
+  // - User clicks login/register → goes to /login or /register on same domain
+  if (environment === 'staging') {
+    return <LandingPage />
+  }
+
+  // PRODUCTION:
+  // Landing domain (autokufe.com) - show landing page
   const isLandingDomain = hostname.includes('autokufe.com') && !hostname.includes('app.')
 
   if (isLandingDomain) {
     return <LandingPage />
   }
 
-  // App domain - redirect based on auth status
+  // App domain (app.autokufe.com) - redirect based on auth status
   const supabase = await createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
