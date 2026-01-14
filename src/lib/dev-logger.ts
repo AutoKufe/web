@@ -43,6 +43,13 @@ class DevLogger {
     const savedSession = this.loadSessionFromStorage()
     if (savedSession && this.isSessionValid(savedSession)) {
       this.sessionId = savedSession.session_id
+
+      // Configure apiClient to send session_id in all requests
+      if (typeof window !== 'undefined') {
+        const { apiClient } = await import('@/lib/api/client')
+        apiClient.setDevSessionId(this.sessionId)
+      }
+
       console.log(`✅ Dev session restored: ${this.sessionId}`)
       return
     }
@@ -71,6 +78,12 @@ class DevLogger {
       const session: DevSession = await response.json()
       this.sessionId = session.session_id
       this.saveSessionToStorage(session)
+
+      // Configure apiClient to send session_id in all requests
+      if (typeof window !== 'undefined') {
+        const { apiClient } = await import('@/lib/api/client')
+        apiClient.setDevSessionId(this.sessionId)
+      }
 
       console.log(`✅ Dev session created: ${this.sessionId}`)
     } catch (error) {
@@ -177,6 +190,13 @@ class DevLogger {
     this.sessionId = null
     try {
       localStorage.removeItem('dev_session')
+
+      // Clear from apiClient too
+      if (typeof window !== 'undefined') {
+        import('@/lib/api/client').then(({ apiClient }) => {
+          apiClient.setDevSessionId(null)
+        })
+      }
     } catch {
       // Ignore
     }
