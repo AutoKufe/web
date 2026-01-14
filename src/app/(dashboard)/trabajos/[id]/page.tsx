@@ -231,14 +231,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         // Job no encontrado o error - no seguir haciendo polling
         setJobNotFound(true)
         if (!showRefreshing) {
-          toast.error('Job no encontrado o no tienes acceso')
+          toast.error('Trabajo no encontrado o no tienes acceso')
         }
       }
     } catch (err) {
       console.error('Error fetching job status:', err)
       setJobNotFound(true)
       if (!showRefreshing) {
-        toast.error('Error cargando estado del job')
+        toast.error('Error cargando estado del trabajo')
       }
     } finally {
       setLoading(false)
@@ -303,7 +303,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   const handleCancelJob = async () => {
-    if (!confirm('¿Estás seguro de que quieres cancelar este job? Esta acción no se puede deshacer.')) {
+    if (!confirm('¿Estás seguro de que quieres cancelar este trabajo? Esta acción no se puede deshacer.')) {
       return
     }
 
@@ -311,14 +311,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     try {
       const response = await apiClient.cancelJob(id)
       if (response && !response.error) {
-        toast.success('Job cancelado exitosamente')
+        toast.success('Trabajo cancelado exitosamente')
         fetchJobStatus(true)
       } else {
-        toast.error('Error cancelando job')
+        toast.error('Error cancelando trabajo')
       }
     } catch (err) {
       console.error('Error cancelling job:', err)
-      toast.error('Error cancelando job')
+      toast.error('Error cancelando trabajo')
     } finally {
       setCancelling(false)
     }
@@ -342,9 +342,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">Job no encontrado</p>
-              <Link href="/jobs">
-                <Button>Volver a Jobs</Button>
+              <p className="text-muted-foreground mb-4">Trabajo no encontrado</p>
+              <Link href="/trabajos">
+                <Button>Volver a Lista de Trabajos</Button>
               </Link>
             </div>
           </CardContent>
@@ -358,7 +358,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/jobs">
+          <Link href="/trabajos">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -388,7 +388,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               disabled={cancelling}
             >
               <Ban className="h-4 w-4" />
-              {cancelling ? 'Cancelando...' : 'Cancelar Job'}
+              {cancelling ? 'Cancelando...' : 'Cancelar Trabajo'}
             </Button>
           )}
           {job.status === 'completed' && (
@@ -399,7 +399,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   const result = await apiClient.downloadExcel(job.id)
 
                   if (!result.success || !result.blob) {
-                    toast.error(result.error || 'Error descargando Excel')
+                    toast.error(result.error || 'Error al descargar el archivo')
                     return
                   }
 
@@ -411,10 +411,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   a.click()
                   window.URL.revokeObjectURL(url)
                   document.body.removeChild(a)
-                  toast.success('Excel descargado correctamente')
+                  toast.success('Archivo descargado correctamente')
                 } catch (error) {
                   console.error('Error descargando Excel:', error)
-                  toast.error('Error al descargar el Excel')
+                  toast.error('Error al descargar el archivo')
                 }
               }}
             >
@@ -471,26 +471,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <div className="flex items-start gap-3">
               <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 space-y-3">
-                <div>
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-destructive">Error en el procesamiento</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {job.error_message.split("\n\n")[0]}
-                    </p>
-                    {job.error_code && (
-                      <p className="text-xs text-muted-foreground font-mono">
-                        Código de error: <span className="font-semibold">{job.error_code}</span>
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-destructive">Error al realizar el trabajo</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Ha ocurrido un error durante el procesamiento. Nuestro equipo técnico ha sido notificado automáticamente y trabajará en resolverlo.
+                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Si después de unas horas no ves cambios, puedes contactar a soporte con este código de referencia para consultar el estado:
+                  </p>
+                  {job.error_code && (
+                    <div className="bg-muted/50 rounded p-3 border">
+                      <p className="text-sm font-mono">
+                        <span className="text-muted-foreground">Código:</span>{' '}
+                        <span className="font-semibold">{job.error_code}</span>
                       </p>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{job.error_message}</p>
+                    </div>
+                  )}
                 </div>
-                <Link href={`/soporte?job_id=${job.id}`}>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Contactar Soporte
-                  </Button>
-                </Link>
               </div>
             </div>
           </CardContent>

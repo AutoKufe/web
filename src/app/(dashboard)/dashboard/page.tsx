@@ -171,10 +171,10 @@ export default function DashboardPage() {
             Resumen de tu actividad en AutoKufe
           </p>
         </div>
-        <Link href="/jobs/new">
+        <Link href="/trabajos/new">
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
-            Nuevo Job
+            Nuevo Trabajo
           </Button>
         </Link>
       </div>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">
               {recentJobs.filter(j => j.status === 'completed').length} completados
             </p>
-            <Link href="/jobs">
+            <Link href="/trabajos">
               <Button variant="link" className="px-0 h-auto text-xs">
                 Ver todos <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
                 Tus últimos trabajos de procesamiento
               </CardDescription>
             </div>
-            <Link href="/jobs">
+            <Link href="/trabajos">
               <Button variant="outline" size="sm">
                 Ver todos
               </Button>
@@ -300,11 +300,11 @@ export default function DashboardPage() {
           {recentJobs.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">No tienes jobs aún</p>
-              <Link href="/jobs/new">
+              <p className="text-muted-foreground mb-4">No tienes trabajos aún</p>
+              <Link href="/procesos/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Crear primer job
+                  Crear primer trabajo
                 </Button>
               </Link>
             </div>
