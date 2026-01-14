@@ -18,6 +18,13 @@ class DevLogger {
   private backendUrl: string
   private isStaging: boolean
   private initPromise: Promise<void> | null = null
+  private consoleIntercepted: boolean = false
+  private originalConsole: {
+    log: typeof console.log
+    info: typeof console.info
+    warn: typeof console.warn
+    error: typeof console.error
+  } | null = null
 
   constructor() {
     this.backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://autokufe-backend-dev.fly.dev'
@@ -51,6 +58,7 @@ class DevLogger {
       }
 
       console.log(`✅ Dev session restored: ${this.sessionId}`)
+      this.interceptConsole()
       return
     }
 
@@ -58,6 +66,72 @@ class DevLogger {
     this.initPromise = this.createSession(accessToken)
     await this.initPromise
     this.initPromise = null
+  }
+
+  /**
+   * Intercepta console.log/info/warn/error y los envía al dev-logs system
+   */
+  private interceptConsole(): void {
+    if (this.consoleIntercepted || typeof window === 'undefined' || !this.isStaging) {
+      return
+    }
+
+    this.consoleIntercepted = true
+
+    // Guardar referencias originales
+    this.originalConsole = {
+      log: console.log,
+      info: console.info,
+      warn: console.warn,
+      error: console.error
+    }
+
+    // Interceptar console.log
+    console.log = (...args: any[]) => {
+      this.originalConsole!.log(...args)
+      this.log('debug', this.formatConsoleArgs(args), this.getContext())
+    }
+
+    // Interceptar console.info
+    console.info = (...args: any[]) => {
+      this.originalConsole!.info(...args)
+      this.log('info', this.formatConsoleArgs(args), this.getContext())
+    }
+
+    // Interceptar console.warn
+    console.warn = (...args: any[]) => {
+      this.originalConsole!.warn(...args)
+      this.log('warn', this.formatConsoleArgs(args), this.getContext())
+    }
+
+    // Interceptar console.error
+    console.error = (...args: any[]) => {
+      this.originalConsole!.error(...args)
+      this.log('error', this.formatConsoleArgs(args), this.getContext())
+    }
+
+    console.log('📡 Console intercepted - All logs will be sent to dev-logs system')
+  }
+
+  private formatConsoleArgs(args: any[]): string {
+    return args.map(arg => {
+      if (typeof arg === 'string') return arg
+      if (arg instanceof Error) return arg.message
+      try {
+        return JSON.stringify(arg)
+      } catch {
+        return String(arg)
+      }
+    }).join(' ')
+  }
+
+  private getContext(): Record<string, any> {
+    if (typeof window === 'undefined') return {}
+
+    return {
+      page: window.location.pathname,
+      url: window.location.href
+    }
   }
 
   private async createSession(accessToken: string): Promise<void> {
@@ -86,6 +160,7 @@ class DevLogger {
       }
 
       console.log(`✅ Dev session created: ${this.sessionId}`)
+      this.interceptConsole()
     } catch (error) {
       console.error('Error creating dev session:', error)
     }
@@ -147,6 +222,12 @@ class DevLogger {
     metadata: Record<string, any>
   ): Promise<void> {
     try {
+      // Add page to message if available
+      let fullMessage = message
+      if (metadata.page) {
+        fullMessage = `[${metadata.page}] ${message}`
+      }
+
       await fetch(`${this.backendUrl}/dev-logs/log`, {
         method: 'POST',
         headers: {
@@ -155,14 +236,14 @@ class DevLogger {
         },
         body: JSON.stringify({
           level,
-          message,
+          message: fullMessage,
           trace_id: metadata.trace_id || null,
           metadata
         })
       })
     } catch (error) {
       // Silently fail - no bloqueamos la app por logging
-      console.error('Dev log send failed:', error)
+      // Don't use console.error here to avoid infinite loop
     }
   }
 
