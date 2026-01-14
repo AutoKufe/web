@@ -228,7 +228,7 @@ class DevLogger {
         fullMessage = `[${metadata.page}] ${message}`
       }
 
-      await fetch(`${this.backendUrl}/dev-logs/log`, {
+      const response = await fetch(`${this.backendUrl}/dev-logs/log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -241,10 +241,34 @@ class DevLogger {
           metadata
         })
       })
+
+      // Si la sesión expiró o es inválida, limpiar y dejar de enviar logs
+      if (response.status === 401 || response.status === 403 || response.status === 404) {
+        this.originalConsole?.warn?.('⚠️ Dev session expired or invalid - clearing session and stopping log interception')
+        this.clearSession()
+        this.restoreConsole()
+      }
     } catch (error) {
       // Silently fail - no bloqueamos la app por logging
       // Don't use console.error here to avoid infinite loop
     }
+  }
+
+  /**
+   * Restaura console.log/info/warn/error originales
+   */
+  private restoreConsole(): void {
+    if (!this.consoleIntercepted || !this.originalConsole) {
+      return
+    }
+
+    console.log = this.originalConsole.log
+    console.info = this.originalConsole.info
+    console.warn = this.originalConsole.warn
+    console.error = this.originalConsole.error
+
+    this.consoleIntercepted = false
+    this.originalConsole = null
   }
 
   // Shortcuts para niveles comunes
