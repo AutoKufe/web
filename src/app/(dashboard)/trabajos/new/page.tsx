@@ -341,7 +341,7 @@ function NewJobContent() {
     if (jobName) {
       const error = validateJobName(jobName)
       if (error) {
-        toast.error(`Nombre de job inválido: ${error}`)
+        toast.error(`Nombre de trabajo inválido: ${error}`)
         return
       }
     }
@@ -429,7 +429,7 @@ function NewJobContent() {
       )
 
       if (response.error) {
-        toast.error(response.message || 'Error creando job')
+        toast.error(response.message || 'Error creando trabajo')
         setCreating(false)
         return
       }
@@ -451,10 +451,10 @@ function NewJobContent() {
       }
 
       setStep('success')
-      toast.success('Job creado exitosamente')
+      toast.success('Trabajo creado exitosamente')
     } catch (err) {
       console.error('Error creating job:', err)
-      toast.error('Error creando job')
+      toast.error('Error creando trabajo')
     } finally {
       setCreating(false)
     }
@@ -487,16 +487,16 @@ function NewJobContent() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
                 <CheckCircle2 className="h-8 w-8 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Job Creado Exitosamente</h2>
+              <h2 className="text-2xl font-bold mb-2">Trabajo Creado Exitosamente</h2>
               <p className="text-muted-foreground mb-6">
-                Tu job ha sido enviado para procesamiento
+                Tu trabajo ha sido enviado para procesamiento
               </p>
               <div className="flex gap-4 justify-center">
                 <Link href={`/jobs/${createdJobId}`}>
-                  <Button size="lg">Ver Estado del Job</Button>
+                  <Button size="lg">Ver Estado del Trabajo</Button>
                 </Link>
                 <Button variant="outline" size="lg" onClick={resetForm}>
-                  Crear Otro Job
+                  Crear Otro Trabajo
                 </Button>
               </div>
             </div>
@@ -510,13 +510,13 @@ function NewJobContent() {
     <div className="max-w-3xl mx-auto space-y-8 p-8">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/jobs">
+        <Link href="/trabajos">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Nuevo Job</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Nuevo Trabajo</h1>
           <p className="text-muted-foreground mt-1">
             Crea un nuevo trabajo de procesamiento DIAN
           </p>
@@ -525,7 +525,7 @@ function NewJobContent() {
 
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-xl">Configuración del Job</CardTitle>
+          <CardTitle className="text-xl">Configuración del Trabajo</CardTitle>
           <CardDescription>
             Ingresa los datos necesarios para procesar documentos DIAN
           </CardDescription>
@@ -565,7 +565,7 @@ function NewJobContent() {
                         <p className="text-sm text-muted-foreground mb-2">
                           No se encontraron entidades
                         </p>
-                        <Link href="/entities">
+                        <Link href="/entidades">
                           <Button variant="outline" size="sm">
                             <Building2 className="h-4 w-4 mr-2" />
                             Registrar Entidad
@@ -767,7 +767,7 @@ function NewJobContent() {
                         <div className="flex items-center gap-2 pt-2 border-t border-green-200">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <span className="text-sm font-medium text-green-900">
-                            Token DIAN se solicitará automáticamente al crear el job
+                            Token DIAN se solicitará automáticamente al crear el trabajo
                           </span>
                         </div>
                       )}
@@ -923,9 +923,9 @@ function NewJobContent() {
             </div>
           )}
 
-          {/* Nombre del Job (opcional) */}
+          {/* Nombre del Trabajo (opcional) */}
           <div className="space-y-2">
-            <Label htmlFor="job-name">Nombre del Job (opcional)</Label>
+            <Label htmlFor="job-name">Nombre del Trabajo (opcional)</Label>
             <Input
               id="job-name"
               placeholder="Ej: facturas_enero_2024"
@@ -1213,7 +1213,7 @@ function NewJobContent() {
 
           {/* Submit */}
           <div className="flex gap-4 pt-4 border-t">
-            <Link href="/jobs" className="flex-1">
+            <Link href="/trabajos" className="flex-1">
               <Button variant="outline" className="w-full" size="lg">
                 Cancelar
               </Button>
@@ -1246,20 +1246,10 @@ function NewJobContent() {
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Creando...
                 </>
-              ) : useAutoToken ? (
-                <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Crear Job (Auto-Token)
-                </>
-              ) : tokenStatus === 'valid' && !useNewToken ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Crear Job (Token Guardado)
-                </>
               ) : (
                 <>
                   <FileText className="h-4 w-4 mr-2" />
-                  Crear Job (Token Manual)
+                  Crear Trabajo
                 </>
               )}
             </Button>

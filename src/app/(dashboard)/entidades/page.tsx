@@ -631,7 +631,7 @@ export default function EntitiesPage() {
                       <TableRow
                         key={entity.id}
                         className="hover:bg-muted/50 cursor-pointer"
-                        onClick={() => router.push(`/entities/${entity.id}`)}
+                        onClick={() => router.push(`/entidades/${entity.id}`)}
                       >
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
@@ -688,7 +688,7 @@ export default function EntitiesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuItem asChild>
-                                <Link href={`/entities/${entity.id}`} className="cursor-pointer">
+                                <Link href={`/entidades/${entity.id}`} className="cursor-pointer">
                                   <ExternalLink className="h-4 w-4 mr-2" />
                                   Ver detalles
                                 </Link>

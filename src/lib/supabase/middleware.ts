@@ -34,8 +34,8 @@ export async function updateSession(request: NextRequest) {
 
   // Protected routes - redirect to login if no user
   const isAuthRoute = request.nextUrl.pathname.startsWith('/dashboard') ||
-                      request.nextUrl.pathname.startsWith('/entities') ||
-                      request.nextUrl.pathname.startsWith('/jobs')
+                      request.nextUrl.pathname.startsWith('/entidades') ||
+                      request.nextUrl.pathname.startsWith('/trabajos')
 
   if (isAuthRoute && !user) {
     const url = request.nextUrl.clone()

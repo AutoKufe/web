@@ -52,20 +52,20 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
   DIAN_EMAIL_AUTH_EXPIRED: {
     message: 'La autorización para acceder al correo DIAN asociado a esta entidad ha expirado. Las entidades vinculadas a este correo no pueden usar gestión automática.',
     actionLabel: 'Reautorizar email DIAN',
-    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+    getActionUrl: (job) => `/entidades/${job.entity_id}/edit?tab=email`
   },
   DIAN_EMAIL_NOT_AUTHORIZED: {
     message: 'El correo DIAN asociado a esta entidad no está autorizado para gestión automática.',
     actionLabel: 'Autorizar email DIAN',
-    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+    getActionUrl: (job) => `/entidades/${job.entity_id}/edit?tab=email`
   },
   DIAN_EMAIL_NOT_FOUND: {
     message: 'No se encontró un correo DIAN asociado a esta entidad.',
     actionLabel: 'Configurar email DIAN',
-    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+    getActionUrl: (job) => `/entidades/${job.entity_id}/edit?tab=email`
   },
   ENTITY_NOT_FOUND: {
-    message: 'La entidad asociada a este job no fue encontrada.'
+    message: 'La entidad asociada a este trabajo no fue encontrada.'
   },
   INVALID_DATE_RANGE: {
     message: 'El rango de fechas especificado no es válido.'
@@ -73,7 +73,7 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
   TOKEN_REQUEST_FAILED: {
     message: 'La solicitud de token DIAN falló. Verifica que el correo DIAN esté correctamente autorizado.',
     actionLabel: 'Verificar autorización',
-    getActionUrl: (job) => `/entities/${job.entity_id}/edit?tab=email`
+    getActionUrl: (job) => `/entidades/${job.entity_id}/edit?tab=email`
   },
   TOKEN_REQUEST_TIMEOUT: {
     message: 'La solicitud de token DIAN excedió el tiempo de espera.',
@@ -82,7 +82,7 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
     message: 'Error interno al procesar la solicitud de token DIAN.'
   },
   WORKFLOW_ERROR: {
-    message: 'Error inesperado durante la creación del job.'
+    message: 'Error inesperado durante la creación del trabajo.'
   }
 }
 
@@ -329,7 +329,7 @@ export default function JobsPage() {
       }
     } catch (err) {
       console.error('Error fetching jobs:', err)
-      toast.error('Error cargando jobs')
+      toast.error('Error cargando trabajos')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -429,7 +429,7 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Jobs</h1>
+          <h1 className="text-3xl font-bold">Trabajos</h1>
           <p className="text-muted-foreground">
             Gestiona tus trabajos de procesamiento DIAN
           </p>
@@ -443,10 +443,10 @@ export default function JobsPage() {
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
-          <Link href="/jobs/new">
+          <Link href="/trabajos/new">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Nuevo Job
+              Nuevo Trabajo
             </Button>
           </Link>
         </div>
@@ -455,9 +455,9 @@ export default function JobsPage() {
       {/* Jobs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Historial de Jobs</CardTitle>
+          <CardTitle>Historial de Trabajos</CardTitle>
           <CardDescription>
-            {jobs.length} job{jobs.length !== 1 ? 's' : ''} encontrado{jobs.length !== 1 ? 's' : ''}
+            {jobs.length} trabajo{jobs.length !== 1 ? 's' : ''} encontrado{jobs.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -470,11 +470,11 @@ export default function JobsPage() {
           ) : jobs.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">No tienes jobs aún</p>
-              <Link href="/jobs/new">
+              <p className="text-muted-foreground mb-4">No tienes trabajos aún</p>
+              <Link href="/trabajos/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Crear primer job
+                  Crear primer trabajo
                 </Button>
               </Link>
             </div>
@@ -558,7 +558,7 @@ export default function JobsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/jobs/${jobId}`}>
+                              <Link href={`/trabajos/${jobId}`}>
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Ver detalles
                               </Link>

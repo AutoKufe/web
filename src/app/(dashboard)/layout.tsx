@@ -27,8 +27,8 @@ import {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Entidades', href: '/entities', icon: Building2 },
-  { name: 'Jobs', href: '/jobs', icon: FileText },
+  { name: 'Entidades', href: '/entidades', icon: Building2 },
+  { name: 'Trabajos', href: '/trabajos', icon: FileText },
   { name: 'DIAN Emails', href: '/dian-emails', icon: Mail },
 ]
 
@@ -97,10 +97,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
           {/* Actions */}
           <div className="flex items-center space-x-2 ml-auto">
-            <Link href="/jobs/new">
+            <Link href="/trabajos/new">
               <Button size="sm" className="gap-2">
                 <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Nuevo Job</span>
+                <span className="hidden sm:inline">Nuevo Trabajo</span>
               </Button>
             </Link>
 

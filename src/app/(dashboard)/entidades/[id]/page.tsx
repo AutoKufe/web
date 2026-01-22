@@ -85,12 +85,12 @@ export default function EntityDetailPage() {
         setEntity(data.entity)
       } else {
         toast.error('Entidad no encontrada')
-        router.push('/entities')
+        router.push('/entidades')
       }
     } catch (err) {
       console.error('Error fetching entity:', err)
       toast.error('Error cargando entidad')
-      router.push('/entities')
+      router.push('/entidades')
     } finally {
       setLoading(false)
     }
@@ -102,7 +102,7 @@ export default function EntityDetailPage() {
       const response = await apiClient.deleteEntity(entityId)
       if (response && !response.error) {
         toast.success('Entidad eliminada exitosamente')
-        router.push('/entities')
+        router.push('/entidades')
       } else {
         toast.error(response?.message || 'Error eliminando entidad')
       }
@@ -147,7 +147,7 @@ export default function EntityDetailPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push('/entities')}
+            onClick={() => router.push('/entidades')}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
