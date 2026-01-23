@@ -314,11 +314,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         toast.success('Trabajo cancelado exitosamente')
         fetchJobStatus(true)
       } else {
-        toast.error('Error cancelando trabajo')
+        throw new Error(response.message || 'Error cancelando trabajo')
       }
     } catch (err) {
       console.error('Error cancelling job:', err)
-      toast.error('Error cancelando trabajo')
+      toast.error(err instanceof Error ? err.message : 'Error cancelando trabajo')
     } finally {
       setCancelling(false)
     }

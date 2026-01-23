@@ -882,7 +882,13 @@ function NewJobContent() {
                         id="dian-token"
                         placeholder="https://catalogo-vpfe.dian.gov.co/..."
                         value={dianToken}
-                        onChange={(e) => setDianToken(e.target.value)}
+                        onChange={(e) => {
+                          setDianToken(e.target.value)
+                          // Si el usuario escribe manualmente, desactivar auto-token
+                          if (e.target.value.trim() && useAutoToken) {
+                            setUseAutoToken(false)
+                          }
+                        }}
                         className="font-mono text-sm"
                       />
                       {tokenStatus === 'expired' && (
@@ -914,7 +920,13 @@ function NewJobContent() {
                 id="dian-token"
                 placeholder="https://catalogo-vpfe.dian.gov.co/..."
                 value={dianToken}
-                onChange={(e) => setDianToken(e.target.value)}
+                onChange={(e) => {
+                  setDianToken(e.target.value)
+                  // Si el usuario escribe manualmente, desactivar auto-token
+                  if (e.target.value.trim() && useAutoToken) {
+                    setUseAutoToken(false)
+                  }
+                }}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
