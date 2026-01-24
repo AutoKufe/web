@@ -8,7 +8,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-export type AdminRole = 'super_admin' | 'technical_support' | 'support_agent'
+export type AdminRole = 'super_admin' | 'technical_support' | 'support_agent' | 'dev'
 
 export interface UserRole {
   id: string

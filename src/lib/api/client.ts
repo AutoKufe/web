@@ -165,6 +165,20 @@ export class ApiClient {
     }>('GET', `/entities/${entityId}/job-creation-options`)
   }
 
+  /**
+   * Cleanup all storage files for an entity (staging only, dev role required)
+   * Deletes files from B2 and DB records
+   */
+  async cleanupEntityStorage(entityId: string) {
+    return this.request<{
+      success: boolean
+      files_deleted: number
+      files_failed?: number
+      space_freed_mb: number
+      entity_name?: string
+    }>('POST', `/entities/${entityId}/cleanup-storage`)
+  }
+
   // === DIAN EMAILS ===
   async listDianEmails() {
     return this.request<{
@@ -211,11 +225,23 @@ export class ApiClient {
       date_range: { start_date: string; end_date: string }
       document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
+      is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
     }
   ) {
     return this.request('POST', '/jobs/create-job', {
       dian_token: dianToken,
       job_data: jobData,
+      is_dev_job: jobData.is_dev_job,  // Pass at top level for Backend
+    })
+  }
+
+  /**
+   * Check if cached raw Excel is available for dev jobs (staging only)
+   */
+  async checkCachedRawExcel(entityId: string, startDate: string, endDate: string) {
+    return this.request('GET', `/jobs/check-cached-excel/${entityId}`, undefined, {
+      start_date: startDate,
+      end_date: endDate,
     })
   }
 

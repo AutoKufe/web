@@ -39,8 +39,11 @@ import {
   AlertCircle,
   ExternalLink,
   MoreHorizontal,
-  Mail
+  Mail,
+  Trash2,
+  Loader2
 } from 'lucide-react'
+import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,6 +121,50 @@ export default function EntitiesPage() {
   const [totalCount, setTotalCount] = useState(0)
   const fetchingRef = useRef(false)  // Prevenir llamadas duplicadas
   const { syncDianEmails } = useDianEmailsCache()
+
+  // Dev mode state
+  const { isDev: hasDevRole } = useUserRoles()
+  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
+
+  // Cleanup storage dialog state
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false)
+  const [cleanupEntity, setCleanupEntity] = useState<Entity | null>(null)
+  const [cleanupLoading, setCleanupLoading] = useState(false)
+
+  const openCleanupDialog = (entity: Entity) => {
+    setCleanupEntity(entity)
+    setCleanupDialogOpen(true)
+  }
+
+  const handleCleanupStorage = async () => {
+    if (!cleanupEntity) return
+
+    setCleanupLoading(true)
+    try {
+      const response = await apiClient.cleanupEntityStorage(cleanupEntity.id)
+
+      if (response.error) {
+        toast.error(response.message || 'Error limpiando storage')
+        return
+      }
+
+      const result = response as {
+        success: boolean
+        files_deleted: number
+        space_freed_mb: number
+        entity_name?: string
+      }
+
+      toast.success(`Storage limpiado: ${result.files_deleted} archivos eliminados (${result.space_freed_mb}MB liberados)`)
+      setCleanupDialogOpen(false)
+      setCleanupEntity(null)
+    } catch (err) {
+      console.error('Error cleaning up storage:', err)
+      toast.error('Error limpiando storage')
+    } finally {
+      setCleanupLoading(false)
+    }
+  }
 
   const loadFromCache = (): EntitiesCache | null => {
     try {
@@ -694,11 +741,22 @@ export default function EntitiesPage() {
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem asChild>
-                                <Link href={`/jobs/new?entity=${entity.id}`} className="cursor-pointer">
+                                <Link href={`/trabajos/nuevo?entity=${entity.id}`} className="cursor-pointer">
                                   <Plus className="h-4 w-4 mr-2" />
                                   Crear job
                                 </Link>
                               </DropdownMenuItem>
+                              {isStaging && hasDevRole && (
+                                <>
+                                  <DropdownMenuItem
+                                    className="text-red-600 cursor-pointer"
+                                    onClick={() => openCleanupDialog(entity)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Limpiar storage
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -809,6 +867,68 @@ export default function EntitiesPage() {
           </Card>
         </div>
       </div>
+
+      {/* Cleanup Storage Confirmation Dialog */}
+      <Dialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Limpiar Storage
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              <div className="space-y-3">
+                <p>
+                  Se eliminarán <strong>TODOS</strong> los archivos de storage para{' '}
+                  <strong className="text-foreground">{cleanupEntity?.display_name}</strong>:
+                </p>
+                <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                  <li>ZIPs de documentos descargados</li>
+                  <li>Excel generados</li>
+                  <li>Raw Excel cacheados</li>
+                  <li>Logs de jobs</li>
+                </ul>
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 text-sm ml-2">
+                    <strong>NO</strong> se eliminará la entidad ni el historial de jobs.
+                    Solo los archivos en storage.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCleanupDialogOpen(false)
+                setCleanupEntity(null)
+              }}
+              disabled={cleanupLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCleanupStorage}
+              disabled={cleanupLoading}
+            >
+              {cleanupLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Confirmar eliminación
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

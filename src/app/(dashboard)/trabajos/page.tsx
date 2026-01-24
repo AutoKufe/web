@@ -443,7 +443,7 @@ export default function JobsPage() {
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
-          <Link href="/trabajos/new">
+          <Link href="/trabajos/nuevo">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Nuevo Trabajo
@@ -471,7 +471,7 @@ export default function JobsPage() {
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground mb-4">No tienes trabajos aún</p>
-              <Link href="/trabajos/new">
+              <Link href="/trabajos/nuevo">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Crear primer trabajo

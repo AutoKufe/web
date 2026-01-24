@@ -171,7 +171,7 @@ export default function DashboardPage() {
             Resumen de tu actividad en AutoKufe
           </p>
         </div>
-        <Link href="/trabajos/new">
+        <Link href="/trabajos/nuevo">
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Nuevo Trabajo

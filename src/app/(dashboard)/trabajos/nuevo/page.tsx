@@ -39,7 +39,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical } from 'lucide-react'
+import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -106,6 +107,22 @@ const setEntitiesCache = (entities: Array<{ id: string; display_name: string; id
 function NewJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // User roles for dev mode
+  const { isDev: hasDevRole, loading: rolesLoading } = useUserRoles()
+
+  // Check if we're in staging environment
+  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
+
+  // Dev job mode state
+  const [isDevJob, setIsDevJob] = useState(false)
+  const [devCacheStatus, setDevCacheStatus] = useState<{
+    available: boolean
+    files: Array<{ year: number; file_id: string; size_mb: number }>
+    missing_years: number[]
+    entity_name?: string
+  } | null>(null)
+  const [loadingDevCache, setLoadingDevCache] = useState(false)
 
   // Entity selection
   const [entities, setEntities] = useState<Entity[]>([])
@@ -331,6 +348,38 @@ function NewJobContent() {
     }
   }
 
+  // Check dev cache availability when dev mode is enabled
+  const checkDevCache = async () => {
+    if (!selectedEntity || !startDate || !endDate) {
+      setDevCacheStatus(null)
+      return
+    }
+
+    setLoadingDevCache(true)
+    try {
+      const response = await apiClient.checkCachedRawExcel(selectedEntity.id, startDate, endDate)
+      if (response && !response.error) {
+        setDevCacheStatus(response as typeof devCacheStatus)
+      } else {
+        setDevCacheStatus(null)
+      }
+    } catch (err) {
+      console.error('Error checking dev cache:', err)
+      setDevCacheStatus(null)
+    } finally {
+      setLoadingDevCache(false)
+    }
+  }
+
+  // Check dev cache when dev mode is toggled or dates change
+  useEffect(() => {
+    if (isDevJob && selectedEntity && startDate && endDate) {
+      checkDevCache()
+    } else {
+      setDevCacheStatus(null)
+    }
+  }, [isDevJob, selectedEntity?.id, startDate, endDate])
+
   const handleSubmit = async () => {
     if (!selectedEntity && !dianToken.trim()) {
       toast.error('Selecciona una entidad o ingresa un token DIAN')
@@ -368,7 +417,13 @@ function NewJobContent() {
     }
 
     // Validación de token según modo seleccionado
-    if (useAutoToken) {
+    if (isDevJob) {
+      // Modo dev job: no necesita token DIAN (usa cache)
+      if (!devCacheStatus?.available) {
+        toast.error('El cache de raw Excel no está disponible. Ejecuta primero un job normal.')
+        return
+      }
+    } else if (useAutoToken) {
       // Modo auto-token: no necesita token manual
       // Sin validación adicional
     } else if (tokenStatus === 'valid' && !useNewToken) {
@@ -408,7 +463,9 @@ function NewJobContent() {
 
       // Determinar token a enviar
       let tokenToSend = dianToken
-      if (useAutoToken) {
+      if (isDevJob) {
+        tokenToSend = ''  // No token needed for dev jobs
+      } else if (useAutoToken) {
         tokenToSend = 'use_auto_token'
       } else if (!dianToken.trim()) {
         tokenToSend = 'use_stored_token'
@@ -425,6 +482,7 @@ function NewJobContent() {
           },
           document_categories: finalDocCategories,
           consolidation_interval: consolidationInterval,
+          is_dev_job: isDevJob,  // Flag for dev jobs using cached Excel
         }
       )
 
@@ -1147,6 +1205,76 @@ function NewJobContent() {
             </p>
           </div>
 
+          {/* Dev Mode (staging only + dev role) */}
+          {isStaging && hasDevRole && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="dev-job-mode"
+                  checked={isDevJob}
+                  onCheckedChange={(checked) => {
+                    setIsDevJob(checked as boolean)
+                    if (checked) {
+                      // Dev mode: disable auto-token and new token
+                      setUseAutoToken(false)
+                      setUseNewToken(false)
+                      setDianToken('')
+                    }
+                  }}
+                  className="h-5 w-5 data-[state=checked]:bg-yellow-600 data-[state=checked]:border-yellow-600"
+                />
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-yellow-600" />
+                  <Label
+                    htmlFor="dev-job-mode"
+                    className="text-sm font-medium text-yellow-800 cursor-pointer"
+                  >
+                    Modo desarrollo (usar Excel cacheado)
+                  </Label>
+                </div>
+              </div>
+
+              {isDevJob && (
+                <div className="pl-7 space-y-2">
+                  {loadingDevCache ? (
+                    <div className="flex items-center gap-2 text-sm text-yellow-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verificando cache...
+                    </div>
+                  ) : devCacheStatus?.available ? (
+                    <Alert className="border-green-200 bg-green-50">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-700 text-sm ml-2">
+                        <strong>Cache disponible:</strong>{' '}
+                        {devCacheStatus.files.map(f => `${f.year} (${f.size_mb}MB)`).join(', ')}
+                      </AlertDescription>
+                    </Alert>
+                  ) : devCacheStatus && !devCacheStatus.available ? (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700 text-sm ml-2">
+                        <strong>Cache no disponible.</strong> Faltan años:{' '}
+                        {devCacheStatus.missing_years.join(', ')}.{' '}
+                        <span className="block mt-1">
+                          Ejecuta primero un job normal para poblar el cache.
+                        </span>
+                      </AlertDescription>
+                    </Alert>
+                  ) : !selectedEntity || !startDate || !endDate ? (
+                    <p className="text-xs text-yellow-700">
+                      Selecciona una entidad y rango de fechas para verificar el cache
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              <p className="text-xs text-yellow-700 pl-7">
+                Este modo usa el raw Excel cacheado de jobs anteriores en vez de descargar de DIAN.
+                No requiere token DIAN.
+              </p>
+            </div>
+          )}
+
           {/* Intervalo de Consolidado */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -1237,13 +1365,17 @@ function NewJobContent() {
                 !selectedEntity ||
                 !startDate ||
                 !endDate ||
-                // Validación según modo seleccionado
+                // Dev job mode: requires cache to be available
+                (isDevJob && !devCacheStatus?.available) ||
+                // Non-dev job: validación según modo seleccionado
                 (
+                  !isDevJob && // Not a dev job
                   !useAutoToken && // No usa auto-token
                   tokenStatus !== 'valid' && // No tiene token guardado
                   !dianToken.trim() // Y no proporcionó token manual
                 ) ||
                 (
+                  !isDevJob && // Not a dev job
                   !useAutoToken && // No usa auto-token
                   tokenStatus === 'valid' && // Tiene token guardado
                   useNewToken && // Pero quiere usar nuevo token
