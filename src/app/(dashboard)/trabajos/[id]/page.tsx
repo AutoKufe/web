@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   ArrowLeft,
   RefreshCw,
@@ -22,7 +24,8 @@ import {
   AlertCircle,
   Info,
   MessageCircle,
-  Ban
+  Ban,
+  Send
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -181,6 +184,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [refreshing, setRefreshing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [jobNotFound, setJobNotFound] = useState(false)
+  const [newTokenUrl, setNewTokenUrl] = useState('')
+  const [submittingToken, setSubmittingToken] = useState(false)
 
   const fetchJobStatus = async (showRefreshing = false) => {
     if (showRefreshing) {
@@ -326,6 +331,36 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       toast.error(err instanceof Error ? err.message : 'Error cancelando trabajo')
     } finally {
       setCancelling(false)
+    }
+  }
+
+  const handleProvideToken = async () => {
+    if (!newTokenUrl.trim()) {
+      toast.error('Por favor ingresa una URL de token válida')
+      return
+    }
+
+    // Validate it looks like a DIAN token URL
+    if (!newTokenUrl.includes('dian.gov.co') && !newTokenUrl.includes('muisca.dian.gov.co')) {
+      toast.error('La URL debe ser del portal DIAN (dian.gov.co)')
+      return
+    }
+
+    setSubmittingToken(true)
+    try {
+      const response = await apiClient.provideToken(id, newTokenUrl.trim())
+      if (response && !response.error && response.success) {
+        toast.success('Token DIAN aceptado. Reanudando procesamiento...')
+        setNewTokenUrl('')
+        fetchJobStatus(true)
+      } else {
+        throw new Error(response.message || response.error || 'Error al enviar el token')
+      }
+    } catch (err) {
+      console.error('Error providing token:', err)
+      toast.error(err instanceof Error ? err.message : 'Error al enviar el token')
+    } finally {
+      setSubmittingToken(false)
     }
   }
 
@@ -475,20 +510,48 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <CardContent className="py-4 px-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
-              <div className="flex-1 space-y-3">
-                <div className="space-y-3">
+              <div className="flex-1 space-y-4">
+                <div className="space-y-2">
                   <h3 className="font-semibold text-orange-600">Se requiere nuevo Token DIAN</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    El token DIAN expiró durante el procesamiento del trabajo. Para continuar, necesitas proporcionar un nuevo token válido.
+                    El token DIAN expiró durante el procesamiento del trabajo. Para continuar, obtén un nuevo token desde el portal DIAN y pégalo abajo.
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Puedes obtener un nuevo token desde el portal DIAN y pegarlo en el campo de abajo, o cancelar el trabajo actual y crear uno nuevo.
-                  </p>
-                  <div className="bg-orange-50 dark:bg-orange-950/30 rounded p-3 border border-orange-200 dark:border-orange-800">
-                    <p className="text-sm">
-                      <span className="font-medium">Nota:</span> Esta funcionalidad estará disponible próximamente. Por ahora, cancela este trabajo y crea uno nuevo con un token DIAN válido.
-                    </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="token-url" className="text-sm font-medium">
+                    URL del Token DIAN
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="token-url"
+                      type="url"
+                      placeholder="https://muisca.dian.gov.co/WebArquitectura/..."
+                      value={newTokenUrl}
+                      onChange={(e) => setNewTokenUrl(e.target.value)}
+                      disabled={submittingToken}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleProvideToken}
+                      disabled={submittingToken || !newTokenUrl.trim()}
+                      className="gap-2"
+                    >
+                      {submittingToken ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Enviar
+                        </>
+                      )}
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Pega la URL completa del token que copiaste del portal DIAN
+                  </p>
                 </div>
               </div>
             </div>

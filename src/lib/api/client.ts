@@ -260,6 +260,19 @@ export class ApiClient {
     return this.request('POST', `/jobs/${jobId}/cancel`)
   }
 
+  /**
+   * Provide a new DIAN token for a job in waiting_token status
+   * Validates the token, updates entity, and relaunches Core processing
+   */
+  async provideToken(jobId: string, tokenUrl: string) {
+    return this.request<{
+      success: boolean
+      message: string
+      job_id: string
+      new_status: string
+    }>('POST', `/jobs/${jobId}/provide-token`, { token_url: tokenUrl })
+  }
+
   async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
     try {
       const headers: HeadersInit = {}
