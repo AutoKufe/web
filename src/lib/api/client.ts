@@ -504,10 +504,10 @@ export class ApiClient {
   }
 
   /**
-   * Unsubscribe from push notifications
+   * Unsubscribe from push notifications (soft-disable)
    */
   async unsubscribeFromNotifications(data: { endpoint: string }) {
-    return this.request('DELETE', '/notifications/unsubscribe', data)
+    return this.request('POST', '/notifications/unsubscribe', data)
   }
 
   /**

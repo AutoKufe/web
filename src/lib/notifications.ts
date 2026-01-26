@@ -153,7 +153,8 @@ export async function subscribeToPush(): Promise<{ success: boolean; error?: str
 }
 
 /**
- * Unsubscribe from push notifications
+ * Unsubscribe from push notifications (soft-disable)
+ * Keeps browser subscription intact for easy reactivation
  */
 export async function unsubscribeFromPush(): Promise<{ success: boolean; error?: string }> {
   if (!isNotificationsSupported()) {
@@ -167,11 +168,12 @@ export async function unsubscribeFromPush(): Promise<{ success: boolean; error?:
     if (subscription) {
       const endpoint = subscription.endpoint
 
-      // Unsubscribe from browser
-      await subscription.unsubscribe()
+      // Deactivate in backend (soft-disable, keeps browser subscription)
+      const response = await apiClient.unsubscribeFromNotifications({ endpoint })
 
-      // Remove from backend
-      await apiClient.unsubscribeFromNotifications({ endpoint })
+      if (response.error) {
+        return { success: false, error: response.error }
+      }
     }
 
     return { success: true }
