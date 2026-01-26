@@ -481,6 +481,50 @@ export class ApiClient {
       }
     }
   }
+
+  // === PUSH NOTIFICATIONS ===
+
+  /**
+   * Get VAPID public key for push subscription
+   */
+  async getVapidPublicKey() {
+    return this.request<{ vapid_public_key: string }>('GET', '/notifications/vapid-public-key')
+  }
+
+  /**
+   * Subscribe to push notifications
+   */
+  async subscribeToNotifications(subscription: {
+    endpoint: string
+    p256dh_key: string
+    auth_key: string
+    device_name?: string
+  }) {
+    return this.request('POST', '/notifications/subscribe', subscription)
+  }
+
+  /**
+   * Unsubscribe from push notifications
+   */
+  async unsubscribeFromNotifications(data: { endpoint: string }) {
+    return this.request('DELETE', '/notifications/unsubscribe', data)
+  }
+
+  /**
+   * Get push notification status for current user
+   */
+  async getNotificationStatus() {
+    return this.request<{
+      enabled: boolean
+      devices: Array<{
+        id: string
+        device_name: string | null
+        created_at: string
+        endpoint_preview: string
+      }>
+      total_devices: number
+    }>('GET', '/notifications/status')
+  }
 }
 
 export const apiClient = new ApiClient()

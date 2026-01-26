@@ -24,6 +24,7 @@ import {
   X,
   Mail
 } from 'lucide-react'
+import { NotificationBell } from '@/components/notification-bell'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -103,6 +104,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline">Nuevo Trabajo</span>
               </Button>
             </Link>
+
+            <NotificationBell />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
