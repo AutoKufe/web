@@ -525,7 +525,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     <Input
                       id="token-url"
                       type="url"
-                      placeholder="https://muisca.dian.gov.co/WebArquitectura/..."
+                      placeholder="https://catalogo-vpfe.dian.gov.co/..."
                       value={newTokenUrl}
                       onChange={(e) => setNewTokenUrl(e.target.value)}
                       disabled={submittingToken}
