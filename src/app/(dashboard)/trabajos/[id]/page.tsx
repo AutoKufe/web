@@ -253,7 +253,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   useEffect(() => {
     // Solo hacer polling si el job existe, no está en estado final, y no hubo error 404
-    if (job && !jobNotFound && (job.status === 'processing' || job.status === 'pending')) {
+    const activeStatuses = ['processing', 'pending', 'queued', 'waiting_token']
+    if (job && !jobNotFound && activeStatuses.includes(job.status)) {
       const interval = setInterval(() => {
         fetchJobStatus(true)
       }, 5000)
@@ -268,7 +269,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       case 'processing':
         return <Loader2 className={`${size} text-blue-500 animate-spin`} />
       case 'pending':
+      case 'queued':
         return <Clock className={`${size} text-yellow-500`} />
+      case 'waiting_token':
+        return <AlertCircle className={`${size} text-orange-500`} />
       case 'failed':
         return <XCircle className={`${size} text-red-500`} />
       default:
@@ -277,15 +281,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
       completed: { variant: 'default', label: 'Completado' },
       processing: { variant: 'secondary', label: 'Procesando' },
       queued: { variant: 'secondary', label: 'En Cola' },
       pending: { variant: 'outline', label: 'Pendiente' },
+      waiting_token: { variant: 'outline', label: 'Requiere Token', className: 'border-orange-500 text-orange-600' },
       failed: { variant: 'destructive', label: 'Fallido' },
     }
-    const { variant, label } = config[status] || { variant: 'outline' as const, label: status }
-    return <Badge variant={variant} className="text-base px-3 py-1">{label}</Badge>
+    const { variant, label, className } = config[status] || { variant: 'outline' as const, label: status }
+    return <Badge variant={variant} className={`text-base px-3 py-1 ${className || ''}`}>{label}</Badge>
   }
 
   const getEntityTypeLabel = (typeCode: string) => {
@@ -379,7 +384,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
-          {(job.status === 'pending' || job.status === 'queued' || job.status === 'processing') && (
+          {(job.status === 'pending' || job.status === 'queued' || job.status === 'processing' || job.status === 'waiting_token') && (
             <Button
               variant="destructive"
               size="sm"
@@ -459,6 +464,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   Documentos: <strong>{job.processed_documents || 0}</strong> de <strong>{job.total_documents}</strong>
                 </p>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Waiting Token Card */}
+      {job.status === 'waiting_token' && (
+        <Card className="border-orange-500">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-3">
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-orange-600">Se requiere nuevo Token DIAN</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    El token DIAN expiró durante el procesamiento del trabajo. Para continuar, necesitas proporcionar un nuevo token válido.
+                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Puedes obtener un nuevo token desde el portal DIAN y pegarlo en el campo de abajo, o cancelar el trabajo actual y crear uno nuevo.
+                  </p>
+                  <div className="bg-orange-50 dark:bg-orange-950/30 rounded p-3 border border-orange-200 dark:border-orange-800">
+                    <p className="text-sm">
+                      <span className="font-medium">Nota:</span> Esta funcionalidad estará disponible próximamente. Por ahora, cancela este trabajo y crea uno nuevo con un token DIAN válido.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
