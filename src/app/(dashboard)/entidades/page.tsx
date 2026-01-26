@@ -726,7 +726,7 @@ export default function EntitiesPage() {
                             day: 'numeric'
                           })}
                         </TableCell>
-                        <TableCell className="pr-6">
+                        <TableCell className="pr-6" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -750,7 +750,10 @@ export default function EntitiesPage() {
                                 <>
                                   <DropdownMenuItem
                                     className="text-red-600 cursor-pointer"
-                                    onClick={() => openCleanupDialog(entity)}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openCleanupDialog(entity)
+                                    }}
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     Limpiar storage
@@ -876,13 +879,13 @@ export default function EntitiesPage() {
               <Trash2 className="h-5 w-5" />
               Limpiar Storage
             </DialogTitle>
-            <DialogDescription className="pt-2">
-              <div className="space-y-3">
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-2 text-sm text-muted-foreground">
                 <p>
                   Se eliminarán <strong>TODOS</strong> los archivos de storage para{' '}
                   <strong className="text-foreground">{cleanupEntity?.display_name}</strong>:
                 </p>
-                <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                <ul className="list-disc list-inside space-y-1">
                   <li>ZIPs de documentos descargados</li>
                   <li>Excel generados</li>
                   <li>Raw Excel cacheados</li>
