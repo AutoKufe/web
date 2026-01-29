@@ -118,8 +118,15 @@ function NewJobContent() {
   const [isDevJob, setIsDevJob] = useState(false)
   const [devCacheStatus, setDevCacheStatus] = useState<{
     available: boolean
-    files: Array<{ year: number; file_id: string; size_mb: number }>
-    missing_years: number[]
+    file?: {
+      file_id: string
+      cached_range: string
+      dian_categories: string[]
+    }
+    missing?: {
+      date_range: boolean
+      categories: string[]
+    } | null
     entity_name?: string
   } | null>(null)
   const [loadingDevCache, setLoadingDevCache] = useState(false)
@@ -1246,15 +1253,16 @@ function NewJobContent() {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <AlertDescription className="text-green-700 text-sm ml-2">
                         <strong>Cache disponible:</strong>{' '}
-                        {devCacheStatus.files?.map(f => `${f.year} (${f.size_mb}MB)`).join(', ') ?? 'Verificando...'}
+                        {devCacheStatus.file?.cached_range} ({devCacheStatus.file?.dian_categories?.join(', ')})
                       </AlertDescription>
                     </Alert>
                   ) : devCacheStatus && !devCacheStatus.available ? (
                     <Alert className="border-red-200 bg-red-50">
                       <AlertCircle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-red-700 text-sm ml-2">
-                        <strong>Cache no disponible.</strong> Faltan años:{' '}
-                        {devCacheStatus.missing_years?.join(', ') ?? 'desconocido'}.{' '}
+                        <strong>Cache no disponible.</strong>{' '}
+                        {devCacheStatus.missing?.date_range && 'Rango de fechas no cubierto. '}
+                        {devCacheStatus.missing?.categories?.length ? `Faltan categorías: ${devCacheStatus.missing.categories.join(', ')}` : ''}
                         <span className="block mt-1">
                           Ejecuta primero un job normal para poblar el cache.
                         </span>
