@@ -1246,7 +1246,7 @@ function NewJobContent() {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <AlertDescription className="text-green-700 text-sm ml-2">
                         <strong>Cache disponible:</strong>{' '}
-                        {devCacheStatus.files.map(f => `${f.year} (${f.size_mb}MB)`).join(', ')}
+                        {devCacheStatus.files?.map(f => `${f.year} (${f.size_mb}MB)`).join(', ') ?? 'Verificando...'}
                       </AlertDescription>
                     </Alert>
                   ) : devCacheStatus && !devCacheStatus.available ? (
@@ -1254,7 +1254,7 @@ function NewJobContent() {
                       <AlertCircle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-red-700 text-sm ml-2">
                         <strong>Cache no disponible.</strong> Faltan años:{' '}
-                        {devCacheStatus.missing_years.join(', ')}.{' '}
+                        {devCacheStatus.missing_years?.join(', ') ?? 'desconocido'}.{' '}
                         <span className="block mt-1">
                           Ejecuta primero un job normal para poblar el cache.
                         </span>
