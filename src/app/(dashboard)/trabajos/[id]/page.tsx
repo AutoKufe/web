@@ -183,7 +183,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [markingFailed, setMarkingFailed] = useState(false)
   const [jobNotFound, setJobNotFound] = useState(false)
+
+  // Check if we're in staging/dev environment (show dev tools)
+  const isDevEnvironment = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.includes('dev.') ||
+    process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
+  )
   const [newTokenUrl, setNewTokenUrl] = useState('')
   const [submittingToken, setSubmittingToken] = useState(false)
 
@@ -334,6 +342,28 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  const handleMarkFailed = async () => {
+    if (!confirm('[DEV] ¿Marcar este trabajo como fallido? Esto es solo para testing.')) {
+      return
+    }
+
+    setMarkingFailed(true)
+    try {
+      const response = await apiClient.markJobAsFailed(id)
+      if (response && !response.error) {
+        toast.success('[DEV] Trabajo marcado como fallido')
+        fetchJobStatus(true)
+      } else {
+        throw new Error(response.message || 'Error marcando trabajo como fallido')
+      }
+    } catch (err) {
+      console.error('Error marking job as failed:', err)
+      toast.error(err instanceof Error ? err.message : 'Error marcando trabajo como fallido')
+    } finally {
+      setMarkingFailed(false)
+    }
+  }
+
   const handleProvideToken = async () => {
     if (!newTokenUrl.trim()) {
       toast.error('Por favor ingresa una URL de token válida')
@@ -420,16 +450,30 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
           {(job.status === 'pending' || job.status === 'queued' || job.status === 'processing' || job.status === 'waiting_token') && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-              onClick={handleCancelJob}
-              disabled={cancelling}
-            >
-              <Ban className="h-4 w-4" />
-              {cancelling ? 'Cancelando...' : 'Cancelar Trabajo'}
-            </Button>
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+                onClick={handleCancelJob}
+                disabled={cancelling}
+              >
+                <Ban className="h-4 w-4" />
+                {cancelling ? 'Cancelando...' : 'Cancelar Trabajo'}
+              </Button>
+              {isDevEnvironment && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                  onClick={handleMarkFailed}
+                  disabled={markingFailed}
+                >
+                  <XCircle className="h-4 w-4" />
+                  {markingFailed ? 'Marcando...' : '[DEV] Marcar Fallido'}
+                </Button>
+              )}
+            </>
           )}
           {job.status === 'completed' && (
             <Button

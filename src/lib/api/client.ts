@@ -261,6 +261,14 @@ export class ApiClient {
   }
 
   /**
+   * Mark a job as failed (STAGING ONLY - requires dev role)
+   * Used for testing error flows in development
+   */
+  async markJobAsFailed(jobId: string) {
+    return this.request('POST', `/jobs/${jobId}/mark-failed`)
+  }
+
+  /**
    * Provide a new DIAN token for a job in waiting_token status
    * Validates the token, updates entity, and relaunches Core processing
    */
