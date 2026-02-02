@@ -125,6 +125,24 @@ export class ApiClient {
     return this.request('GET', '/entities/search', undefined, searchParams)
   }
 
+  /**
+   * Get entities for selector (minimal fields: id, display_name, identifier_suffix)
+   * Uses selector_updated_at for granular cache invalidation
+   */
+  async listEntitiesSelector(since?: string, cachedPrefixes?: string[]) {
+    const params: Record<string, string> = {}
+
+    if (since) {
+      params.since = since
+    }
+
+    if (cachedPrefixes && cachedPrefixes.length > 0) {
+      params.cached_prefixes = cachedPrefixes.join(',')
+    }
+
+    return this.request('GET', '/entities/selector', undefined, params)
+  }
+
   async registerEntity(dianToken: string) {
     return this.request('POST', '/entities/register', { dian_token: dianToken })
   }
@@ -163,6 +181,20 @@ export class ApiClient {
       }
       recommended_option: 'auto' | 'saved' | 'manual'
     }>('GET', `/entities/${entityId}/job-creation-options`)
+  }
+
+  /**
+   * Cleanup all storage files for an entity (staging only, dev role required)
+   * Deletes files from B2 and DB records
+   */
+  async cleanupEntityStorage(entityId: string) {
+    return this.request<{
+      success: boolean
+      files_deleted: number
+      files_failed?: number
+      space_freed_mb: number
+      entity_name?: string
+    }>('POST', `/entities/${entityId}/cleanup-storage`)
   }
 
   // === DIAN EMAILS ===
@@ -211,11 +243,23 @@ export class ApiClient {
       date_range: { start_date: string; end_date: string }
       document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
+      is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
     }
   ) {
     return this.request('POST', '/jobs/create-job', {
       dian_token: dianToken,
       job_data: jobData,
+      is_dev_job: jobData.is_dev_job,  // Pass at top level for Backend
+    })
+  }
+
+  /**
+   * Check if cached raw Excel is available for dev jobs (staging only)
+   */
+  async checkCachedRawExcel(entityId: string, startDate: string, endDate: string) {
+    return this.request('GET', `/jobs/check-cached-excel/${entityId}`, undefined, {
+      start_date: startDate,
+      end_date: endDate,
     })
   }
 
@@ -232,6 +276,27 @@ export class ApiClient {
 
   async cancelJob(jobId: string) {
     return this.request('POST', `/jobs/${jobId}/cancel`)
+  }
+
+  /**
+   * Mark a job as failed (STAGING ONLY - requires dev role)
+   * Used for testing error flows in development
+   */
+  async markJobAsFailed(jobId: string) {
+    return this.request('POST', `/jobs/${jobId}/mark-failed`)
+  }
+
+  /**
+   * Provide a new DIAN token for a job in waiting_token status
+   * Validates the token, updates entity, and relaunches Core processing
+   */
+  async provideToken(jobId: string, tokenUrl: string) {
+    return this.request<{
+      success: boolean
+      message: string
+      job_id: string
+      new_status: string
+    }>('POST', `/jobs/${jobId}/provide-token`, { token_url: tokenUrl })
   }
 
   async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
@@ -441,6 +506,50 @@ export class ApiClient {
         error: error instanceof Error ? error.message : 'Error de red'
       }
     }
+  }
+
+  // === PUSH NOTIFICATIONS ===
+
+  /**
+   * Get VAPID public key for push subscription
+   */
+  async getVapidPublicKey() {
+    return this.request<{ vapid_public_key: string }>('GET', '/notifications/vapid-public-key')
+  }
+
+  /**
+   * Subscribe to push notifications
+   */
+  async subscribeToNotifications(subscription: {
+    endpoint: string
+    p256dh_key: string
+    auth_key: string
+    device_name?: string
+  }) {
+    return this.request('POST', '/notifications/subscribe', subscription)
+  }
+
+  /**
+   * Unsubscribe from push notifications (soft-disable)
+   */
+  async unsubscribeFromNotifications(data: { endpoint: string }) {
+    return this.request('POST', '/notifications/unsubscribe', data)
+  }
+
+  /**
+   * Get push notification status for current user
+   */
+  async getNotificationStatus() {
+    return this.request<{
+      enabled: boolean
+      devices: Array<{
+        id: string
+        device_name: string | null
+        created_at: string
+        endpoint_preview: string
+      }>
+      total_devices: number
+    }>('GET', '/notifications/status')
   }
 }
 

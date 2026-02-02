@@ -8,7 +8,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-export type AdminRole = 'super_admin' | 'technical_support' | 'support_agent'
+export type AdminRole = 'super_admin' | 'technical_support' | 'support_agent' | 'dev'
 
 export interface UserRole {
   id: string
@@ -92,7 +92,8 @@ export function getRoleLabel(role: AdminRole): string {
   const labels: Record<AdminRole, string> = {
     'super_admin': 'Super Admin',
     'technical_support': 'Soporte Técnico',
-    'support_agent': 'Agente de Soporte'
+    'support_agent': 'Agente de Soporte',
+    'dev': 'Desarrollador'
   }
   return labels[role] || role
 }
@@ -104,7 +105,8 @@ export function getRoleDescription(role: AdminRole): string {
   const descriptions: Record<AdminRole, string> = {
     'super_admin': 'Acceso completo a todas las funcionalidades',
     'technical_support': 'Puede resolver errores técnicos y ver logs',
-    'support_agent': 'Puede reportar errores de usuarios'
+    'support_agent': 'Puede reportar errores de usuarios',
+    'dev': 'Acceso a funciones de desarrollo en staging'
   }
   return descriptions[role] || ''
 }

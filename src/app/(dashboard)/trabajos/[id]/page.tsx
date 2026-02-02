@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useState, use } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth/context'
 import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   ArrowLeft,
   RefreshCw,
@@ -21,22 +22,29 @@ import {
   FileText,
   AlertCircle,
   Info,
-  MessageCircle,
-  Ban
+  Ban,
+  Send
 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  useJob,
+  useEntity,
+  useCancelJob,
+  useMarkJobAsFailed,
+  useProvideToken,
+} from '@/lib/query'
 
 
 // Helper: Format document categories with proper "y" conjunction
 // Input: ['ingresos', 'egresos', 'nominas'] or "ingresosegresosnominas"
-// Output: "Ingresos, Egresos y Nóminas"
+// Output: "Ingresos, Egresos y Nominas"
 function formatDocumentCategories(categories: string | string[] | undefined | null): string {
   if (!categories) return 'Todos'
 
   const categoryMap: Record<string, string> = {
     'ingresos': 'Ingresos',
     'egresos': 'Egresos',
-    'nominas': 'Nóminas'
+    'nominas': 'Nominas'
   }
 
   const joinWithY = (items: string[]): string => {
@@ -84,247 +92,153 @@ function formatDateOnly(dateString: string | undefined | null): string {
   return date.toLocaleDateString()
 }
 
-interface JobDetails {
-  id: string
-  entity_id: string
-  job_name: string
-  status: string
-  start_date: string
-  end_date: string
-  document_categories?: string | string[]
-  consolidation_interval?: string
-  processed_documents?: number
-  total_documents?: number
-  unique_documents?: number
-  created_at: string
-  processing_start_time?: string
-  completed_at?: string
-  error_message?: string
-  error_code?: string
-  error_category?: string
-  stage?: string
-  progress_percentage?: number
-}
-
-interface EntityDetails {
-  full_name: string
-  identifier_suffix: string
-  type: string
-}
-
-
-const ENTITIES_CACHE_KEY = 'autokufe_entities_cache_global' // Same key as entities page
-
-interface Entity {
-  id: string
-  display_name: string
-  identifier_suffix: string
-  entity_type: string
-  updated_at?: string
-}
-
-interface EntitiesCache {
-  entities: Entity[]
-  total_count: number
-}
-
-// Entity cache helpers
-const getEntitiesCache = (): EntitiesCache | null => {
-  try {
-    const cached = localStorage.getItem(ENTITIES_CACHE_KEY)
-    if (!cached) return null
-    return JSON.parse(cached)
-  } catch {
-    return null
+const getStatusIcon = (status: string, size = 'h-5 w-5') => {
+  switch (status) {
+    case 'completed':
+      return <CheckCircle2 className={`${size} text-green-500`} />
+    case 'processing':
+      return <Loader2 className={`${size} text-blue-500 animate-spin`} />
+    case 'pending':
+    case 'queued':
+      return <Clock className={`${size} text-yellow-500`} />
+    case 'waiting_token':
+      return <AlertCircle className={`${size} text-orange-500`} />
+    case 'failed':
+      return <XCircle className={`${size} text-red-500`} />
+    default:
+      return <Clock className={`${size} text-muted-foreground`} />
   }
 }
 
-const updateEntityInCache = (entity: Entity) => {
-  try {
-    const cache = getEntitiesCache()
-    if (!cache) {
-      localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify({
-        entities: [entity],
-        total_count: 1
-      }))
-      return
-    }
-
-    const existingIndex = cache.entities.findIndex(e => e.id === entity.id)
-    if (existingIndex >= 0) {
-      cache.entities[existingIndex] = entity
-    } else {
-      cache.entities.push(entity)
-      cache.total_count = cache.entities.length
-    }
-
-    localStorage.setItem(ENTITIES_CACHE_KEY, JSON.stringify(cache))
-  } catch (error) {
-    console.warn('Failed to update entity cache:', error)
+const getStatusBadge = (status: string) => {
+  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
+    completed: { variant: 'default', label: 'Completado' },
+    processing: { variant: 'secondary', label: 'Procesando' },
+    queued: { variant: 'secondary', label: 'En Cola' },
+    pending: { variant: 'outline', label: 'Pendiente' },
+    waiting_token: { variant: 'outline', label: 'Requiere Token', className: 'border-orange-500 text-orange-600' },
+    failed: { variant: 'destructive', label: 'Fallido' },
   }
+  const { variant, label, className } = config[status] || { variant: 'outline' as const, label: status }
+  return <Badge variant={variant} className={`text-base px-3 py-1 ${className || ''}`}>{label}</Badge>
 }
 
-const getEntityFromCache = (entityId: string): Entity | null => {
-  const cache = getEntitiesCache()
-  if (!cache) return null
-  return cache.entities.find(e => e.id === entityId) || null
+const getEntityTypeLabel = (typeCode: string) => {
+  const types: Record<string, string> = {
+    'persona_juridica': 'Persona Juridica',
+    'juridica': 'Persona Juridica',
+    'persona_natural': 'Persona Natural',
+    'natural': 'Persona Natural'
+  }
+  return types[typeCode.toLowerCase()] || typeCode
 }
 
+const formatIdentifier = (suffix: string) => {
+  return `****${suffix}`
+}
 
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { user, loading: authLoading } = useAuth()
-  const [job, setJob] = useState<JobDetails | null>(null)
-  const [entity, setEntity] = useState<EntityDetails | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
-  const [jobNotFound, setJobNotFound] = useState(false)
 
-  const fetchJobStatus = async (showRefreshing = false) => {
-    if (showRefreshing) {
-      setRefreshing(true)
-    }
+  // React Query hooks
+  const { data: job, isLoading, isFetching, refetch, error } = useJob(id)
 
-    try {
-      const response = await apiClient.getJobStatus(id)
-      if (response && !response.error) {
-        // Backend wraps data in job_data field
-        const responseData = response as any
-        const jobData = responseData.job_data as JobDetails
-        setJob(jobData)
-        setJobNotFound(false)
+  // Get entity data from cache or fetch if needed
+  const { data: entity } = useEntity(job?.entity_id)
 
-        // Get entity data from cache, fetch if missing
-        if (jobData.entity_id) {
-          let entity = getEntityFromCache(jobData.entity_id)
-          
-          // Fetch from backend if not in cache
-          if (!entity) {
-            try {
-              const entityResponse = await apiClient.getEntity(jobData.entity_id) as any
-              if (entityResponse && !entityResponse.error && entityResponse.entity) {
-                entity = {
-                  id: entityResponse.entity.id,
-                  display_name: entityResponse.entity.display_name,
-                  identifier_suffix: entityResponse.entity.identifier?.slice(-4) || '',
-                  entity_type: entityResponse.entity.type_code,
-                  updated_at: entityResponse.entity.updated_at
-                }
-                updateEntityInCache(entity)
-              }
-            } catch (err) {
-              console.warn('Failed to fetch entity:', err)
-            }
-          }
+  // Mutations
+  const cancelMutation = useCancelJob()
+  const markFailedMutation = useMarkJobAsFailed()
+  const provideTokenMutation = useProvideToken()
 
-          if (entity) {
-            setEntity({
-              full_name: entity.display_name || 'N/A',
-              identifier_suffix: entity.identifier_suffix || 'N/A',
-              type: entity.entity_type || 'N/A'
-            })
-          }
-        }
-      } else {
-        // Job no encontrado o error - no seguir haciendo polling
-        setJobNotFound(true)
-        if (!showRefreshing) {
-          toast.error('Trabajo no encontrado o no tienes acceso')
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching job status:', err)
-      setJobNotFound(true)
-      if (!showRefreshing) {
-        toast.error('Error cargando estado del trabajo')
-      }
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
+  // Local state for token input
+  const [newTokenUrl, setNewTokenUrl] = useState('')
 
-  useEffect(() => {
-    if (authLoading || !user) return
-    fetchJobStatus()
-  }, [id, authLoading, user])
-
-  useEffect(() => {
-    // Solo hacer polling si el job existe, no está en estado final, y no hubo error 404
-    if (job && !jobNotFound && (job.status === 'processing' || job.status === 'pending')) {
-      const interval = setInterval(() => {
-        fetchJobStatus(true)
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [job, jobNotFound])
-
-  const getStatusIcon = (status: string, size = 'h-5 w-5') => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className={`${size} text-green-500`} />
-      case 'processing':
-        return <Loader2 className={`${size} text-blue-500 animate-spin`} />
-      case 'pending':
-        return <Clock className={`${size} text-yellow-500`} />
-      case 'failed':
-        return <XCircle className={`${size} text-red-500`} />
-      default:
-        return <Clock className={`${size} text-muted-foreground`} />
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      completed: { variant: 'default', label: 'Completado' },
-      processing: { variant: 'secondary', label: 'Procesando' },
-      queued: { variant: 'secondary', label: 'En Cola' },
-      pending: { variant: 'outline', label: 'Pendiente' },
-      failed: { variant: 'destructive', label: 'Fallido' },
-    }
-    const { variant, label } = config[status] || { variant: 'outline' as const, label: status }
-    return <Badge variant={variant} className="text-base px-3 py-1">{label}</Badge>
-  }
-
-  const getEntityTypeLabel = (typeCode: string) => {
-    const types: Record<string, string> = {
-      'persona_juridica': 'Persona Jurídica',
-      'juridica': 'Persona Jurídica',
-      'persona_natural': 'Persona Natural',
-      'natural': 'Persona Natural'
-    }
-    return types[typeCode.toLowerCase()] || typeCode
-  }
-
-  const formatIdentifier = (suffix: string) => {
-    return `****${suffix}`
-  }
+  // Check if we're in staging/dev environment (show dev tools)
+  const isDevEnvironment = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.includes('dev.') ||
+    process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
+  )
 
   const handleCancelJob = async () => {
-    if (!confirm('¿Estás seguro de que quieres cancelar este trabajo? Esta acción no se puede deshacer.')) {
+    if (!confirm('Estas seguro de que quieres cancelar este trabajo? Esta accion no se puede deshacer.')) {
       return
     }
 
-    setCancelling(true)
     try {
-      const response = await apiClient.cancelJob(id)
-      if (response && !response.error) {
-        toast.success('Trabajo cancelado exitosamente')
-        fetchJobStatus(true)
-      } else {
-        toast.error('Error cancelando trabajo')
-      }
+      await cancelMutation.mutateAsync(id)
+      toast.success('Trabajo cancelado exitosamente')
     } catch (err) {
       console.error('Error cancelling job:', err)
-      toast.error('Error cancelando trabajo')
-    } finally {
-      setCancelling(false)
+      toast.error(err instanceof Error ? err.message : 'Error cancelando trabajo')
     }
   }
 
-  if (loading) {
+  const handleMarkFailed = async () => {
+    if (!confirm('[DEV] Marcar este trabajo como fallido? Esto es solo para testing.')) {
+      return
+    }
+
+    try {
+      await markFailedMutation.mutateAsync(id)
+      toast.success('[DEV] Trabajo marcado como fallido')
+    } catch (err) {
+      console.error('Error marking job as failed:', err)
+      toast.error(err instanceof Error ? err.message : 'Error marcando trabajo como fallido')
+    }
+  }
+
+  const handleProvideToken = async () => {
+    if (!newTokenUrl.trim()) {
+      toast.error('Por favor ingresa una URL de token valida')
+      return
+    }
+
+    // Validate it looks like a DIAN token URL
+    if (!newTokenUrl.includes('dian.gov.co') && !newTokenUrl.includes('muisca.dian.gov.co')) {
+      toast.error('La URL debe ser del portal DIAN (dian.gov.co)')
+      return
+    }
+
+    try {
+      await provideTokenMutation.mutateAsync({ jobId: id, tokenUrl: newTokenUrl.trim() })
+      toast.success('Token DIAN aceptado. Reanudando procesamiento...')
+      setNewTokenUrl('')
+    } catch (err) {
+      console.error('Error providing token:', err)
+      toast.error(err instanceof Error ? err.message : 'Error al enviar el token')
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!job) return
+
+    try {
+      const result = await apiClient.downloadExcel(job.id)
+
+      if (!result.success || !result.blob) {
+        toast.error(result.error || 'Error al descargar el archivo')
+        return
+      }
+
+      const url = window.URL.createObjectURL(result.blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.filename || `${job.job_name}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('Archivo descargado correctamente')
+    } catch (error) {
+      console.error('Error descargando Excel:', error)
+      toast.error('Error al descargar el archivo')
+    }
+  }
+
+  if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="animate-pulse space-y-4">
@@ -335,7 +249,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     )
   }
 
-  if (!job) {
+  if (error || !job) {
     return (
       <div className="max-w-4xl mx-auto">
         <Card>
@@ -352,6 +266,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       </div>
     )
   }
+
+  const isActiveJob = ['processing', 'pending', 'queued', 'waiting_token'].includes(job.status)
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -374,50 +290,39 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <Button
             variant="outline"
             size="icon"
-            onClick={() => fetchJobStatus(true)}
-            disabled={refreshing}
+            onClick={() => refetch()}
+            disabled={isFetching}
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
-          {(job.status === 'pending' || job.status === 'queued' || job.status === 'processing') && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-              onClick={handleCancelJob}
-              disabled={cancelling}
-            >
-              <Ban className="h-4 w-4" />
-              {cancelling ? 'Cancelando...' : 'Cancelar Trabajo'}
-            </Button>
+          {isActiveJob && (
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+                onClick={handleCancelJob}
+                disabled={cancelMutation.isPending}
+              >
+                <Ban className="h-4 w-4" />
+                {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar Trabajo'}
+              </Button>
+              {isDevEnvironment && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                  onClick={handleMarkFailed}
+                  disabled={markFailedMutation.isPending}
+                >
+                  <XCircle className="h-4 w-4" />
+                  {markFailedMutation.isPending ? 'Marcando...' : '[DEV] Marcar Fallido'}
+                </Button>
+              )}
+            </>
           )}
           {job.status === 'completed' && (
-            <Button
-              className="gap-2"
-              onClick={async () => {
-                try {
-                  const result = await apiClient.downloadExcel(job.id)
-
-                  if (!result.success || !result.blob) {
-                    toast.error(result.error || 'Error al descargar el archivo')
-                    return
-                  }
-
-                  const url = window.URL.createObjectURL(result.blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = result.filename || `${job.job_name}.xlsx`
-                  document.body.appendChild(a)
-                  a.click()
-                  window.URL.revokeObjectURL(url)
-                  document.body.removeChild(a)
-                  toast.success('Archivo descargado correctamente')
-                } catch (error) {
-                  console.error('Error descargando Excel:', error)
-                  toast.error('Error al descargar el archivo')
-                }
-              }}
-            >
+            <Button className="gap-2" onClick={handleDownload}>
               <Download className="h-4 w-4" />
               Descargar Excel
             </Button>
@@ -454,11 +359,66 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   </div>
                 </>
               )}
-              {job.total_documents && job.total_documents > 0 && (
+              {job.docs_total && job.docs_total > 0 && (
                 <p className="text-sm">
-                  Documentos: <strong>{job.processed_documents || 0}</strong> de <strong>{job.total_documents}</strong>
+                  Documentos: <strong>{job.docs_processed || 0}</strong> de <strong>{job.docs_total}</strong>
                 </p>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Waiting Token Card */}
+      {job.status === 'waiting_token' && (
+        <Card className="border-orange-500">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-4">
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-orange-600">Se requiere nuevo Token DIAN</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    El token DIAN expiro durante el procesamiento del trabajo. Para continuar, obten un nuevo token desde el portal DIAN y pegalo abajo.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="token-url" className="text-sm font-medium">
+                    URL del Token DIAN
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="token-url"
+                      type="url"
+                      placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                      value={newTokenUrl}
+                      onChange={(e) => setNewTokenUrl(e.target.value)}
+                      disabled={provideTokenMutation.isPending}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleProvideToken}
+                      disabled={provideTokenMutation.isPending || !newTokenUrl.trim()}
+                      className="gap-2"
+                    >
+                      {provideTokenMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Enviar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Pega la URL completa del token que copiaste del portal DIAN
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -474,15 +434,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <div className="space-y-3">
                   <h3 className="font-semibold text-destructive">Error al realizar el trabajo</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Ha ocurrido un error durante el procesamiento. Nuestro equipo técnico ha sido notificado automáticamente y trabajará en resolverlo.
+                    Ha ocurrido un error durante el procesamiento. Nuestro equipo tecnico ha sido notificado automaticamente y trabajara en resolverlo.
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Si después de unas horas no ves cambios, puedes contactar a soporte con este código de referencia para consultar el estado:
+                    Si despues de unas horas no ves cambios, puedes contactar a soporte con este codigo de referencia para consultar el estado:
                   </p>
                   {job.error_code && (
                     <div className="bg-muted/50 rounded p-3 border">
                       <p className="text-sm font-mono">
-                        <span className="text-muted-foreground">Código:</span>{' '}
+                        <span className="text-muted-foreground">Codigo:</span>{' '}
                         <span className="font-semibold">{job.error_code}</span>
                       </p>
                     </div>
@@ -499,7 +459,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <CardHeader>
           <CardTitle>Detalles del Job</CardTitle>
           <CardDescription>
-            Información de configuración y ejecución
+            Informacion de configuracion y ejecucion
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -510,7 +470,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               Entidad
             </h3>
             <div className="bg-muted p-4 rounded-lg space-y-2">
-              <p className="font-medium">{entity?.full_name || 'Cargando...'}</p>
+              <p className="font-medium">{entity?.display_name || job.entity_name || 'Cargando...'}</p>
               {entity?.identifier_suffix && (
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground font-mono">
@@ -519,14 +479,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <div className="group relative">
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-md border z-10">
-                      Los últimos 4 dígitos del número de identificación de la entidad
+                      Los ultimos 4 digitos del numero de identificacion de la entidad
                     </div>
                   </div>
                 </div>
               )}
-              {entity?.type && (
+              {entity?.type_code && (
                 <p className="text-sm text-muted-foreground">
-                  Tipo: {getEntityTypeLabel(entity.type)}
+                  Tipo: {getEntityTypeLabel(entity.type_code)}
                 </p>
               )}
             </div>
@@ -544,16 +504,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Inicio</p>
                 <p className="font-medium">
-                  {job.start_date
-                    ? formatDateOnly(job.start_date)
+                  {job.date_range?.start_date
+                    ? formatDateOnly(job.date_range.start_date)
                     : 'N/A'}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Fin</p>
                 <p className="font-medium">
-                  {job.end_date
-                    ? formatDateOnly(job.end_date)
+                  {job.date_range?.end_date
+                    ? formatDateOnly(job.date_range.end_date)
                     : 'N/A'}
                 </p>
               </div>
@@ -566,11 +526,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Configuración
+              Configuracion
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Categorías de documentos</p>
+                <p className="text-xs text-muted-foreground">Categorias de documentos</p>
                 <p className="font-medium capitalize">{formatDocumentCategories(job.document_categories)}</p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
@@ -628,26 +588,26 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Total encontrados</p>
                 <p className="font-medium text-lg">
-                  {job.total_documents !== undefined && job.total_documents !== null
-                    ? job.total_documents.toLocaleString()
+                  {job.docs_total !== undefined && job.docs_total !== null
+                    ? job.docs_total.toLocaleString()
                     : 'Calculando...'}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Únicos (cobrados)</p>
+                <p className="text-xs text-muted-foreground">Unicos (cobrados)</p>
                 <p className="font-medium text-lg">
-                  {job.unique_documents !== undefined && job.unique_documents !== null
-                    ? job.unique_documents.toLocaleString()
-                    : job.total_documents !== undefined && job.total_documents !== null
-                      ? job.total_documents.toLocaleString()
+                  {job.docs_unique !== undefined && job.docs_unique !== null
+                    ? job.docs_unique.toLocaleString()
+                    : job.docs_total !== undefined && job.docs_total !== null
+                      ? job.docs_total.toLocaleString()
                       : 'Calculando...'}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Procesados</p>
                 <p className="font-medium text-lg">
-                  {job.processed_documents !== undefined && job.processed_documents !== null
-                    ? job.processed_documents.toLocaleString()
+                  {job.docs_processed !== undefined && job.docs_processed !== null
+                    ? job.docs_processed.toLocaleString()
                     : '0'}
                 </p>
               </div>

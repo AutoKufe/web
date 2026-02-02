@@ -153,7 +153,10 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', user.id)
       .is('revoked_at', null)
 
+    const userRoles = roles?.map(r => r.role) || []
     const isAdmin = roles && roles.length > 0
+    const hasDevRole = userRoles.includes('dev')
+    const hasSuperAdminRole = userRoles.includes('super_admin')
 
     // Debug logs (remove in production)
     console.log('🔍 Middleware Debug:', {
@@ -166,8 +169,41 @@ export async function middleware(request: NextRequest) {
       userEmail: user.email,
       roles,
       rolesError,
-      isAdmin
+      isAdmin,
+      hasDevRole
     })
+
+    // SECURITY: Dev role users can ONLY access staging, not production
+    // This prevents dev users from accidentally using production or testing dev features there
+    // super_admin can access both environments
+    const isProductionApp = hostname.includes(APP_DOMAIN) && environment === 'production'
+    if (hasDevRole && !hasSuperAdminRole && isProductionApp) {
+      console.log('🚫 [PRODUCTION] Dev user blocked from production, redirecting to staging')
+
+      // Sign out the user from production
+      await supabase.auth.signOut()
+
+      // Redirect to staging with message
+      return new NextResponse(
+        `<html>
+          <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; text-align: center;">
+            <h1>🧪 Rol Dev Detectado</h1>
+            <p style="color: #666;">
+              Tu cuenta tiene rol <strong>dev</strong>, por lo que solo puedes usar el ambiente de staging.
+            </p>
+            <p style="color: #666;">
+              Has sido deslogueado de producción automáticamente.
+            </p>
+            <p style="margin-top: 40px;">
+              <a href="https://${STAGING_DOMAIN}" style="background: #0070f3; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                Ir a Staging →
+              </a>
+            </p>
+          </body>
+        </html>`,
+        { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } }
+      )
+    }
 
     // Admin access - only allow admin users
     if (isAdminAccess) {

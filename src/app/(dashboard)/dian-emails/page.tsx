@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth/context'
-import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,20 +43,15 @@ import {
   AlertTitle,
 } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { useDianEmailsCache } from '@/lib/hooks/use-dian-emails-cache'
+import {
+  useDianEmails,
+  useRegisterDianEmail,
+  useDeactivateDianEmail,
+  useReactivateDianEmail,
+  useRegenerateOAuthUrl,
+  type DianEmail,
+} from '@/lib/query'
 
-// Map cache DianEmail to page DianEmail for display
-interface PageDianEmail {
-  dian_email_id: string
-  email: string
-  status: string
-  requested_at: string
-  authorized_at?: string
-  deactivated_at?: string
-  has_associated_entities?: boolean
-  associated_entities_count?: number
-  has_filter?: boolean
-}
 
 const getStatusBadge = (status: string) => {
   const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon: React.ReactNode }> = {
@@ -79,117 +72,85 @@ const getStatusBadge = (status: string) => {
 }
 
 export default function DianEmailsPage() {
-  const { user, loading: authLoading } = useAuth()
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
   const [registerEmail, setRegisterEmail] = useState('')
-  const [registering, setRegistering] = useState(false)
 
-  // Use cache hook for DIAN emails
-  const { emails: cachedEmails, loading, syncDianEmails } = useDianEmailsCache()
+  // React Query hooks
+  const { data, isLoading, isFetching, refetch } = useDianEmails()
+  const registerMutation = useRegisterDianEmail()
+  const deactivateMutation = useDeactivateDianEmail()
+  const reactivateMutation = useReactivateDianEmail()
+  const regenerateOAuthMutation = useRegenerateOAuthUrl()
 
-  // Map cache emails to page format
-  const dianEmails: PageDianEmail[] = cachedEmails.map(email => ({
-    dian_email_id: email.id,
-    email: email.email_masked,
-    status: email.auth_status,
-    requested_at: email.created_at,
-    authorized_at: email.authorized_at || undefined,
-    deactivated_at: email.deactivated_at || undefined,
-    has_associated_entities: email.associated_entities_count > 0,
-    associated_entities_count: email.associated_entities_count
-  }))
-
-  useEffect(() => {
-    if (authLoading || !user) return
-    syncDianEmails()
-  }, [authLoading, user, syncDianEmails])
+  const dianEmails = data?.emails || []
 
   const handleRegister = async () => {
     if (!registerEmail.trim()) {
-      toast.error('Ingresa un email DIAN válido')
+      toast.error('Ingresa un email DIAN valido')
       return
     }
 
-    setRegistering(true)
     try {
-      const response = await apiClient.registerDianEmail(registerEmail) as any
-      if (response.error) {
-        toast.error(response.message || 'Error registrando DIAN email')
-        return
-      }
+      const response = await registerMutation.mutateAsync(registerEmail)
 
       toast.success('DIAN email registrado')
 
-      // Abrir OAuth URL en nueva ventana
+      // Open OAuth URL in new window
       if (response.oauth_url) {
         window.open(response.oauth_url, '_blank')
-        toast.info('Completa la autorización OAuth en la nueva ventana')
+        toast.info('Completa la autorizacion OAuth en la nueva ventana')
       }
 
       setRegisterDialogOpen(false)
       setRegisterEmail('')
-      syncDianEmails()
     } catch (err) {
       console.error('Error registering DIAN email:', err)
-      toast.error('Error registrando DIAN email')
-    } finally {
-      setRegistering(false)
+      toast.error(err instanceof Error ? err.message : 'Error registrando DIAN email')
     }
   }
 
   const handleRegenerateOAuth = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.regenerateOAuthUrl(dianEmailId) as any
-      if (response.error) {
-        toast.error(response.message || 'Error regenerando OAuth URL')
-        return
-      }
+      const response = await regenerateOAuthMutation.mutateAsync(dianEmailId)
 
       toast.success('OAuth URL regenerada')
 
       if (response.oauth_url) {
         window.open(response.oauth_url, '_blank')
-        toast.info('Completa la autorización OAuth en la nueva ventana')
+        toast.info('Completa la autorizacion OAuth en la nueva ventana')
       }
     } catch (err) {
       console.error('Error regenerating OAuth:', err)
-      toast.error('Error regenerando OAuth URL')
+      toast.error(err instanceof Error ? err.message : 'Error regenerando OAuth URL')
     }
   }
 
   const handleDeactivate = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.deactivateDianEmail(dianEmailId) as any
-      if (response.error) {
-        toast.error(response.message || 'Error desactivando DIAN email')
-        return
-      }
-
+      await deactivateMutation.mutateAsync(dianEmailId)
       toast.success('DIAN email desactivado')
-      syncDianEmails()
     } catch (err) {
       console.error('Error deactivating:', err)
-      toast.error('Error desactivando DIAN email')
+      toast.error(err instanceof Error ? err.message : 'Error desactivando DIAN email')
     }
   }
 
   const handleReactivate = async (dianEmailId: string) => {
     try {
-      const response = await apiClient.reactivateDianEmail(dianEmailId) as any
-      if (response.error) {
-        toast.error(response.message || 'Error reactivando DIAN email')
-        return
-      }
-
+      await reactivateMutation.mutateAsync(dianEmailId)
       toast.success('DIAN email reactivado')
-      syncDianEmails()
     } catch (err) {
       console.error('Error reactivating:', err)
-      toast.error('Error reactivando DIAN email')
+      toast.error(err instanceof Error ? err.message : 'Error reactivando DIAN email')
     }
   }
 
-  if (loading && authLoading) {
+  // Check for emails without associated entities
+  const emailsWithoutEntities = dianEmails.filter(
+    (email) => email.auth_status === 'active' && email.associated_entities_count === 0
+  )
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -203,7 +164,7 @@ export default function DianEmailsPage() {
       <div>
         <h1 className="text-3xl font-bold">DIAN Emails</h1>
         <p className="text-muted-foreground text-sm">
-          Gestiona los emails DIAN para recibir tokens automáticamente
+          Gestiona los emails DIAN para recibir tokens automaticamente
         </p>
       </div>
 
@@ -220,65 +181,62 @@ export default function DianEmailsPage() {
                   Registrar Email DIAN
                 </Button>
               </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Registrar Email DIAN</DialogTitle>
-              <DialogDescription>
-                Ingresa el email donde recibes los tokens DIAN de tus entidades
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="dian-email">Email DIAN</Label>
-                <Input
-                  id="dian-email"
-                  type="email"
-                  placeholder="ejemplo@empresa.com"
-                  value={registerEmail}
-                  onChange={(e) => setRegisterEmail(e.target.value)}
-                  disabled={registering}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Este es el email configurado en tu cuenta DIAN donde llegan los tokens
-                </p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setRegisterDialogOpen(false)}
-                disabled={registering}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleRegister} disabled={registering}>
-                {registering ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
-                  </>
-                ) : (
-                  'Registrar'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Registrar Email DIAN</DialogTitle>
+                  <DialogDescription>
+                    Ingresa el email donde recibes los tokens DIAN de tus entidades
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dian-email">Email DIAN</Label>
+                    <Input
+                      id="dian-email"
+                      type="email"
+                      placeholder="ejemplo@empresa.com"
+                      value={registerEmail}
+                      onChange={(e) => setRegisterEmail(e.target.value)}
+                      disabled={registerMutation.isPending}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Este es el email configurado en tu cuenta DIAN donde llegan los tokens
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setRegisterDialogOpen(false)}
+                    disabled={registerMutation.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleRegister} disabled={registerMutation.isPending}>
+                    {registerMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Registrando...
+                      </>
+                    ) : (
+                      'Registrar'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Contextual Alert - Active emails without entities */}
-          {dianEmails.some(email =>
-            email.status === 'active' &&
-            !email.has_associated_entities
-          ) && (
+          {emailsWithoutEntities.length > 0 && (
             <Alert className="border-amber-200 bg-amber-50">
               <Info className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-amber-900 text-sm">¡Siguiente paso pendiente!</AlertTitle>
+              <AlertTitle className="text-amber-900 text-sm">Siguiente paso pendiente!</AlertTitle>
               <AlertDescription className="text-xs text-amber-800">
                 <p className="mb-2">
-                  Tienes {dianEmails.filter(e => e.status === 'active' && !e.has_associated_entities).length} email(s) DIAN autorizado(s) pero <strong>sin entidades asociadas</strong>.
+                  Tienes {emailsWithoutEntities.length} email(s) DIAN autorizado(s) pero <strong>sin entidades asociadas</strong>.
                 </p>
-                <Link href="/entities">
+                <Link href="/entidades">
                   <Button size="sm" variant="outline" className="bg-white text-xs h-8">
                     <Plus className="h-3 w-3 mr-1" />
                     Registrar Entidades
@@ -289,143 +247,66 @@ export default function DianEmailsPage() {
           )}
 
           {/* DIAN Emails List */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tus DIAN Emails</CardTitle>
-              <CardDescription>
-                {dianEmails.length} email{dianEmails.length !== 1 ? 's' : ''} registrado{dianEmails.length !== 1 ? 's' : ''}
-              </CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => syncDianEmails()}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {dianEmails.length === 0 ? (
-            <div className="text-center py-12">
-              <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No tienes DIAN emails registrados</h3>
-              <p className="text-muted-foreground mb-4">
-                Registra tu primer email DIAN para habilitar la gestión automática de tokens
-              </p>
-              <Button onClick={() => setRegisterDialogOpen(true)}>
-                Registrar Email DIAN
-              </Button>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Entidades Asociadas</TableHead>
-                  <TableHead>Registrado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dianEmails.map((dianEmail) => (
-                  <TableRow key={dianEmail.dian_email_id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-mono text-sm">{dianEmail.email}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(dianEmail.status)}
-                    </TableCell>
-                    <TableCell>
-                      {dianEmail.has_associated_entities ? (
-                        <Badge variant="default" className="gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {dianEmail.associated_entities_count} entidad{dianEmail.associated_entities_count !== 1 ? 'es' : ''}
-                        </Badge>
-                      ) : dianEmail.status === 'active' ? (
-                        <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
-                          <AlertCircle className="h-3 w-3" />
-                          Sin asociar
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="gap-1 text-muted-foreground">
-                          <XCircle className="h-3 w-3" />
-                          Sin asociar
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {dianEmail.has_filter ? (
-                        <Badge variant="outline" className="gap-1">
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          Configurado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="gap-1 text-muted-foreground">
-                          <XCircle className="h-3 w-3" />
-                          Sin configurar
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(dianEmail.requested_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {dianEmail.status === 'pending' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRegenerateOAuth(dianEmail.dian_email_id)}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Autorizar
-                          </Button>
-                        )}
-                        {dianEmail.status === 'active' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeactivate(dianEmail.dian_email_id)}
-                          >
-                            Desactivar
-                          </Button>
-                        )}
-                        {dianEmail.status === 'inactive' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReactivate(dianEmail.dian_email_id)}
-                          >
-                            Reactivar
-                          </Button>
-                        )}
-                        {(dianEmail.status === 'revoked' || dianEmail.status === 'expired' || dianEmail.status === 'failed') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRegenerateOAuth(dianEmail.dian_email_id)}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Re-autorizar
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Tus DIAN Emails</CardTitle>
+                  <CardDescription>
+                    {dianEmails.length} email{dianEmails.length !== 1 ? 's' : ''} registrado{dianEmails.length !== 1 ? 's' : ''}
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {dianEmails.length === 0 ? (
+                <div className="text-center py-12">
+                  <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No tienes DIAN emails registrados</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Registra tu primer email DIAN para habilitar la gestion automatica de tokens
+                  </p>
+                  <Button onClick={() => setRegisterDialogOpen(true)}>
+                    Registrar Email DIAN
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Entidades Asociadas</TableHead>
+                      <TableHead>Registrado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dianEmails.map((dianEmail) => (
+                      <DianEmailRow
+                        key={dianEmail.id}
+                        dianEmail={dianEmail}
+                        onRegenerateOAuth={handleRegenerateOAuth}
+                        onDeactivate={handleDeactivate}
+                        onReactivate={handleReactivate}
+                        isRegenerating={regenerateOAuthMutation.isPending}
+                        isDeactivating={deactivateMutation.isPending}
+                        isReactivating={reactivateMutation.isPending}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column - Educational Content (1/3 width) */}
@@ -435,7 +316,7 @@ export default function DianEmailsPage() {
             <CardHeader className="pb-1.5 pt-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-600" />
-                ¿Cómo funciona?
+                Como funciona?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 pt-2 pb-3">
@@ -445,9 +326,9 @@ export default function DianEmailsPage() {
                     1
                   </div>
                   <div>
-                    <p className="font-medium text-blue-900">Registra y autoriza aquí</p>
+                    <p className="font-medium text-blue-900">Registra y autoriza aqui</p>
                     <p className="text-muted-foreground text-[10px]">
-                      Email donde recibes tokens DIAN. AutoKufe creará filtros automáticos para detectar tokens.
+                      Email donde recibes tokens DIAN. AutoKufe creara filtros automaticos para detectar tokens.
                     </p>
                   </div>
                 </div>
@@ -459,7 +340,7 @@ export default function DianEmailsPage() {
                   <div>
                     <p className="font-medium text-blue-900">Registra entidades</p>
                     <p className="text-muted-foreground text-[10px]">
-                      Ve a <Link href="/entities" className="underline">Entidades</Link> y registra las empresas/personas de las que descargarás documentos.
+                      Ve a <Link href="/entidades" className="underline">Entidades</Link> y registra las empresas/personas de las que descargaras documentos.
                     </p>
                   </div>
                 </div>
@@ -481,9 +362,9 @@ export default function DianEmailsPage() {
                     ✓
                   </div>
                   <div>
-                    <p className="font-medium text-green-600">¡Automático!</p>
+                    <p className="font-medium text-green-600">Automatico!</p>
                     <p className="text-muted-foreground text-[10px]">
-                      Cuando llegue al email, AutoKufe lo asociará automáticamente y podrás crear jobs sin ingresar tokens.
+                      Cuando llegue al email, AutoKufe lo asociara automaticamente y podras crear jobs sin ingresar tokens.
                     </p>
                   </div>
                 </div>
@@ -492,7 +373,7 @@ export default function DianEmailsPage() {
               <Alert className="bg-amber-50 border-amber-200 py-1.5">
                 <AlertCircle className="h-3 w-3 text-amber-600" />
                 <AlertDescription className="text-[10px] text-amber-900 ml-5">
-                  <strong>Importante:</strong> La asociación entidad-email es automática cuando llega el token.
+                  <strong>Importante:</strong> La asociacion entidad-email es automatica cuando llega el token.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -500,5 +381,127 @@ export default function DianEmailsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Row component to handle individual email actions
+function DianEmailRow({
+  dianEmail,
+  onRegenerateOAuth,
+  onDeactivate,
+  onReactivate,
+  isRegenerating,
+  isDeactivating,
+  isReactivating,
+}: {
+  dianEmail: DianEmail
+  onRegenerateOAuth: (id: string) => void
+  onDeactivate: (id: string) => void
+  onReactivate: (id: string) => void
+  isRegenerating: boolean
+  isDeactivating: boolean
+  isReactivating: boolean
+}) {
+  const hasAssociatedEntities = dianEmail.associated_entities_count > 0
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-muted-foreground" />
+          <span className="font-mono text-sm">{dianEmail.email_masked}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        {getStatusBadge(dianEmail.auth_status)}
+      </TableCell>
+      <TableCell>
+        {hasAssociatedEntities ? (
+          <Badge variant="default" className="gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            {dianEmail.associated_entities_count} entidad{dianEmail.associated_entities_count !== 1 ? 'es' : ''}
+          </Badge>
+        ) : dianEmail.auth_status === 'active' ? (
+          <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+            <AlertCircle className="h-3 w-3" />
+            Sin asociar
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1 text-muted-foreground">
+            <XCircle className="h-3 w-3" />
+            Sin asociar
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {new Date(dianEmail.created_at).toLocaleDateString()}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-2">
+          {dianEmail.auth_status === 'pending' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRegenerateOAuth(dianEmail.id)}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <>
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Autorizar
+                </>
+              )}
+            </Button>
+          )}
+          {dianEmail.auth_status === 'active' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDeactivate(dianEmail.id)}
+              disabled={isDeactivating}
+            >
+              {isDeactivating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                'Desactivar'
+              )}
+            </Button>
+          )}
+          {dianEmail.auth_status === 'inactive' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onReactivate(dianEmail.id)}
+              disabled={isReactivating}
+            >
+              {isReactivating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                'Reactivar'
+              )}
+            </Button>
+          )}
+          {(dianEmail.auth_status === 'revoked' || dianEmail.auth_status === 'expired' || dianEmail.auth_status === 'failed') && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRegenerateOAuth(dianEmail.id)}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <>
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Re-autorizar
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }

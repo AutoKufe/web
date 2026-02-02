@@ -43,6 +43,7 @@ export function useUserRoles() {
     isAdmin,
     isSuperAdmin: roles.includes('super_admin'),
     isTechnicalSupport: roles.includes('technical_support'),
-    isSupportAgent: roles.includes('support_agent')
+    isSupportAgent: roles.includes('support_agent'),
+    isDev: roles.includes('dev') || roles.includes('super_admin')  // super_admin has all roles
   }
 }
