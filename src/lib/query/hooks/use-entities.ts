@@ -12,9 +12,10 @@ export interface Entity {
   id: string
   display_name: string
   identifier_suffix: string
-  entity_type: string
+  type_code: string  // "natural" | "juridica"
   created_at: string
   updated_at?: string
+  last_used_at?: string | null
   dian_email_id?: string | null
 }
 
@@ -164,7 +165,9 @@ export function useEntity(entityId: string | undefined) {
         if (cachedEntity) {
           return {
             ...cachedEntity,
-            identifier: `****${cachedEntity.identifier_suffix}`,
+            // Add fields that might not be in list cache
+            last_token_received_at: null,
+            tokens_received_count: 0,
           }
         }
       }
@@ -175,12 +178,14 @@ export function useEntity(entityId: string | undefined) {
         message?: string
         entity?: {
           id: string
-          name: string
           display_name: string
-          identifier: string
+          identifier_suffix: string
           type_code: string
           created_at: string
           updated_at?: string
+          last_used_at?: string | null
+          last_token_received_at?: string | null
+          tokens_received_count?: number
           dian_email_id?: string | null
         }
       }
@@ -196,12 +201,14 @@ export function useEntity(entityId: string | undefined) {
 
       return {
         id: entity.id,
-        display_name: entity.display_name || entity.name,
-        identifier: entity.identifier,
-        identifier_suffix: entity.identifier?.slice(-4) || '',
-        entity_type: entity.type_code,
+        display_name: entity.display_name,
+        identifier_suffix: entity.identifier_suffix,
+        type_code: entity.type_code,
         created_at: entity.created_at,
         updated_at: entity.updated_at,
+        last_used_at: entity.last_used_at,
+        last_token_received_at: entity.last_token_received_at,
+        tokens_received_count: entity.tokens_received_count,
         dian_email_id: entity.dian_email_id,
       }
     },

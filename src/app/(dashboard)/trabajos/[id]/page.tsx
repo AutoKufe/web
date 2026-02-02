@@ -484,9 +484,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   </div>
                 </div>
               )}
-              {entity?.entity_type && (
+              {entity?.type_code && (
                 <p className="text-sm text-muted-foreground">
-                  Tipo: {getEntityTypeLabel(entity.entity_type)}
+                  Tipo: {getEntityTypeLabel(entity.type_code)}
                 </p>
               )}
             </div>

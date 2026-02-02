@@ -295,7 +295,7 @@ export default function EntitiesPage() {
                 {totalCount} entidad{totalCount !== 1 ? 'es' : ''} encontrada{totalCount !== 1 ? 's' : ''}
               </CardDescription>
             </CardHeader>
-            <CardContent className="px-0">
+            <CardContent className="px-0 overflow-hidden">
               {isLoading ? (
                 <div className="px-6">
                   <Table>
@@ -363,12 +363,14 @@ export default function EntitiesPage() {
                             className="hover:bg-muted/50 cursor-pointer"
                             onClick={() => router.push(`/entidades/${entity.id}`)}
                           >
-                            <TableCell className="pl-6">
+                            <TableCell className="pl-6 max-w-[290px]">
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 shrink-0">
                                   <Building2 className="h-4 w-4 text-primary" />
                                 </div>
-                                <span className="font-medium">{entity.display_name}</span>
+                                <span className="font-medium truncate" title={entity.display_name}>
+                                  {entity.display_name}
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell className="font-mono text-sm text-muted-foreground">
@@ -376,7 +378,7 @@ export default function EntitiesPage() {
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary" className="font-normal">
-                                {getEntityTypeLabel(entity.entity_type)}
+                                {getEntityTypeLabel(entity.type_code)}
                               </Badge>
                             </TableCell>
                             <TableCell>
