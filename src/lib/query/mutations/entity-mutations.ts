@@ -21,8 +21,9 @@ export function useRegisterEntity() {
       return response
     },
     onSuccess: () => {
-      // Invalidate entities list to refetch with new entity
+      // New entity: invalidate both full list AND selector
       queryClient.invalidateQueries({ queryKey: queryKeys.entities.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.selector() })
     },
   })
 }
@@ -44,8 +45,9 @@ export function useDeleteEntity() {
       return response
     },
     onSuccess: (_, entityId) => {
-      // Invalidate entities list
+      // Entity removed: invalidate both full list AND selector
       queryClient.invalidateQueries({ queryKey: queryKeys.entities.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.selector() })
       // Remove specific entity from cache
       queryClient.removeQueries({ queryKey: queryKeys.entities.detail(entityId) })
     },

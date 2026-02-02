@@ -11,6 +11,9 @@ export const queryKeys = {
     all: ['entities'] as const,
     list: (filters?: { search?: string }) =>
       [...queryKeys.entities.all, 'list', filters] as const,
+    // Selector has its own key - NOT under 'all' to prevent invalidation when list changes
+    // Uses selector_updated_at in DB, only invalidated when display_name/identifier_suffix change
+    selector: () => ['entities-selector'] as const,
     detail: (id: string) =>
       [...queryKeys.entities.all, 'detail', id] as const,
     tokenStatus: (id: string) =>

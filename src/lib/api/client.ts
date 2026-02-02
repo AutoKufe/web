@@ -125,6 +125,24 @@ export class ApiClient {
     return this.request('GET', '/entities/search', undefined, searchParams)
   }
 
+  /**
+   * Get entities for selector (minimal fields: id, display_name, identifier_suffix)
+   * Uses selector_updated_at for granular cache invalidation
+   */
+  async listEntitiesSelector(since?: string, cachedPrefixes?: string[]) {
+    const params: Record<string, string> = {}
+
+    if (since) {
+      params.since = since
+    }
+
+    if (cachedPrefixes && cachedPrefixes.length > 0) {
+      params.cached_prefixes = cachedPrefixes.join(',')
+    }
+
+    return this.request('GET', '/entities/selector', undefined, params)
+  }
+
   async registerEntity(dianToken: string) {
     return this.request('POST', '/entities/register', { dian_token: dianToken })
   }

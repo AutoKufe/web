@@ -76,24 +76,56 @@ export function useEntities() {
 }
 
 /**
+ * Selector response from /entities/selector endpoint
+ */
+interface SelectorResponse {
+  status: string
+  sync_mode: string
+  changes: {
+    modified_or_added: EntitySelectorItem[]
+    all_valid_prefixes: string[]
+    count: number
+  }
+  total_count: number
+  sync_timestamp: string
+}
+
+interface SelectorData {
+  entities: EntitySelectorItem[]
+  totalCount: number
+}
+
+/**
  * Get entities for selector (minimal fields)
  *
- * Uses the same cache as useEntities but transforms data with select.
- * If entities are already cached, this returns instantly without waiting.
+ * Uses a SEPARATE endpoint and query key from useEntities.
+ * Only invalidated when display_name or identifier_suffix change in DB
+ * (uses selector_updated_at timestamp).
+ *
+ * This provides true cache granularity:
+ * - Changing dian_email_id does NOT invalidate selector cache
+ * - Only display_name/identifier_suffix changes trigger refetch
  *
  * Use this for entity dropdowns/selectors that only need id + display_name + suffix
  */
 export function useEntitiesSelector() {
-  return useQuery({
-    ...entitiesQueryOptions,
-    select: (data): { entities: EntitySelectorItem[]; totalCount: number } => ({
-      entities: data.entities.map((e) => ({
-        id: e.id,
-        display_name: e.display_name,
-        identifier_suffix: e.identifier_suffix,
-      })),
-      totalCount: data.totalCount,
-    }),
+  return useQuery<SelectorData>({
+    queryKey: queryKeys.entities.selector(),
+    queryFn: async () => {
+      const response = await apiClient.listEntitiesSelector()
+
+      if (response.error) {
+        throw new Error(response.message || 'Error fetching entities selector')
+      }
+
+      const data = response as unknown as SelectorResponse
+      return {
+        entities: data.changes?.modified_or_added || [],
+        totalCount: data.total_count || 0,
+      }
+    },
+    staleTime: staleTime.entities,
+    gcTime: gcTime.entities,
   })
 }
 
