@@ -191,7 +191,11 @@ function NewJobContent() {
     if (jobName) {
       const error = validateJobName(jobName)
       if (error) {
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
         toast.error(`Nombre de trabajo invalido: ${error}`)
+========
+        toast.error(`Nombre de trabajo inválido: ${error}`)
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
         return
       }
     }
@@ -270,13 +274,46 @@ function NewJobContent() {
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
         }
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
       })
+========
+      )
+
+      if (response.error) {
+        toast.error(response.message || 'Error creando trabajo')
+        setCreating(false)
+        return
+      }
+
+      const successData = response as {
+        job_id?: string
+        dian_email_status?: {
+          has_active_oauth: boolean
+          expired_emails: Array<{ email: string; expired_at: string }>
+          pending_emails: Array<{ email: string; created_at: string }>
+          total_emails: number
+        }
+      }
+      setCreatedJobId(successData.job_id || null)
+
+      // Capture DIAN email status if present
+      if (successData.dian_email_status) {
+        setDianEmailStatus(successData.dian_email_status)
+      }
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
 
       setCreatedJobId(result.job_id || null)
       setStep('success')
       toast.success('Trabajo creado exitosamente')
     } catch (err) {
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
       toast.error(err instanceof Error ? err.message : 'Error creando trabajo')
+========
+      console.error('Error creating job:', err)
+      toast.error('Error creando trabajo')
+    } finally {
+      setCreating(false)
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
     }
   }
 
@@ -320,7 +357,11 @@ function NewJobContent() {
                 Tu trabajo ha sido enviado para procesamiento
               </p>
               <div className="flex gap-4 justify-center">
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
                 <Link href={`/trabajos/${createdJobId}`}>
+========
+                <Link href={`/jobs/${createdJobId}`}>
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
                   <Button size="lg">Ver Estado del Trabajo</Button>
                 </Link>
                 <Button variant="outline" size="lg" onClick={resetForm}>
@@ -353,7 +394,11 @@ function NewJobContent() {
 
       <Card>
         <CardHeader className="pb-4">
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
           <CardTitle className="text-xl">Configuracion del Trabajo</CardTitle>
+========
+          <CardTitle className="text-xl">Configuración del Trabajo</CardTitle>
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
           <CardDescription>
             Ingresa los datos necesarios para procesar documentos DIAN
           </CardDescription>
@@ -541,7 +586,11 @@ function NewJobContent() {
                         <div className="flex items-center gap-2 pt-2 border-t border-green-200">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <span className="text-sm font-medium text-green-900">
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
                             Token DIAN se solicitara automaticamente
+========
+                            Token DIAN se solicitará automáticamente al crear el trabajo
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
                           </span>
                         </div>
                       )}
@@ -627,7 +676,11 @@ function NewJobContent() {
             </div>
           )}
 
+<<<<<<<< HEAD:src/app/(dashboard)/trabajos/nuevo/page.tsx
           {/* Job Name */}
+========
+          {/* Nombre del Trabajo (opcional) */}
+>>>>>>>> origin/main:src/app/(dashboard)/trabajos/new/page.tsx
           <div className="space-y-2">
             <Label htmlFor="job-name">Nombre del Trabajo (opcional)</Label>
             <Input
