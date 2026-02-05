@@ -145,7 +145,15 @@ class DevLogger {
       })
 
       if (!response.ok) {
-        console.error('Failed to create dev session:', response.statusText)
+        // Parse error body for useful message (statusText is empty in HTTP/2)
+        let errorMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          errorMessage = errorBody.detail?.message || errorBody.message || errorMessage
+        } catch {
+          // Ignore parse errors
+        }
+        console.error(`Failed to create dev session: ${errorMessage}`)
         return
       }
 

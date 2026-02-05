@@ -68,6 +68,38 @@ const getColombiaMonth = () => {
   return colombiaTime.toISOString().slice(0, 7)
 }
 
+// Extract 'rk' parameter from DIAN token URL
+// Token format: https://catalogo-vpfe.dian.gov.co/User/AuthToken?pk=...&rk=901911696&token=...
+const extractRkFromToken = (tokenUrl: string): string | null => {
+  try {
+    const url = new URL(tokenUrl)
+    return url.searchParams.get('rk')
+  } catch {
+    // Try regex fallback for malformed URLs
+    const match = tokenUrl.match(/[?&]rk=(\d+)/)
+    return match ? match[1] : null
+  }
+}
+
+// Validate that DIAN token matches selected entity by comparing identifier suffix
+// Returns error message if mismatch, null if valid
+const validateTokenMatchesEntity = (
+  tokenUrl: string,
+  entitySuffix: string
+): string | null => {
+  const rk = extractRkFromToken(tokenUrl)
+  if (!rk) {
+    return 'El token DIAN no tiene un formato valido (falta parametro rk)'
+  }
+
+  const rkSuffix = rk.slice(-4)
+  if (rkSuffix !== entitySuffix) {
+    return `El token DIAN es de otra entidad (termina en ${rkSuffix}). La entidad seleccionada termina en ${entitySuffix}.`
+  }
+
+  return null // Valid
+}
+
 function NewJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -96,8 +128,21 @@ function NewJobContent() {
 
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
+  const [dianTokenError, setDianTokenError] = useState<string | null>(null)
   const [useNewToken, setUseNewToken] = useState(false)
   const [useAutoToken, setUseAutoToken] = useState(false)
+
+  // Handler for token input with instant validation
+  const handleDianTokenChange = (value: string) => {
+    setDianToken(value)
+    // Validate against selected entity if both exist
+    if (selectedEntity && value.trim()) {
+      const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
+      setDianTokenError(error)
+    } else {
+      setDianTokenError(null)
+    }
+  }
 
   // Job config
   const [jobName, setJobName] = useState('')
@@ -180,6 +225,7 @@ function NewJobContent() {
     setUseAutoToken(false)
     setUseNewToken(false)
     setDianToken('')
+    setDianTokenError(null)
   }
 
   const handleSubmit = async () => {
@@ -228,6 +274,16 @@ function NewJobContent() {
     } else if (!useAutoToken && jobOptions?.saved_token.available && useNewToken && !dianToken.trim()) {
       toast.error('Ingresa el nuevo token DIAN')
       return
+    }
+
+    // Validate token matches selected entity (instant check using identifier_suffix)
+    // Only validate if: entity selected + new token provided (not auto, not stored, not dev)
+    if (selectedEntity && dianToken.trim() && !useAutoToken && !isDevJob) {
+      const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
+      if (tokenMismatchError) {
+        toast.error(tokenMismatchError)
+        return
+      }
     }
 
     if (selectedSheetTypes.length === 0) {
@@ -531,6 +587,7 @@ function NewJobContent() {
                               if (checked) {
                                 setUseNewToken(false)
                                 setDianToken('')
+                                setDianTokenError(null)
                               }
                             }}
                             className="h-5 w-5 data-[state=checked]:bg-green-600"
@@ -594,16 +651,23 @@ function NewJobContent() {
                         placeholder="https://catalogo-vpfe.dian.gov.co/..."
                         value={dianToken}
                         onChange={(e) => {
-                          setDianToken(e.target.value)
+                          handleDianTokenChange(e.target.value)
                           if (e.target.value.trim() && useAutoToken) {
                             setUseAutoToken(false)
                           }
                         }}
-                        className="font-mono text-sm"
+                        className={`font-mono text-sm ${dianTokenError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Pega la URL completa del token que obtuviste de la DIAN
-                      </p>
+                      {dianTokenError ? (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />
+                          {dianTokenError}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Pega la URL completa del token que obtuviste de la DIAN
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -618,7 +682,7 @@ function NewJobContent() {
                 id="dian-token"
                 placeholder="https://catalogo-vpfe.dian.gov.co/..."
                 value={dianToken}
-                onChange={(e) => setDianToken(e.target.value)}
+                onChange={(e) => handleDianTokenChange(e.target.value)}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
