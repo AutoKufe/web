@@ -261,16 +261,27 @@ export class ApiClient {
   // === DIAN TOKEN VALIDATION ===
 
   /**
-   * Quick validate a DIAN token URL
-   * Uses HTTP status code only (302=valid, 200=expired)
-   * Fast validation for real-time feedback (~5s timeout)
+   * Quick validate a DIAN token URL and optionally save to entity
+   *
+   * If entityId is provided:
+   * - Validates token matches entity (by NIT/document)
+   * - Saves token to entity if valid
+   * - Detects representative change (juridica) and updates if needed
+   *
+   * Returns representative_updated if rep legal changed (juridica only)
    */
-  async quickValidateDianToken(tokenUrl: string) {
+  async quickValidateDianToken(tokenUrl: string, entityId?: string) {
     return this.request<{
       valid: boolean
       status: 'valid' | 'expired' | 'invalid' | 'error'
       message: string
-    }>('POST', '/dian/quick-validate', { token_url: tokenUrl })
+      token_saved?: boolean
+      representative_updated?: boolean
+      new_representative_name?: string
+    }>('POST', '/dian/quick-validate', {
+      token_url: tokenUrl,
+      entity_id: entityId
+    })
   }
 
   // === JOBS ===

@@ -38,7 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -130,24 +130,69 @@ function NewJobContent() {
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
   const [dianTokenError, setDianTokenError] = useState<string | null>(null)
-  const [dianTokenValidating, setDianTokenValidating] = useState(false)
-  const [dianTokenValid, setDianTokenValid] = useState<boolean | null>(null)
   const [useNewToken, setUseNewToken] = useState(false)
   const [useAutoToken, setUseAutoToken] = useState(false)
 
+  // Validation phase for progressive UX
+  type ValidationPhase = 'idle' | 'validating' | 'verifying' | 'updating' | 'success' | 'success_sparkle' | 'error'
+  const [validationPhase, setValidationPhase] = useState<ValidationPhase>('idle')
+  const [representativeUpdated, setRepresentativeUpdated] = useState(false)
+
   // Debounce ref for server validation
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const sparkleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Progressive phase messages (if validation takes long)
+  useEffect(() => {
+    if (validationPhase === 'validating') {
+      // After 3s, show "Verificando con DIAN..."
+      phaseTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('verifying')
+      }, 3000)
+
+      return () => {
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
+      }
+    }
+    if (validationPhase === 'verifying') {
+      // After 2s more, show "Actualizando datos..."
+      phaseTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('updating')
+      }, 2000)
+
+      return () => {
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
+      }
+    }
+  }, [validationPhase])
+
+  // Sparkle animation timeout (return to normal success after 2.5s)
+  useEffect(() => {
+    if (validationPhase === 'success_sparkle') {
+      sparkleTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('success')
+        setRepresentativeUpdated(false)
+      }, 2500)
+
+      return () => {
+        if (sparkleTimeoutRef.current) clearTimeout(sparkleTimeoutRef.current)
+      }
+    }
+  }, [validationPhase])
 
   // Server-side token validation with debounce
-  const validateTokenWithServer = useCallback(async (tokenUrl: string) => {
-    // Clear previous timeout
+  const validateTokenWithServer = useCallback(async (tokenUrl: string, entityId?: string) => {
+    // Clear previous timeouts
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current)
     }
+    if (phaseTimeoutRef.current) {
+      clearTimeout(phaseTimeoutRef.current)
+    }
 
     // Reset validation state
-    setDianTokenValidating(false)
-    setDianTokenValid(null)
+    setValidationPhase('idle')
 
     // Don't validate empty or short tokens
     if (!tokenUrl.trim() || tokenUrl.length < 50) {
@@ -160,27 +205,33 @@ function NewJobContent() {
     }
 
     // Start debounce timer (800ms after user stops typing)
-    setDianTokenValidating(true)
+    setValidationPhase('validating')
     validationTimeoutRef.current = setTimeout(async () => {
       try {
-        const result = await apiClient.quickValidateDianToken(tokenUrl)
+        // Pass entityId to save token if valid
+        const result = await apiClient.quickValidateDianToken(tokenUrl, entityId)
 
         if (result.error) {
           setDianTokenError(result.message || 'Error validando token')
-          setDianTokenValid(false)
+          setValidationPhase('error')
         } else if (result.valid) {
           setDianTokenError(null)
-          setDianTokenValid(true)
+
+          // Check if representative was updated (sparkle animation)
+          if (result.representative_updated) {
+            setRepresentativeUpdated(true)
+            setValidationPhase('success_sparkle')
+          } else {
+            setValidationPhase('success')
+          }
         } else {
           // Token expired or invalid
           setDianTokenError(result.message || 'Token expirado o invalido')
-          setDianTokenValid(false)
+          setValidationPhase('error')
         }
       } catch {
         // Network error - don't show error, just reset
-        setDianTokenValid(null)
-      } finally {
-        setDianTokenValidating(false)
+        setValidationPhase('idle')
       }
     }, 800)
   }, [])
@@ -189,23 +240,23 @@ function NewJobContent() {
   const handleDianTokenChange = (value: string) => {
     setDianToken(value)
 
-    // Reset server validation state
-    setDianTokenValid(null)
-    setDianTokenValidating(false)
+    // Reset validation state
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
 
-    // Instant validation: check entity match
+    // Instant validation: check entity match (for juridica by rk suffix)
     if (selectedEntity && value.trim()) {
       const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
       setDianTokenError(error)
 
-      // If entity match is OK, trigger server validation
+      // If entity match is OK, trigger server validation with entity_id
       if (!error) {
-        validateTokenWithServer(value)
+        validateTokenWithServer(value, selectedEntity.id)
       }
     } else {
       setDianTokenError(null)
 
-      // No entity selected - still validate token with server
+      // No entity selected - validate token without saving
       if (value.trim()) {
         validateTokenWithServer(value)
       }
@@ -303,8 +354,8 @@ function NewJobContent() {
     setUseNewToken(false)
     setDianToken('')
     setDianTokenError(null)
-    setDianTokenValid(null)
-    setDianTokenValidating(false)
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
     // Clear validation timeout
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current)
@@ -423,8 +474,8 @@ function NewJobContent() {
     setStep('form')
     setDianToken('')
     setDianTokenError(null)
-    setDianTokenValid(null)
-    setDianTokenValidating(false)
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
     setJobName('')
     setStartDate('')
     setEndDate('')
@@ -661,12 +712,12 @@ function NewJobContent() {
                 }}
                 disabled={loadingJobOptions || useAutoToken || (!useNewToken && savedTokenAvailable)}
                 className={`font-mono text-sm pr-10 ${
-                  dianTokenError
+                  dianTokenError || validationPhase === 'error'
                     ? 'border-red-500 focus-visible:ring-red-500'
-                    : dianTokenValid || useAutoToken || (!useNewToken && savedTokenAvailable)
+                    : validationPhase === 'success' || validationPhase === 'success_sparkle' || useAutoToken || (!useNewToken && savedTokenAvailable)
                     ? 'border-green-500 focus-visible:ring-green-500'
                     : ''
-                } ${(useAutoToken || (!useNewToken && savedTokenAvailable)) ? 'bg-green-50/50' : ''}`}
+                } ${(useAutoToken || (!useNewToken && savedTokenAvailable)) ? 'bg-green-50/50' : ''} ${validationPhase === 'success_sparkle' ? 'bg-amber-50/50' : ''}`}
               />
               {/* Status indicator inside input */}
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -677,11 +728,13 @@ function NewJobContent() {
                 ) : !useNewToken && savedTokenAvailable ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500" />
                 ) : dianToken.trim() ? (
-                  dianTokenValidating ? (
+                  validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating' ? (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  ) : dianTokenValid ? (
+                  ) : validationPhase === 'success_sparkle' ? (
+                    <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                  ) : validationPhase === 'success' ? (
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  ) : dianTokenError ? (
+                  ) : validationPhase === 'error' || dianTokenError ? (
                     <XCircle className="h-4 w-4 text-red-500" />
                   ) : null
                 ) : null}
@@ -712,15 +765,30 @@ function NewJobContent() {
                     <CheckCircle2 className="h-3 w-3" />
                     Token guardado listo para usar
                   </p>
-                ) : dianTokenValid ? (
+                ) : validationPhase === 'success_sparkle' ? (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 animate-pulse" />
+                    Representante legal actualizado
+                  </p>
+                ) : validationPhase === 'success' ? (
                   <p className="text-xs text-green-600 flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3" />
                     Token DIAN valido
                   </p>
-                ) : dianTokenValidating ? (
+                ) : validationPhase === 'validating' ? (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Validando con DIAN...
+                    Validando...
+                  </p>
+                ) : validationPhase === 'verifying' ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Verificando con DIAN...
+                  </p>
+                ) : validationPhase === 'updating' ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Actualizando datos...
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
@@ -742,7 +810,7 @@ function NewJobContent() {
                             setUseAutoToken(false)
                             setDianToken('')
                             setDianTokenError(null)
-                            setDianTokenValid(null)
+                            setValidationPhase('idle')
                           } else {
                             setUseNewToken(true)
                           }
@@ -762,7 +830,7 @@ function NewJobContent() {
                             setUseNewToken(false)
                             setDianToken('')
                             setDianTokenError(null)
-                            setDianTokenValid(null)
+                            setValidationPhase('idle')
                           }
                         }}
                         className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
