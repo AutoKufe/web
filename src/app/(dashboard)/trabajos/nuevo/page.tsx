@@ -82,6 +82,22 @@ const extractRkFromToken = (tokenUrl: string): string | null => {
   }
 }
 
+// Error code to user-friendly message mapping
+const TOKEN_ERROR_MESSAGES: Record<string, string> = {
+  'INVALID_URL': 'La URL del token DIAN no es valida',
+  'METADATA_EXTRACTION_FAILED': 'No se pudo leer la informacion del token',
+  'TOKEN_EXPIRED': 'El token DIAN ha expirado',
+  'TOKEN_INVALID': 'El token DIAN no es valido',
+  'ENTITY_NOT_FOUND': 'Entidad no encontrada',
+  'TOKEN_ENTITY_MISMATCH': 'El token pertenece a otra entidad',
+  'INTERNAL_ERROR': 'Ocurrio un error. El equipo tecnico ha sido notificado.',
+}
+
+const getTokenErrorMessage = (errorCode?: string): string => {
+  if (!errorCode) return 'Error desconocido'
+  return TOKEN_ERROR_MESSAGES[errorCode] || 'Error desconocido'
+}
+
 // Validate that DIAN token matches selected entity by comparing identifier suffix
 // Returns error message if mismatch, null if valid
 const validateTokenMatchesEntity = (
@@ -211,10 +227,7 @@ function NewJobContent() {
         // Pass entityId to save token if valid
         const result = await apiClient.quickValidateDianToken(tokenUrl, entityId)
 
-        if (result.error) {
-          setDianTokenError(result.message || 'Error validando token')
-          setValidationPhase('error')
-        } else if (result.valid) {
+        if (result.valid) {
           setDianTokenError(null)
 
           // Check if representative was updated (sparkle animation)
@@ -225,13 +238,15 @@ function NewJobContent() {
             setValidationPhase('success')
           }
         } else {
-          // Token expired or invalid
-          setDianTokenError(result.message || 'Token expirado o invalido')
+          // Map error code to user-friendly message
+          const errorMessage = getTokenErrorMessage(result.error_code)
+          setDianTokenError(errorMessage)
           setValidationPhase('error')
         }
       } catch {
-        // Network error - don't show error, just reset
-        setValidationPhase('idle')
+        // Network error - show friendly message
+        setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+        setValidationPhase('error')
       }
     }, 800)
   }, [])

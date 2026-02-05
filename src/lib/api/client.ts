@@ -274,7 +274,7 @@ export class ApiClient {
     return this.request<{
       valid: boolean
       status: 'valid' | 'expired' | 'invalid' | 'error'
-      message: string
+      error_code?: string
       token_saved?: boolean
       representative_updated?: boolean
       new_representative_name?: string
