@@ -69,25 +69,25 @@ export default function EntityDetailPage() {
   const deleteMutation = useDeleteEntity()
   const updateTaxConfigMutation = useUpdateEntityTaxConfig()
 
-  // Tax configuration local state
+  // Tax configuration local state - no defaults, show real DB state
   const [taxConfig, setTaxConfig] = useState({
     ciiu: '',
-    contributor_type: 'ordinario' as 'ordinario' | 'gran_contribuyente' | 'regimen_simple',
-    is_iva_responsible: true,
-    is_withholding_agent: true,
-    is_self_withholder: true,
+    contributor_type: '' as '' | 'ordinario' | 'gran_contribuyente' | 'regimen_simple',
+    is_iva_responsible: false,
+    is_withholding_agent: false,
+    is_self_withholder: false,
   })
   const [taxConfigDirty, setTaxConfigDirty] = useState(false)
 
-  // Sync tax config from entity data
+  // Sync tax config from entity data - use actual values, no fallbacks
   useEffect(() => {
     if (entity) {
       setTaxConfig({
         ciiu: entity.ciiu || '',
-        contributor_type: entity.contributor_type || 'ordinario',
-        is_iva_responsible: entity.is_iva_responsible ?? true,
-        is_withholding_agent: entity.is_withholding_agent ?? true,
-        is_self_withholder: entity.is_self_withholder ?? true,
+        contributor_type: entity.contributor_type || '',
+        is_iva_responsible: entity.is_iva_responsible === true,
+        is_withholding_agent: entity.is_withholding_agent === true,
+        is_self_withholder: entity.is_self_withholder === true,
       })
       setTaxConfigDirty(false)
     }
@@ -107,7 +107,7 @@ export default function EntityDetailPage() {
         entityId,
         config: {
           ciiu: taxConfig.ciiu || null,
-          contributor_type: taxConfig.contributor_type,
+          contributor_type: taxConfig.contributor_type || undefined,
           is_iva_responsible: taxConfig.is_iva_responsible,
           is_withholding_agent: taxConfig.is_withholding_agent,
           is_self_withholder: taxConfig.is_self_withholder,
@@ -299,63 +299,74 @@ export default function EntityDetailPage() {
               <div className="space-y-2">
                 <Label htmlFor="contributor_type">Tipo de Contribuyente</Label>
                 <Select
-                  value={taxConfig.contributor_type}
+                  value={taxConfig.contributor_type || '_empty'}
                   onValueChange={(value) =>
                     handleTaxConfigChange(
                       'contributor_type',
-                      value as 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
+                      value === '_empty' ? '' : value as 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
                     )
                   }
                 >
                   <SelectTrigger id="contributor_type">
-                    <SelectValue />
+                    <SelectValue placeholder="Seleccionar..." />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_empty" className="text-muted-foreground">
+                      No configurado
+                    </SelectItem>
                     <SelectItem value="ordinario">Regimen Ordinario</SelectItem>
                     <SelectItem value="gran_contribuyente">Gran Contribuyente</SelectItem>
                     <SelectItem value="regimen_simple">Regimen Simple</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Consulta tu RUT para este dato
+                </p>
               </div>
             </div>
 
             {/* Checkboxes */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is_iva_responsible"
-                  checked={taxConfig.is_iva_responsible}
-                  onCheckedChange={(checked) =>
-                    handleTaxConfigChange('is_iva_responsible', checked === true)
-                  }
-                />
-                <Label htmlFor="is_iva_responsible" className="cursor-pointer">
-                  Responsable de IVA
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is_withholding_agent"
-                  checked={taxConfig.is_withholding_agent}
-                  onCheckedChange={(checked) =>
-                    handleTaxConfigChange('is_withholding_agent', checked === true)
-                  }
-                />
-                <Label htmlFor="is_withholding_agent" className="cursor-pointer">
-                  Agente Retenedor
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is_self_withholder"
-                  checked={taxConfig.is_self_withholder}
-                  onCheckedChange={(checked) =>
-                    handleTaxConfigChange('is_self_withholder', checked === true)
-                  }
-                />
-                <Label htmlFor="is_self_withholder" className="cursor-pointer">
-                  Autorretenedor
-                </Label>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Marca segun las responsabilidades en tu RUT
+              </p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_iva_responsible"
+                    checked={taxConfig.is_iva_responsible}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_iva_responsible', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_iva_responsible" className="cursor-pointer">
+                    Responsable de IVA
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_withholding_agent"
+                    checked={taxConfig.is_withholding_agent}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_withholding_agent', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_withholding_agent" className="cursor-pointer">
+                    Agente Retenedor
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_self_withholder"
+                    checked={taxConfig.is_self_withholder}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_self_withholder', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_self_withholder" className="cursor-pointer">
+                    Autorretenedor
+                  </Label>
+                </div>
               </div>
             </div>
 
