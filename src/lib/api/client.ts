@@ -258,6 +258,21 @@ export class ApiClient {
     return this.request('POST', `/dian-emails/${dianEmailId}/regenerate-oauth`)
   }
 
+  // === DIAN TOKEN VALIDATION ===
+
+  /**
+   * Quick validate a DIAN token URL
+   * Uses HTTP status code only (302=valid, 200=expired)
+   * Fast validation for real-time feedback (~5s timeout)
+   */
+  async quickValidateDianToken(tokenUrl: string) {
+    return this.request<{
+      valid: boolean
+      status: 'valid' | 'expired' | 'invalid' | 'error'
+      message: string
+    }>('POST', '/dian/quick-validate', { token_url: tokenUrl })
+  }
+
   // === JOBS ===
   async createJob(
     dianToken: string,

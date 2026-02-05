@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,6 +50,7 @@ import {
   useCreateJob,
   type EntitySelectorItem,
 } from '@/lib/query'
+import { apiClient } from '@/lib/api/client'
 
 // Helper to get Colombia local date (UTC-5)
 const getColombiaToday = () => {
@@ -129,20 +130,96 @@ function NewJobContent() {
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
   const [dianTokenError, setDianTokenError] = useState<string | null>(null)
+  const [dianTokenValidating, setDianTokenValidating] = useState(false)
+  const [dianTokenValid, setDianTokenValid] = useState<boolean | null>(null)
   const [useNewToken, setUseNewToken] = useState(false)
   const [useAutoToken, setUseAutoToken] = useState(false)
+
+  // Debounce ref for server validation
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Server-side token validation with debounce
+  const validateTokenWithServer = useCallback(async (tokenUrl: string) => {
+    // Clear previous timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
+
+    // Reset validation state
+    setDianTokenValidating(false)
+    setDianTokenValid(null)
+
+    // Don't validate empty or short tokens
+    if (!tokenUrl.trim() || tokenUrl.length < 50) {
+      return
+    }
+
+    // Check URL structure first (instant)
+    if (!tokenUrl.includes('catalogo-vpfe.dian.gov.co')) {
+      return
+    }
+
+    // Start debounce timer (800ms after user stops typing)
+    setDianTokenValidating(true)
+    validationTimeoutRef.current = setTimeout(async () => {
+      try {
+        const result = await apiClient.quickValidateDianToken(tokenUrl)
+
+        if (result.error) {
+          setDianTokenError(result.message || 'Error validando token')
+          setDianTokenValid(false)
+        } else if (result.valid) {
+          setDianTokenError(null)
+          setDianTokenValid(true)
+        } else {
+          // Token expired or invalid
+          setDianTokenError(result.message || 'Token expirado o invalido')
+          setDianTokenValid(false)
+        }
+      } catch {
+        // Network error - don't show error, just reset
+        setDianTokenValid(null)
+      } finally {
+        setDianTokenValidating(false)
+      }
+    }, 800)
+  }, [])
 
   // Handler for token input with instant validation
   const handleDianTokenChange = (value: string) => {
     setDianToken(value)
-    // Validate against selected entity if both exist
+
+    // Reset server validation state
+    setDianTokenValid(null)
+    setDianTokenValidating(false)
+
+    // Instant validation: check entity match
     if (selectedEntity && value.trim()) {
       const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
       setDianTokenError(error)
+
+      // If entity match is OK, trigger server validation
+      if (!error) {
+        validateTokenWithServer(value)
+      }
     } else {
       setDianTokenError(null)
+
+      // No entity selected - still validate token with server
+      if (value.trim()) {
+        validateTokenWithServer(value)
+      }
     }
   }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Job config
   const [jobName, setJobName] = useState('')
@@ -226,6 +303,12 @@ function NewJobContent() {
     setUseNewToken(false)
     setDianToken('')
     setDianTokenError(null)
+    setDianTokenValid(null)
+    setDianTokenValidating(false)
+    // Clear validation timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
   }
 
   const handleSubmit = async () => {
@@ -339,6 +422,9 @@ function NewJobContent() {
   const resetForm = () => {
     setStep('form')
     setDianToken('')
+    setDianTokenError(null)
+    setDianTokenValid(null)
+    setDianTokenValidating(false)
     setJobName('')
     setStartDate('')
     setEndDate('')
@@ -353,6 +439,10 @@ function NewJobContent() {
     setUseAutoToken(false)
     setCreatedJobId(null)
     setIsDevJob(false)
+    // Clear validation timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
   }
 
   // Derived states from job options
@@ -646,22 +736,52 @@ function NewJobContent() {
                   {(!savedTokenAvailable || useNewToken) && (
                     <div className="space-y-2">
                       <Label htmlFor="dian-token">Token DIAN *</Label>
-                      <Input
-                        id="dian-token"
-                        placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                        value={dianToken}
-                        onChange={(e) => {
-                          handleDianTokenChange(e.target.value)
-                          if (e.target.value.trim() && useAutoToken) {
-                            setUseAutoToken(false)
-                          }
-                        }}
-                        className={`font-mono text-sm ${dianTokenError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="dian-token"
+                          placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                          value={dianToken}
+                          onChange={(e) => {
+                            handleDianTokenChange(e.target.value)
+                            if (e.target.value.trim() && useAutoToken) {
+                              setUseAutoToken(false)
+                            }
+                          }}
+                          className={`font-mono text-sm pr-10 ${
+                            dianTokenError
+                              ? 'border-red-500 focus-visible:ring-red-500'
+                              : dianTokenValid
+                              ? 'border-green-500 focus-visible:ring-green-500'
+                              : ''
+                          }`}
+                        />
+                        {/* Validation status indicator */}
+                        {dianToken.trim() && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            {dianTokenValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : dianTokenValid ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            ) : dianTokenError ? (
+                              <XCircle className="h-4 w-4 text-red-500" />
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
                       {dianTokenError ? (
                         <p className="text-xs text-red-600 flex items-center gap-1">
                           <XCircle className="h-3 w-3" />
                           {dianTokenError}
+                        </p>
+                      ) : dianTokenValid ? (
+                        <p className="text-xs text-green-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Token DIAN valido
+                        </p>
+                      ) : dianTokenValidating ? (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Validando token con DIAN...
                         </p>
                       ) : (
                         <p className="text-xs text-muted-foreground">
@@ -678,16 +798,53 @@ function NewJobContent() {
           {!selectedEntity && (
             <div className="space-y-2">
               <Label htmlFor="dian-token">Token DIAN *</Label>
-              <Input
-                id="dian-token"
-                placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                value={dianToken}
-                onChange={(e) => handleDianTokenChange(e.target.value)}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Pega la URL completa del token que obtuviste del portal DIAN
-              </p>
+              <div className="relative">
+                <Input
+                  id="dian-token"
+                  placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                  value={dianToken}
+                  onChange={(e) => handleDianTokenChange(e.target.value)}
+                  className={`font-mono text-sm pr-10 ${
+                    dianTokenError
+                      ? 'border-red-500 focus-visible:ring-red-500'
+                      : dianTokenValid
+                      ? 'border-green-500 focus-visible:ring-green-500'
+                      : ''
+                  }`}
+                />
+                {/* Validation status indicator */}
+                {dianToken.trim() && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {dianTokenValidating ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : dianTokenValid ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : dianTokenError ? (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    ) : null}
+                  </div>
+                )}
+              </div>
+              {dianTokenError ? (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <XCircle className="h-3 w-3" />
+                  {dianTokenError}
+                </p>
+              ) : dianTokenValid ? (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Token DIAN valido
+                </p>
+              ) : dianTokenValidating ? (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Validando token con DIAN...
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Pega la URL completa del token que obtuviste del portal DIAN
+                </p>
+              )}
             </div>
           )}
 
