@@ -635,218 +635,148 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Token DIAN section */}
-          {selectedEntity && (
-            <div className="space-y-4">
-              {/* Loading state */}
-              {loadingJobOptions && (
-                <Alert>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <AlertDescription className="ml-2">
-                    Verificando estado del token...
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Auto-token available */}
-              {!loadingJobOptions && autoTokenAvailable && (
-                <div className="border rounded-lg p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <Zap className="h-4 w-4 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-green-900">Gestion automatica disponible</h4>
-                          <p className="text-sm text-green-700 mt-0.5">
-                            AutoKufe puede solicitar tokens DIAN automaticamente
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3 ml-4">
-                          <Label htmlFor="use-auto-token" className="text-sm font-medium text-green-900 cursor-pointer">
-                            {useAutoToken ? 'Activado' : 'Usar automatico'}
-                          </Label>
-                          <Checkbox
-                            id="use-auto-token"
-                            checked={useAutoToken}
-                            onCheckedChange={(checked) => {
-                              setUseAutoToken(checked as boolean)
-                              if (checked) {
-                                setUseNewToken(false)
-                                setDianToken('')
-                                setDianTokenError(null)
-                              }
-                            }}
-                            className="h-5 w-5 data-[state=checked]:bg-green-600"
-                          />
-                        </div>
-                      </div>
-                      {useAutoToken && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-green-200">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-900">
-                            Token DIAN se solicitara automaticamente
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual token (when not using auto-token) */}
-              {!loadingJobOptions && !useAutoToken && (
-                <div className="space-y-3">
-                  {/* Saved token available */}
-                  {savedTokenAvailable && (
-                    <Card className="border-green-200 bg-green-50/50">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 shrink-0">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <div>
-                              <p className="text-sm font-medium text-green-900">Token DIAN guardado disponible</p>
-                              <p className="text-xs text-green-700 font-mono mt-1">{tokenMasked || '****'}</p>
-                            </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <Checkbox
-                                id="use-new-token"
-                                checked={useNewToken}
-                                onCheckedChange={(checked) => {
-                                  setUseNewToken(checked as boolean)
-                                  if (checked) setDianToken('')
-                                }}
-                              />
-                              <Label htmlFor="use-new-token" className="text-xs text-green-800 cursor-pointer">
-                                Solicitar nuevo token en su lugar
-                              </Label>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* New token input */}
-                  {(!savedTokenAvailable || useNewToken) && (
-                    <div className="space-y-2">
-                      <Label htmlFor="dian-token">Token DIAN *</Label>
-                      <div className="relative">
-                        <Input
-                          id="dian-token"
-                          placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                          value={dianToken}
-                          onChange={(e) => {
-                            handleDianTokenChange(e.target.value)
-                            if (e.target.value.trim() && useAutoToken) {
-                              setUseAutoToken(false)
-                            }
-                          }}
-                          className={`font-mono text-sm pr-10 ${
-                            dianTokenError
-                              ? 'border-red-500 focus-visible:ring-red-500'
-                              : dianTokenValid
-                              ? 'border-green-500 focus-visible:ring-green-500'
-                              : ''
-                          }`}
-                        />
-                        {/* Validation status indicator */}
-                        {dianToken.trim() && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            {dianTokenValidating ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : dianTokenValid ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            ) : dianTokenError ? (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                      {dianTokenError ? (
-                        <p className="text-xs text-red-600 flex items-center gap-1">
-                          <XCircle className="h-3 w-3" />
-                          {dianTokenError}
-                        </p>
-                      ) : dianTokenValid ? (
-                        <p className="text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Token DIAN valido
-                        </p>
-                      ) : dianTokenValidating ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Validando token con DIAN...
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Pega la URL completa del token que obtuviste de la DIAN
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* Token DIAN section - Clean unified design */}
+          <div className="space-y-2">
+            <Label htmlFor="dian-token">Token DIAN *</Label>
+            <div className="relative">
+              <Input
+                id="dian-token"
+                placeholder={
+                  loadingJobOptions
+                    ? 'Verificando opciones...'
+                    : useAutoToken
+                    ? 'Se solicitara automaticamente'
+                    : !useNewToken && savedTokenAvailable
+                    ? `Usando token guardado (${tokenMasked || '****'})`
+                    : 'https://catalogo-vpfe.dian.gov.co/...'
+                }
+                value={dianToken}
+                onChange={(e) => {
+                  handleDianTokenChange(e.target.value)
+                  // If user starts typing, disable auto/stored token
+                  if (e.target.value.trim()) {
+                    if (useAutoToken) setUseAutoToken(false)
+                    if (!useNewToken && savedTokenAvailable) setUseNewToken(true)
+                  }
+                }}
+                disabled={loadingJobOptions || useAutoToken || (!useNewToken && savedTokenAvailable)}
+                className={`font-mono text-sm pr-10 ${
+                  dianTokenError
+                    ? 'border-red-500 focus-visible:ring-red-500'
+                    : dianTokenValid || useAutoToken || (!useNewToken && savedTokenAvailable)
+                    ? 'border-green-500 focus-visible:ring-green-500'
+                    : ''
+                } ${(useAutoToken || (!useNewToken && savedTokenAvailable)) ? 'bg-green-50/50' : ''}`}
+              />
+              {/* Status indicator inside input */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {loadingJobOptions ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : useAutoToken ? (
+                  <Zap className="h-4 w-4 text-green-500" />
+                ) : !useNewToken && savedTokenAvailable ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : dianToken.trim() ? (
+                  dianTokenValidating ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : dianTokenValid ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : dianTokenError ? (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  ) : null
+                ) : null}
+              </div>
             </div>
-          )}
 
-          {!selectedEntity && (
-            <div className="space-y-2">
-              <Label htmlFor="dian-token">Token DIAN *</Label>
-              <div className="relative">
-                <Input
-                  id="dian-token"
-                  placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                  value={dianToken}
-                  onChange={(e) => handleDianTokenChange(e.target.value)}
-                  className={`font-mono text-sm pr-10 ${
-                    dianTokenError
-                      ? 'border-red-500 focus-visible:ring-red-500'
-                      : dianTokenValid
-                      ? 'border-green-500 focus-visible:ring-green-500'
-                      : ''
-                  }`}
-                />
-                {/* Validation status indicator */}
-                {dianToken.trim() && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {dianTokenValidating ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : dianTokenValid ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : dianTokenError ? (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    ) : null}
-                  </div>
+            {/* Status message and options row */}
+            <div className="flex items-center justify-between">
+              {/* Left: Status message */}
+              <div className="flex-1">
+                {loadingJobOptions ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Verificando opciones disponibles...
+                  </p>
+                ) : dianTokenError ? (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    {dianTokenError}
+                  </p>
+                ) : useAutoToken ? (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Gestion automatica activada
+                  </p>
+                ) : !useNewToken && savedTokenAvailable ? (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Token guardado listo para usar
+                  </p>
+                ) : dianTokenValid ? (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Token DIAN valido
+                  </p>
+                ) : dianTokenValidating ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Validando con DIAN...
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedEntity ? 'Pega la URL del token DIAN' : 'Pega la URL completa del token DIAN'}
+                  </p>
                 )}
               </div>
-              {dianTokenError ? (
-                <p className="text-xs text-red-600 flex items-center gap-1">
-                  <XCircle className="h-3 w-3" />
-                  {dianTokenError}
-                </p>
-              ) : dianTokenValid ? (
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Token DIAN valido
-                </p>
-              ) : dianTokenValidating ? (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Validando token con DIAN...
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Pega la URL completa del token que obtuviste del portal DIAN
-                </p>
+
+              {/* Right: Quick options (only when entity selected and options loaded) */}
+              {selectedEntity && !loadingJobOptions && (autoTokenAvailable || savedTokenAvailable) && (
+                <div className="flex items-center gap-4 ml-4">
+                  {savedTokenAvailable && (
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox
+                        checked={!useNewToken && !useAutoToken}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setUseNewToken(false)
+                            setUseAutoToken(false)
+                            setDianToken('')
+                            setDianTokenError(null)
+                            setDianTokenValid(null)
+                          } else {
+                            setUseNewToken(true)
+                          }
+                        }}
+                        className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
+                      />
+                      <span className="text-xs text-muted-foreground">Guardado</span>
+                    </label>
+                  )}
+                  {autoTokenAvailable && (
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox
+                        checked={useAutoToken}
+                        onCheckedChange={(checked) => {
+                          setUseAutoToken(checked as boolean)
+                          if (checked) {
+                            setUseNewToken(false)
+                            setDianToken('')
+                            setDianTokenError(null)
+                            setDianTokenValid(null)
+                          }
+                        }}
+                        className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
+                      />
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Zap className="h-3 w-3" />
+                        Auto
+                      </span>
+                    </label>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
 
           {/* Job Name */}
           <div className="space-y-2">
