@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
 import { queryKeys } from '../keys'
 import { staleTime, gcTime } from '../config'
@@ -362,5 +362,37 @@ export function useEntityJobCreationOptions(entityId: string | undefined) {
     },
     enabled: !!entityId,
     staleTime: staleTime.jobCreationOptions,
+  })
+}
+
+/**
+ * Update entity tax configuration
+ *
+ * Updates CIIU, contributor type, and tax-related flags.
+ * Invalidates entity caches on success.
+ */
+export function useUpdateEntityTaxConfig() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      entityId,
+      config,
+    }: {
+      entityId: string
+      config: EntityTaxConfig
+    }) => {
+      const response = await apiClient.updateEntityTaxConfig(entityId, config)
+      if (response.error) {
+        throw new Error(response.message || 'Error updating tax config')
+      }
+      return response
+    },
+    onSuccess: (_, { entityId }) => {
+      // Invalidate entity detail cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.detail(entityId) })
+      // Invalidate entity list cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.list() })
+    },
   })
 }

@@ -155,6 +155,30 @@ export class ApiClient {
     return this.request('DELETE', `/entities/${entityId}`)
   }
 
+  async updateEntityTaxConfig(
+    entityId: string,
+    config: {
+      ciiu?: string | null
+      contributor_type?: 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
+      is_iva_responsible?: boolean
+      is_withholding_agent?: boolean
+      is_self_withholder?: boolean
+    }
+  ) {
+    return this.request<{
+      status: string
+      entity: {
+        id: string
+        ciiu: string | null
+        contributor_type: string | null
+        is_iva_responsible: boolean
+        is_withholding_agent: boolean
+        is_self_withholder: boolean
+        updated_at: string
+      }
+    }>('PATCH', `/entities/${entityId}/tax-config`, config as Record<string, unknown>)
+  }
+
   async getEntityTokenStatus(entityId: string) {
     return this.request('GET', `/entities/${entityId}/token-status`)
   }
