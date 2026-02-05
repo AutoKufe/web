@@ -93,7 +93,9 @@ const TOKEN_ERROR_MESSAGES: Record<string, string> = {
   'INTERNAL_ERROR': 'Ocurrio un error. El equipo tecnico ha sido notificado.',
   // Auto-token specific errors
   'COOLDOWN_ACTIVE': 'Debes esperar antes de solicitar otro token',
-  'RATE_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes por hora',
+  'HOURLY_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes por hora (20/hora)',
+  'DAILY_LIMIT_EXCEEDED': 'Has alcanzado el limite diario de solicitudes (75/dia)',
+  'RATE_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes',
   'REQUEST_IN_PROGRESS': 'Ya hay una solicitud en progreso',
   'AUTO_TOKEN_NOT_CONFIGURED': 'La gestion automatica no esta configurada',
   'VALID_TOKEN_EXISTS': 'Ya existe un token valido',
