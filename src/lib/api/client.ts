@@ -284,6 +284,50 @@ export class ApiClient {
     })
   }
 
+  /**
+   * Request automatic DIAN token for an entity
+   * Validates rate limits and cooldowns before creating the request
+   */
+  async requestAutoToken(entityId: string) {
+    return this.request<{
+      success: boolean
+      request_id?: string
+      error_code?: string
+      retry_after_seconds?: number
+    }>('POST', '/dian/auto-token/request', {
+      entity_id: entityId
+    })
+  }
+
+  /**
+   * Poll auto-token request status
+   * Frontend should poll every 3-5 seconds
+   */
+  async getAutoTokenStatus(requestId: string) {
+    return this.request<{
+      success: boolean
+      request_id?: string
+      status?: 'pending' | 'polling' | 'received' | 'failed' | 'timeout'
+      requested_at?: string
+      polling_started_at?: string
+      received_at?: string
+      error_code?: string
+    }>('GET', `/dian/auto-token/status/${requestId}`)
+  }
+
+  /**
+   * Check if there's an active auto-token request for an entity
+   * Used to restore UI state when user returns to page
+   */
+  async getActiveAutoTokenRequest(entityId: string) {
+    return this.request<{
+      has_active_request: boolean
+      request_id?: string
+      status?: 'pending' | 'polling'
+      requested_at?: string
+    }>('GET', `/dian/auto-token/active/${entityId}`)
+  }
+
   // === JOBS ===
   async createJob(
     dianToken: string,
