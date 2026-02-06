@@ -297,23 +297,21 @@ export default function EntitiesPage() {
             </CardHeader>
             <CardContent className="px-0 overflow-hidden">
               {isLoading ? (
-                <div className="px-6">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-b">
-                        <TableHead className="pl-6">Nombre</TableHead>
-                        <TableHead>Identificador</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Gestion Automatica</TableHead>
-                        <TableHead>Registrado</TableHead>
-                        <TableHead className="w-[70px] pr-6"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <EntityTableSkeleton rows={3} />
-                    </TableBody>
-                  </Table>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b">
+                      <TableHead className="pl-6">Nombre</TableHead>
+                      <TableHead>Identificador</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Gestion Automatica</TableHead>
+                      <TableHead>Registrado</TableHead>
+                      <TableHead className="w-[70px] pr-6"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <EntityTableSkeleton rows={3} />
+                  </TableBody>
+                </Table>
               ) : paginatedEntities.length === 0 ? (
                 <div className="text-center py-16 px-6">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
