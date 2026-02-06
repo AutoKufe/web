@@ -15,14 +15,9 @@ interface ApiResponse<T = unknown> {
 
 export class ApiClient {
   private accessToken: string | null = null
-  private devSessionId: string | null = null
 
   setAccessToken(token: string | null) {
     this.accessToken = token
-  }
-
-  setDevSessionId(sessionId: string | null) {
-    this.devSessionId = sessionId
   }
 
   private async request<T>(
@@ -45,11 +40,6 @@ export class ApiClient {
 
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`
-    }
-
-    // Dev session header (staging only)
-    if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-      headers['X-Dev-Session-Id'] = this.devSessionId
     }
 
     try {
@@ -401,10 +391,6 @@ export class ApiClient {
         headers['Authorization'] = `Bearer ${this.accessToken}`
       }
 
-      if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-        headers['X-Dev-Session-Id'] = this.devSessionId
-      }
-
       const response = await fetch(`${API_BASE}/storage/download-excel/${jobId}`, {
         method: 'GET',
         headers,
@@ -544,10 +530,6 @@ export class ApiClient {
 
       if (this.accessToken) {
         headers['Authorization'] = `Bearer ${this.accessToken}`
-      }
-
-      if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-        headers['X-Dev-Session-Id'] = this.devSessionId
       }
 
       const response = await fetch(`${API_BASE}/logs/jobs/${jobId}`, {

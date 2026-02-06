@@ -4,7 +4,6 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { apiClient } from '@/lib/api/client'
-import { devLogger } from '@/lib/dev-logger'
 
 interface User {
   id: string
@@ -39,9 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: session.user.email || '',
         })
         apiClient.setAccessToken(session.access_token)
-
-        // Initialize dev logger in staging
-        await devLogger.init(session.access_token)
       }
       setLoading(false)
     }
@@ -53,18 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'SIGNED_OUT' || !session) {
           setUser(null)
           apiClient.setAccessToken(null)
-          devLogger.clearSession()
-          // Don't auto-redirect - let pages decide if they need auth
-          // Landing pages don't require auth, so shouldn't redirect
         } else if (session) {
           setUser({
             id: session.user.id,
             email: session.user.email || '',
           })
           apiClient.setAccessToken(session.access_token)
-
-          // Initialize dev logger in staging
-          await devLogger.init(session.access_token)
         }
       }
     )
