@@ -824,10 +824,10 @@ function NewJobContent() {
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar por nombre o identificador..." />
-                  <CommandList>
+                  <CommandList className="max-h-[300px]">
                     <CommandEmpty>
                       <div className="py-6 text-center">
                         <p className="text-sm text-muted-foreground mb-2">
