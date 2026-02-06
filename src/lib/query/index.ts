@@ -23,8 +23,10 @@ export {
   useEntityTokenStatus,
   useEntityAutoTokenStatus,
   useEntityJobCreationOptions,
+  useUpdateEntityTaxConfig,
   type Entity,
   type EntitySelectorItem,
+  type EntityTaxConfig,
 } from './hooks/use-entities'
 
 // Job hooks

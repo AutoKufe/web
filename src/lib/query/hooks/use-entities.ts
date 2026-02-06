@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api/client'
 import { queryKeys } from '../keys'
 import { staleTime, gcTime } from '../config'
@@ -17,6 +17,23 @@ export interface Entity {
   updated_at?: string
   last_used_at?: string | null
   dian_email_id?: string | null
+  // Tax configuration fields
+  ciiu?: string | null
+  contributor_type?: 'ordinario' | 'gran_contribuyente' | 'regimen_simple' | null
+  is_iva_responsible?: boolean
+  is_withholding_agent?: boolean
+  is_self_withholder?: boolean
+}
+
+/**
+ * Tax configuration update payload
+ */
+export interface EntityTaxConfig {
+  ciiu?: string | null
+  contributor_type?: 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
+  is_iva_responsible?: boolean
+  is_withholding_agent?: boolean
+  is_self_withholder?: boolean
 }
 
 /**
@@ -187,6 +204,12 @@ export function useEntity(entityId: string | undefined) {
           last_token_received_at?: string | null
           tokens_received_count?: number
           dian_email_id?: string | null
+          // Tax configuration
+          ciiu?: string | null
+          contributor_type?: string | null
+          is_iva_responsible?: boolean
+          is_withholding_agent?: boolean
+          is_self_withholder?: boolean
         }
       }
 
@@ -210,6 +233,12 @@ export function useEntity(entityId: string | undefined) {
         last_token_received_at: entity.last_token_received_at,
         tokens_received_count: entity.tokens_received_count,
         dian_email_id: entity.dian_email_id,
+        // Tax configuration
+        ciiu: entity.ciiu,
+        contributor_type: entity.contributor_type as Entity['contributor_type'],
+        is_iva_responsible: entity.is_iva_responsible,
+        is_withholding_agent: entity.is_withholding_agent,
+        is_self_withholder: entity.is_self_withholder,
       }
     },
     enabled: !!entityId,
@@ -333,5 +362,37 @@ export function useEntityJobCreationOptions(entityId: string | undefined) {
     },
     enabled: !!entityId,
     staleTime: staleTime.jobCreationOptions,
+  })
+}
+
+/**
+ * Update entity tax configuration
+ *
+ * Updates CIIU, contributor type, and tax-related flags.
+ * Invalidates entity caches on success.
+ */
+export function useUpdateEntityTaxConfig() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      entityId,
+      config,
+    }: {
+      entityId: string
+      config: EntityTaxConfig
+    }) => {
+      const response = await apiClient.updateEntityTaxConfig(entityId, config)
+      if (response.error) {
+        throw new Error(response.message || 'Error updating tax config')
+      }
+      return response
+    },
+    onSuccess: (_, { entityId }) => {
+      // Invalidate entity detail cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.detail(entityId) })
+      // Invalidate entity list cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.list() })
+    },
   })
 }

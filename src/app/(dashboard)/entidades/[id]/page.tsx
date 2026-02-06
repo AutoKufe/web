@@ -1,9 +1,20 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,9 +26,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, Trash2, Building2, User, Calendar, Mail, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Building2, User, Calendar, Mail, Receipt, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useEntity, useDianEmailLookup, useDeleteEntity } from '@/lib/query'
+import { useEntity, useDianEmailLookup, useDeleteEntity, useUpdateEntityTaxConfig } from '@/lib/query'
 
 // Entity type is inferred from useEntity hook
 
@@ -56,6 +67,59 @@ export default function EntityDetailPage() {
   const { data: entity, isLoading, error } = useEntity(entityId)
   const dianEmail = useDianEmailLookup(entity?.dian_email_id)
   const deleteMutation = useDeleteEntity()
+  const updateTaxConfigMutation = useUpdateEntityTaxConfig()
+
+  // Tax configuration local state - no defaults, show real DB state
+  const [taxConfig, setTaxConfig] = useState({
+    ciiu: '',
+    contributor_type: '' as '' | 'ordinario' | 'gran_contribuyente' | 'regimen_simple',
+    is_iva_responsible: false,
+    is_withholding_agent: false,
+    is_self_withholder: false,
+  })
+  const [taxConfigDirty, setTaxConfigDirty] = useState(false)
+
+  // Sync tax config from entity data - use actual values, no fallbacks
+  useEffect(() => {
+    if (entity) {
+      setTaxConfig({
+        ciiu: entity.ciiu || '',
+        contributor_type: entity.contributor_type || '',
+        is_iva_responsible: entity.is_iva_responsible === true,
+        is_withholding_agent: entity.is_withholding_agent === true,
+        is_self_withholder: entity.is_self_withholder === true,
+      })
+      setTaxConfigDirty(false)
+    }
+  }, [entity])
+
+  const handleTaxConfigChange = <K extends keyof typeof taxConfig>(
+    field: K,
+    value: typeof taxConfig[K]
+  ) => {
+    setTaxConfig((prev) => ({ ...prev, [field]: value }))
+    setTaxConfigDirty(true)
+  }
+
+  const handleSaveTaxConfig = async () => {
+    try {
+      await updateTaxConfigMutation.mutateAsync({
+        entityId,
+        config: {
+          ciiu: taxConfig.ciiu || null,
+          contributor_type: taxConfig.contributor_type || undefined,
+          is_iva_responsible: taxConfig.is_iva_responsible,
+          is_withholding_agent: taxConfig.is_withholding_agent,
+          is_self_withholder: taxConfig.is_self_withholder,
+        },
+      })
+      toast.success('Configuracion tributaria actualizada')
+      setTaxConfigDirty(false)
+    } catch (err) {
+      console.error('Error updating tax config:', err)
+      toast.error(err instanceof Error ? err.message : 'Error actualizando configuracion')
+    }
+  }
 
   const handleDelete = async () => {
     try {
@@ -203,6 +267,122 @@ export default function EntityDetailPage() {
                 No hay gestion automatica configurada
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Tax Configuration Card */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Configuracion Tributaria
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* CIIU */}
+              <div className="space-y-2">
+                <Label htmlFor="ciiu">Codigo CIIU</Label>
+                <Input
+                  id="ciiu"
+                  value={taxConfig.ciiu}
+                  placeholder="Ej: 5611"
+                  onChange={(e) => handleTaxConfigChange('ciiu', e.target.value)}
+                  maxLength={5}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Actividad economica principal (4-5 digitos)
+                </p>
+              </div>
+
+              {/* Contributor Type */}
+              <div className="space-y-2">
+                <Label htmlFor="contributor_type">Tipo de Contribuyente</Label>
+                <Select
+                  value={taxConfig.contributor_type || '_empty'}
+                  onValueChange={(value) =>
+                    handleTaxConfigChange(
+                      'contributor_type',
+                      value === '_empty' ? '' : value as 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
+                    )
+                  }
+                >
+                  <SelectTrigger id="contributor_type">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_empty" className="text-muted-foreground">
+                      No configurado
+                    </SelectItem>
+                    <SelectItem value="ordinario">Regimen Ordinario</SelectItem>
+                    <SelectItem value="gran_contribuyente">Gran Contribuyente</SelectItem>
+                    <SelectItem value="regimen_simple">Regimen Simple</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Consulta tu RUT para este dato
+                </p>
+              </div>
+            </div>
+
+            {/* Checkboxes */}
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Marca segun las responsabilidades en tu RUT
+              </p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_iva_responsible"
+                    checked={taxConfig.is_iva_responsible}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_iva_responsible', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_iva_responsible" className="cursor-pointer">
+                    Responsable de IVA
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_withholding_agent"
+                    checked={taxConfig.is_withholding_agent}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_withholding_agent', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_withholding_agent" className="cursor-pointer">
+                    Agente Retenedor
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_self_withholder"
+                    checked={taxConfig.is_self_withholder}
+                    onCheckedChange={(checked) =>
+                      handleTaxConfigChange('is_self_withholder', checked === true)
+                    }
+                  />
+                  <Label htmlFor="is_self_withholder" className="cursor-pointer">
+                    Autorretenedor
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSaveTaxConfig}
+              disabled={!taxConfigDirty || updateTaxConfigMutation.isPending}
+            >
+              {updateTaxConfigMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Configuracion'
+              )}
+            </Button>
           </CardContent>
         </Card>
 

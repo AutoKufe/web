@@ -28,7 +28,12 @@ export default function LoginPage() {
     })
 
     if (error) {
-      setError(error.message)
+      const messages: Record<string, string> = {
+        'Invalid login credentials': 'Correo o contraseña incorrectos',
+        'Email not confirmed': 'Debes confirmar tu correo electrónico',
+        'Too many requests': 'Demasiados intentos. Intenta de nuevo más tarde',
+      }
+      setError(messages[error.message] || error.message)
       setLoading(false)
       return
     }

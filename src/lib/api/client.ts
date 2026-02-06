@@ -15,14 +15,9 @@ interface ApiResponse<T = unknown> {
 
 export class ApiClient {
   private accessToken: string | null = null
-  private devSessionId: string | null = null
 
   setAccessToken(token: string | null) {
     this.accessToken = token
-  }
-
-  setDevSessionId(sessionId: string | null) {
-    this.devSessionId = sessionId
   }
 
   private async request<T>(
@@ -45,11 +40,6 @@ export class ApiClient {
 
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`
-    }
-
-    // Dev session header (staging only)
-    if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-      headers['X-Dev-Session-Id'] = this.devSessionId
     }
 
     try {
@@ -155,6 +145,30 @@ export class ApiClient {
     return this.request('DELETE', `/entities/${entityId}`)
   }
 
+  async updateEntityTaxConfig(
+    entityId: string,
+    config: {
+      ciiu?: string | null
+      contributor_type?: 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
+      is_iva_responsible?: boolean
+      is_withholding_agent?: boolean
+      is_self_withholder?: boolean
+    }
+  ) {
+    return this.request<{
+      status: string
+      entity: {
+        id: string
+        ciiu: string | null
+        contributor_type: string | null
+        is_iva_responsible: boolean
+        is_withholding_agent: boolean
+        is_self_withholder: boolean
+        updated_at: string
+      }
+    }>('PATCH', `/entities/${entityId}/tax-config`, config as Record<string, unknown>)
+  }
+
   async getEntityTokenStatus(entityId: string) {
     return this.request('GET', `/entities/${entityId}/token-status`)
   }
@@ -234,6 +248,76 @@ export class ApiClient {
     return this.request('POST', `/dian-emails/${dianEmailId}/regenerate-oauth`)
   }
 
+  // === DIAN TOKEN VALIDATION ===
+
+  /**
+   * Quick validate a DIAN token URL and optionally save to entity
+   *
+   * If entityId is provided:
+   * - Validates token matches entity (by NIT/document)
+   * - Saves token to entity if valid
+   * - Detects representative change (juridica) and updates if needed
+   *
+   * Returns representative_updated if rep legal changed (juridica only)
+   */
+  async quickValidateDianToken(tokenUrl: string, entityId?: string) {
+    return this.request<{
+      valid: boolean
+      status: 'valid' | 'expired' | 'invalid' | 'error'
+      error_code?: string
+      token_saved?: boolean
+      representative_updated?: boolean
+      new_representative_name?: string
+    }>('POST', '/dian/quick-validate', {
+      token_url: tokenUrl,
+      entity_id: entityId
+    })
+  }
+
+  /**
+   * Request automatic DIAN token for an entity
+   * Validates rate limits and cooldowns before creating the request
+   */
+  async requestAutoToken(entityId: string) {
+    return this.request<{
+      success: boolean
+      request_id?: string
+      error_code?: string
+      retry_after_seconds?: number
+    }>('POST', '/dian/auto-token/request', {
+      entity_id: entityId
+    })
+  }
+
+  /**
+   * Poll auto-token request status
+   * Frontend should poll every 3-5 seconds
+   */
+  async getAutoTokenStatus(requestId: string) {
+    return this.request<{
+      success: boolean
+      request_id?: string
+      status?: 'pending' | 'polling' | 'received' | 'failed' | 'timeout'
+      requested_at?: string
+      polling_started_at?: string
+      received_at?: string
+      error_code?: string
+    }>('GET', `/dian/auto-token/status/${requestId}`)
+  }
+
+  /**
+   * Check if there's an active auto-token request for an entity
+   * Used to restore UI state when user returns to page
+   */
+  async getActiveAutoTokenRequest(entityId: string) {
+    return this.request<{
+      has_active_request: boolean
+      request_id?: string
+      status?: 'pending' | 'polling'
+      requested_at?: string
+    }>('GET', `/dian/auto-token/active/${entityId}`)
+  }
+
   // === JOBS ===
   async createJob(
     dianToken: string,
@@ -305,10 +389,6 @@ export class ApiClient {
 
       if (this.accessToken) {
         headers['Authorization'] = `Bearer ${this.accessToken}`
-      }
-
-      if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-        headers['X-Dev-Session-Id'] = this.devSessionId
       }
 
       const response = await fetch(`${API_BASE}/storage/download-excel/${jobId}`, {
@@ -450,10 +530,6 @@ export class ApiClient {
 
       if (this.accessToken) {
         headers['Authorization'] = `Bearer ${this.accessToken}`
-      }
-
-      if (this.devSessionId && process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging') {
-        headers['X-Dev-Session-Id'] = this.devSessionId
       }
 
       const response = await fetch(`${API_BASE}/logs/jobs/${jobId}`, {
