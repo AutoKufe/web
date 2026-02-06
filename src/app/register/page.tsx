@@ -45,7 +45,12 @@ export default function RegisterPage() {
     })
 
     if (error) {
-      setError(error.message)
+      const messages: Record<string, string> = {
+        'User already registered': 'Este correo ya está registrado',
+        'Password should be at least 6 characters': 'La contraseña debe tener al menos 6 caracteres',
+        'Too many requests': 'Demasiados intentos. Intenta de nuevo más tarde',
+      }
+      setError(messages[error.message] || error.message)
       setLoading(false)
       return
     }
