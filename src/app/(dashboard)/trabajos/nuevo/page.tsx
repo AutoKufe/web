@@ -182,6 +182,13 @@ function NewJobContent() {
   const [autoTokenStartedAt, setAutoTokenStartedAt] = useState<Date | null>(null)
   const autoTokenPollingRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Token validation timestamp (to know if we need to revalidate on submit)
+  const [tokenValidatedAt, setTokenValidatedAt] = useState<Date | null>(null)
+  const TOKEN_VALIDATION_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
+
+  // Ref for token input focus
+  const dianTokenInputRef = useRef<HTMLInputElement>(null)
+
   // Debounce ref for server validation
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -257,6 +264,7 @@ function NewJobContent() {
 
         if (result.valid) {
           setDianTokenError(null)
+          setTokenValidatedAt(new Date()) // Track when token was validated
 
           // Check if representative was updated (sparkle animation)
           if (result.representative_updated) {
@@ -267,7 +275,8 @@ function NewJobContent() {
           }
         } else {
           // Map error code to user-friendly message
-          const errorMessage = getTokenErrorMessage(result.error_code)
+          const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          const errorMessage = getTokenErrorMessage(errorCode)
           setDianTokenError(errorMessage)
           setValidationPhase('error')
         }
@@ -286,6 +295,7 @@ function NewJobContent() {
     // Reset validation state
     setValidationPhase('idle')
     setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
 
     // Instant validation: check entity match (for juridica by rk suffix)
     if (selectedEntity && value.trim()) {
@@ -330,7 +340,8 @@ function NewJobContent() {
 
         if (!result.success) {
           setAutoTokenStatus('failed')
-          setAutoTokenError(getTokenErrorMessage(result.error_code))
+          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          setAutoTokenError(getTokenErrorMessage(errCode))
           return
         }
 
@@ -343,7 +354,8 @@ function NewJobContent() {
           // Refresh job options to get new token status
           // The token is already saved to entity by backend
         } else if (status === 'failed' || status === 'timeout') {
-          setAutoTokenError(getTokenErrorMessage(result.error_code))
+          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          setAutoTokenError(getTokenErrorMessage(errCode))
         } else {
           // Still pending/polling - continue polling
           autoTokenPollingRef.current = setTimeout(pollStatus, 3000)
@@ -371,11 +383,13 @@ function NewJobContent() {
     const checkActiveRequest = async () => {
       try {
         const result = await apiClient.getActiveAutoTokenRequest(selectedEntity.id)
-        if (result.has_active_request && result.request_id) {
+        if (result.has_active_request && typeof result.request_id === 'string') {
           // Restore active request state
           setAutoTokenRequestId(result.request_id)
-          setAutoTokenStatus(result.status as AutoTokenStatus || 'pending')
-          setAutoTokenStartedAt(result.requested_at ? new Date(result.requested_at) : null)
+          const status = typeof result.status === 'string' ? result.status as AutoTokenStatus : 'pending'
+          setAutoTokenStatus(status)
+          const requestedAt = typeof result.requested_at === 'string' ? result.requested_at : null
+          setAutoTokenStartedAt(requestedAt ? new Date(requestedAt) : null)
         }
       } catch {
         // Ignore errors
@@ -399,16 +413,18 @@ function NewJobContent() {
 
       if (!result.success) {
         setAutoTokenStatus('failed')
-        setAutoTokenError(getTokenErrorMessage(result.error_code))
+        const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+        setAutoTokenError(getTokenErrorMessage(errCode))
 
         // Show retry timer if cooldown
-        if (result.error_code === 'COOLDOWN_ACTIVE' && result.retry_after_seconds) {
+        if (errCode === 'COOLDOWN_ACTIVE' && result.retry_after_seconds) {
           setAutoTokenError(`Debes esperar ${result.retry_after_seconds} segundos`)
         }
         return
       }
 
-      setAutoTokenRequestId(result.request_id || null)
+      const requestId = typeof result.request_id === 'string' ? result.request_id : null
+      setAutoTokenRequestId(requestId)
       setAutoTokenStatus('pending')
     } catch {
       setAutoTokenStatus('failed')
@@ -506,6 +522,7 @@ function NewJobContent() {
     setDianTokenError(null)
     setValidationPhase('idle')
     setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
     // Reset auto-token states
     setAutoTokenRequestId(null)
     setAutoTokenStatus('idle')
@@ -581,6 +598,54 @@ function NewJobContent() {
       }
     }
 
+    // For manual token: check if validated and if validation is still fresh (< 5 min)
+    // Skip this check for: dev jobs, auto-token, or using saved token
+    const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
+
+    if (isUsingManualToken && selectedEntity) {
+      // Check if token was validated
+      if (!tokenValidatedAt || validationPhase !== 'success' && validationPhase !== 'success_sparkle') {
+        // Token not validated - focus input and show error
+        toast.error('El token DIAN no ha sido validado')
+        dianTokenInputRef.current?.focus()
+        return
+      }
+
+      // Check if validation is stale (> 5 min)
+      const validationAge = Date.now() - tokenValidatedAt.getTime()
+      if (validationAge > TOKEN_VALIDATION_MAX_AGE_MS) {
+        // Validation is stale - revalidate before creating job
+        toast.info('Revalidando token DIAN...')
+        setValidationPhase('validating')
+
+        try {
+          const result = await apiClient.quickValidateDianToken(dianToken, selectedEntity.id)
+
+          if (result.valid) {
+            setTokenValidatedAt(new Date())
+            setValidationPhase('success')
+            // Continue with job creation (don't return)
+          } else {
+            // Token is now invalid
+            const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
+            const errorMessage = getTokenErrorMessage(errorCode)
+            setDianTokenError(errorMessage)
+            setValidationPhase('error')
+            setTokenValidatedAt(null)
+            toast.error(errorMessage)
+            dianTokenInputRef.current?.focus()
+            return
+          }
+        } catch {
+          setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+          setValidationPhase('error')
+          toast.error('Error validando token DIAN')
+          dianTokenInputRef.current?.focus()
+          return
+        }
+      }
+    }
+
     if (selectedSheetTypes.length === 0) {
       toast.error('Selecciona al menos un tipo de hoja')
       return
@@ -636,6 +701,7 @@ function NewJobContent() {
     setDianTokenError(null)
     setValidationPhase('idle')
     setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
     setJobName('')
     setStartDate('')
     setEndDate('')
@@ -921,6 +987,7 @@ function NewJobContent() {
               <>
                 <div className="relative">
                   <Input
+                    ref={dianTokenInputRef}
                     id="dian-token"
                     placeholder={
                       loadingJobOptions
@@ -1383,7 +1450,11 @@ function NewJobContent() {
                 (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
                 // No token available: need either auto-token received, saved token, or manual token
                 (!isDevJob && autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
-                (!isDevJob && autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim())
+                (!isDevJob && autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
+                // Manual token validation in progress
+                (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
+                // Manual token has validation error
+                (!!dianToken.trim() && validationPhase === 'error')
               }
               className="flex-1"
               size="lg"
