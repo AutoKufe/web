@@ -663,11 +663,14 @@ function NewJobContent() {
     }
 
     // Determine token to send
-    let tokenToSend = dianToken
+    // Since we now validate and save tokens BEFORE job creation,
+    // we always use 'use_stored_token' - the token is already in DB
+    let tokenToSend: string
     if (isDevJob) {
       tokenToSend = ''
-    } else if (hasAutoTokenReceived || !dianToken.trim()) {
-      // Auto-token received or using saved token - backend will use stored token
+    } else {
+      // Token was validated and saved during input validation
+      // Auto-token, saved token, or manually entered token - all stored in DB
       tokenToSend = 'use_stored_token'
     }
 
