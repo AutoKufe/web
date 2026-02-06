@@ -155,6 +155,7 @@ function NewJobContent() {
   // Entity selection
   const [selectedEntity, setSelectedEntity] = useState<EntitySelectorItem | null>(null)
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
+  const [entitySelectorShake, setEntitySelectorShake] = useState(false)
 
   // Job creation options (fetched when entity is selected)
   const { data: jobOptions, isLoading: loadingJobOptions } = useEntityJobCreationOptions(
@@ -306,13 +307,15 @@ function NewJobContent() {
       if (!error) {
         validateTokenWithServer(value, selectedEntity.id)
       }
+    } else if (value.trim() && value.includes('catalogo-vpfe.dian.gov.co')) {
+      // No entity selected but valid-looking token pasted - prompt to select entity first
+      setDianTokenError('Selecciona una entidad primero')
+      setValidationPhase('error')
+      // Shake the entity selector to draw attention
+      setEntitySelectorShake(true)
+      setTimeout(() => setEntitySelectorShake(false), 600)
     } else {
       setDianTokenError(null)
-
-      // No entity selected - validate token without saving
-      if (value.trim()) {
-        validateTokenWithServer(value)
-      }
     }
   }
 
@@ -801,7 +804,7 @@ function NewJobContent() {
                   variant="outline"
                   role="combobox"
                   aria-expanded={entitySearchOpen}
-                  className="w-full justify-between"
+                  className={`w-full justify-between ${entitySelectorShake ? 'animate-shake ring-2 ring-red-500' : ''}`}
                   disabled={loadingEntities}
                 >
                   {loadingEntities ? (
@@ -1272,7 +1275,8 @@ function NewJobContent() {
                           id="select-all-categories"
                           checked={selectedSheetTypes.length === 3}
                           onCheckedChange={(checked) => {
-                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : [])
+                            // Always keep at least one category selected
+                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
                           }}
                         />
                         <Label htmlFor="select-all-categories" className="font-medium cursor-pointer">
@@ -1294,7 +1298,12 @@ function NewJobContent() {
                           <Checkbox
                             id={`category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
+                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
                             onCheckedChange={(checked) => {
+                              if (!checked && selectedSheetTypes.length === 1) {
+                                // Don't allow unchecking the last category
+                                return
+                              }
                               setSelectedSheetTypes(
                                 checked
                                   ? [...selectedSheetTypes, type.value]
