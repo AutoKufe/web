@@ -1,8 +1,6 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +48,7 @@ import {
   useCreateJob,
   type EntitySelectorItem,
 } from '@/lib/query'
+import { apiClient } from '@/lib/api/client'
 
 // Helper to get Colombia local date (UTC-5)
 const getColombiaToday = () => {
@@ -66,6 +65,75 @@ const getColombiaMonth = () => {
   const localOffset = now.getTimezoneOffset()
   const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
   return colombiaTime.toISOString().slice(0, 7)
+}
+
+// Extract 'rk' parameter from DIAN token URL
+// Token format: https://catalogo-vpfe.dian.gov.co/User/AuthToken?pk=...&rk=901911696&token=...
+const extractRkFromToken = (tokenUrl: string): string | null => {
+  try {
+    const url = new URL(tokenUrl)
+    return url.searchParams.get('rk')
+  } catch {
+    // Try regex fallback for malformed URLs
+    const match = tokenUrl.match(/[?&]rk=(\d+)/)
+    return match ? match[1] : null
+  }
+}
+
+// Error code to user-friendly message mapping
+const TOKEN_ERROR_MESSAGES: Record<string, string> = {
+  'INVALID_URL': 'La URL del token DIAN no es valida',
+  'METADATA_EXTRACTION_FAILED': 'No se pudo leer la informacion del token',
+  'TOKEN_EXPIRED': 'El token DIAN ha expirado',
+  'TOKEN_INVALID': 'El token DIAN no es valido',
+  'ENTITY_NOT_FOUND': 'Entidad no encontrada',
+  'TOKEN_ENTITY_MISMATCH': 'El token pertenece a otra entidad',
+  'INTERNAL_ERROR': 'Ocurrio un error. El equipo tecnico ha sido notificado.',
+  // Auto-token specific errors
+  'COOLDOWN_ACTIVE': 'Debes esperar antes de solicitar otro token',
+  'HOURLY_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes por hora (20/hora)',
+  'DAILY_LIMIT_EXCEEDED': 'Has alcanzado el limite diario de solicitudes (75/dia)',
+  'RATE_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes',
+  'REQUEST_IN_PROGRESS': 'Ya hay una solicitud en progreso',
+  'AUTO_TOKEN_NOT_CONFIGURED': 'La gestion automatica no esta configurada',
+  'VALID_TOKEN_EXISTS': 'Ya existe un token valido',
+  'OAUTH_EXPIRED': 'La autorizacion del email DIAN ha expirado',
+  'DIAN_REQUEST_FAILED': 'No se pudo solicitar el token a DIAN',
+  'TOKEN_NOT_RECEIVED': 'El token no llego. Intenta de nuevo.',
+  'TWOCAPTCHA_NOT_CONFIGURED': 'Error de configuracion del sistema',
+}
+
+const getTokenErrorMessage = (errorCode?: string): string => {
+  if (!errorCode) return 'Error desconocido'
+  return TOKEN_ERROR_MESSAGES[errorCode] || 'Error desconocido'
+}
+
+// Auto-token request status messages
+const AUTO_TOKEN_STATUS_MESSAGES: Record<string, string> = {
+  'pending': 'Solicitando token DIAN...',
+  'polling': 'Esperando respuesta de DIAN...',
+  'received': 'Token recibido!',
+  'failed': 'No se pudo obtener el token',
+  'timeout': 'El token no llego a tiempo',
+}
+
+// Validate that DIAN token matches selected entity by comparing identifier suffix
+// Returns error message if mismatch, null if valid
+const validateTokenMatchesEntity = (
+  tokenUrl: string,
+  entitySuffix: string
+): string | null => {
+  const rk = extractRkFromToken(tokenUrl)
+  if (!rk) {
+    return 'El token DIAN no tiene un formato valido (falta parametro rk)'
+  }
+
+  const rkSuffix = rk.slice(-4)
+  if (rkSuffix !== entitySuffix) {
+    return `El token DIAN es de otra entidad (termina en ${rkSuffix}). La entidad seleccionada termina en ${entitySuffix}.`
+  }
+
+  return null // Valid
 }
 
 function NewJobContent() {
@@ -85,6 +153,7 @@ function NewJobContent() {
   // Entity selection
   const [selectedEntity, setSelectedEntity] = useState<EntitySelectorItem | null>(null)
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
+  const [entitySelectorShake, setEntitySelectorShake] = useState(false)
 
   // Job creation options (fetched when entity is selected)
   const { data: jobOptions, isLoading: loadingJobOptions } = useEntityJobCreationOptions(
@@ -96,8 +165,285 @@ function NewJobContent() {
 
   // Token DIAN
   const [dianToken, setDianToken] = useState('')
+  const [dianTokenError, setDianTokenError] = useState<string | null>(null)
   const [useNewToken, setUseNewToken] = useState(false)
-  const [useAutoToken, setUseAutoToken] = useState(false)
+
+  // Validation phase for progressive UX
+  type ValidationPhase = 'idle' | 'validating' | 'verifying' | 'updating' | 'success' | 'success_sparkle' | 'error'
+  const [validationPhase, setValidationPhase] = useState<ValidationPhase>('idle')
+  const [representativeUpdated, setRepresentativeUpdated] = useState(false)
+
+  // Auto-token request state
+  type AutoTokenStatus = 'idle' | 'pending' | 'polling' | 'received' | 'failed' | 'timeout'
+  const [autoTokenRequestId, setAutoTokenRequestId] = useState<string | null>(null)
+  const [autoTokenStatus, setAutoTokenStatus] = useState<AutoTokenStatus>('idle')
+  const [autoTokenError, setAutoTokenError] = useState<string | null>(null)
+  const [autoTokenStartedAt, setAutoTokenStartedAt] = useState<Date | null>(null)
+  const autoTokenPollingRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Token validation timestamp (to know if we need to revalidate on submit)
+  const [tokenValidatedAt, setTokenValidatedAt] = useState<Date | null>(null)
+  const TOKEN_VALIDATION_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
+
+  // Ref for token input focus
+  const dianTokenInputRef = useRef<HTMLInputElement>(null)
+
+  // Debounce ref for server validation
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const sparkleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Progressive phase messages (if validation takes long)
+  useEffect(() => {
+    if (validationPhase === 'validating') {
+      // After 3s, show "Verificando con DIAN..."
+      phaseTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('verifying')
+      }, 3000)
+
+      return () => {
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
+      }
+    }
+    if (validationPhase === 'verifying') {
+      // After 2s more, show "Actualizando datos..."
+      phaseTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('updating')
+      }, 2000)
+
+      return () => {
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
+      }
+    }
+  }, [validationPhase])
+
+  // Sparkle animation timeout (return to normal success after 2.5s)
+  useEffect(() => {
+    if (validationPhase === 'success_sparkle') {
+      sparkleTimeoutRef.current = setTimeout(() => {
+        setValidationPhase('success')
+        setRepresentativeUpdated(false)
+      }, 2500)
+
+      return () => {
+        if (sparkleTimeoutRef.current) clearTimeout(sparkleTimeoutRef.current)
+      }
+    }
+  }, [validationPhase])
+
+  // Server-side token validation with debounce
+  const validateTokenWithServer = useCallback(async (tokenUrl: string, entityId?: string) => {
+    // Clear previous timeouts
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
+    if (phaseTimeoutRef.current) {
+      clearTimeout(phaseTimeoutRef.current)
+    }
+
+    // Reset validation state
+    setValidationPhase('idle')
+
+    // Don't validate empty or short tokens
+    if (!tokenUrl.trim() || tokenUrl.length < 50) {
+      return
+    }
+
+    // Check URL structure first (instant)
+    if (!tokenUrl.includes('catalogo-vpfe.dian.gov.co')) {
+      return
+    }
+
+    // Start debounce timer (800ms after user stops typing)
+    setValidationPhase('validating')
+    validationTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Pass entityId to save token if valid
+        const result = await apiClient.quickValidateDianToken(tokenUrl, entityId)
+
+        if (result.valid) {
+          setDianTokenError(null)
+          setTokenValidatedAt(new Date()) // Track when token was validated
+
+          // Check if representative was updated (sparkle animation)
+          if (result.representative_updated) {
+            setRepresentativeUpdated(true)
+            setValidationPhase('success_sparkle')
+          } else {
+            setValidationPhase('success')
+          }
+        } else {
+          // Map error code to user-friendly message
+          const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          const errorMessage = getTokenErrorMessage(errorCode)
+          setDianTokenError(errorMessage)
+          setValidationPhase('error')
+        }
+      } catch {
+        // Network error - show friendly message
+        setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+        setValidationPhase('error')
+      }
+    }, 800)
+  }, [])
+
+  // Handler for token input with instant validation
+  const handleDianTokenChange = (value: string) => {
+    setDianToken(value)
+
+    // Reset validation state
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
+
+    // Instant validation: check entity match (for juridica by rk suffix)
+    if (selectedEntity && value.trim()) {
+      const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
+      setDianTokenError(error)
+
+      // If entity match is OK, trigger server validation with entity_id
+      if (!error) {
+        validateTokenWithServer(value, selectedEntity.id)
+      }
+    } else if (value.trim() && value.includes('catalogo-vpfe.dian.gov.co')) {
+      // No entity selected but valid-looking token pasted - prompt to select entity first
+      setDianTokenError('Selecciona una entidad primero')
+      setValidationPhase('error')
+      // Shake the entity selector to draw attention
+      setEntitySelectorShake(true)
+      setTimeout(() => setEntitySelectorShake(false), 600)
+    } else {
+      setDianTokenError(null)
+    }
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current)
+      }
+      if (autoTokenPollingRef.current) {
+        clearTimeout(autoTokenPollingRef.current)
+      }
+    }
+  }, [])
+
+  // Auto-token polling effect
+  useEffect(() => {
+    if (!autoTokenRequestId || autoTokenStatus === 'received' || autoTokenStatus === 'failed' || autoTokenStatus === 'timeout') {
+      return
+    }
+
+    const pollStatus = async () => {
+      try {
+        const result = await apiClient.getAutoTokenStatus(autoTokenRequestId)
+
+        if (!result.success) {
+          setAutoTokenStatus('failed')
+          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          setAutoTokenError(getTokenErrorMessage(errCode))
+          return
+        }
+
+        const status = result.status as AutoTokenStatus
+        setAutoTokenStatus(status)
+
+        if (status === 'received') {
+          // Token received! Clear polling and show success
+          setAutoTokenError(null)
+          // Refresh job options to get new token status
+          // The token is already saved to entity by backend
+        } else if (status === 'failed' || status === 'timeout') {
+          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+          setAutoTokenError(getTokenErrorMessage(errCode))
+        } else {
+          // Still pending/polling - continue polling
+          autoTokenPollingRef.current = setTimeout(pollStatus, 3000)
+        }
+      } catch {
+        // Network error - retry
+        autoTokenPollingRef.current = setTimeout(pollStatus, 5000)
+      }
+    }
+
+    // Start polling
+    autoTokenPollingRef.current = setTimeout(pollStatus, 1000)
+
+    return () => {
+      if (autoTokenPollingRef.current) {
+        clearTimeout(autoTokenPollingRef.current)
+      }
+    }
+  }, [autoTokenRequestId, autoTokenStatus])
+
+  // Check for active auto-token request when entity is selected
+  useEffect(() => {
+    if (!selectedEntity?.id) return
+
+    const checkActiveRequest = async () => {
+      try {
+        const result = await apiClient.getActiveAutoTokenRequest(selectedEntity.id)
+        if (result.has_active_request && typeof result.request_id === 'string') {
+          // Restore active request state
+          setAutoTokenRequestId(result.request_id)
+          const status = typeof result.status === 'string' ? result.status as AutoTokenStatus : 'pending'
+          setAutoTokenStatus(status)
+          const requestedAt = typeof result.requested_at === 'string' ? result.requested_at : null
+          setAutoTokenStartedAt(requestedAt ? new Date(requestedAt) : null)
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    checkActiveRequest()
+  }, [selectedEntity?.id])
+
+  // Request auto-token handler
+  const handleRequestAutoToken = async () => {
+    if (!selectedEntity?.id) return
+
+    // Reset previous state
+    setAutoTokenError(null)
+    setAutoTokenStatus('pending')
+    setAutoTokenStartedAt(new Date())
+
+    try {
+      const result = await apiClient.requestAutoToken(selectedEntity.id)
+
+      if (!result.success) {
+        setAutoTokenStatus('failed')
+        const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
+        setAutoTokenError(getTokenErrorMessage(errCode))
+
+        // Show retry timer if cooldown
+        if (errCode === 'COOLDOWN_ACTIVE' && result.retry_after_seconds) {
+          setAutoTokenError(`Debes esperar ${result.retry_after_seconds} segundos`)
+        }
+        return
+      }
+
+      const requestId = typeof result.request_id === 'string' ? result.request_id : null
+      setAutoTokenRequestId(requestId)
+      setAutoTokenStatus('pending')
+    } catch {
+      setAutoTokenStatus('failed')
+      setAutoTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+    }
+  }
+
+  // Get elapsed time message for auto-token
+  const getAutoTokenElapsedMessage = (): string => {
+    if (!autoTokenStartedAt) return ''
+    const elapsed = Math.floor((Date.now() - autoTokenStartedAt.getTime()) / 1000)
+
+    if (elapsed < 10) return 'Solicitando token DIAN...'
+    if (elapsed < 30) return 'Esperando respuesta de DIAN...'
+    if (elapsed < 60) return 'Tomando mas tiempo del esperado...'
+    if (elapsed < 120) return 'DIAN esta tardando en responder...'
+    return 'Esto esta tomando demasiado tiempo...'
+  }
 
   // Job config
   const [jobName, setJobName] = useState('')
@@ -145,14 +491,9 @@ function NewJobContent() {
   useEffect(() => {
     if (!jobOptions) return
 
-    if (jobOptions.recommended_option === 'auto' && jobOptions.auto_management.available) {
-      setUseAutoToken(true)
-      setUseNewToken(false)
-    } else if (jobOptions.recommended_option === 'saved' && jobOptions.saved_token.available) {
-      setUseAutoToken(false)
+    if (jobOptions.recommended_option === 'saved' && jobOptions.saved_token.available) {
       setUseNewToken(false)
     } else {
-      setUseAutoToken(false)
       setUseNewToken(true)
     }
   }, [jobOptions])
@@ -177,9 +518,24 @@ function NewJobContent() {
     setSelectedEntity(entity)
     setEntitySearchOpen(false)
     // Reset token states
-    setUseAutoToken(false)
     setUseNewToken(false)
     setDianToken('')
+    setDianTokenError(null)
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
+    // Reset auto-token states
+    setAutoTokenRequestId(null)
+    setAutoTokenStatus('idle')
+    setAutoTokenError(null)
+    setAutoTokenStartedAt(null)
+    // Clear timeouts
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
+    if (autoTokenPollingRef.current) {
+      clearTimeout(autoTokenPollingRef.current)
+    }
   }
 
   const handleSubmit = async () => {
@@ -217,17 +573,78 @@ function NewJobContent() {
     }
 
     // Token validation based on mode
+    // Auto-token received counts as having a valid saved token
+    const hasAutoTokenReceived = autoTokenStatus === 'received'
+
     if (isDevJob) {
       if (!devCacheStatus?.available) {
         toast.error('El cache de raw Excel no esta disponible')
         return
       }
-    } else if (!useAutoToken && !jobOptions?.saved_token.available && !dianToken.trim()) {
-      toast.error('Ingresa el token DIAN')
+    } else if (!hasAutoTokenReceived && !jobOptions?.saved_token.available && !dianToken.trim()) {
+      toast.error('Ingresa el token DIAN o solicita uno automatico')
       return
-    } else if (!useAutoToken && jobOptions?.saved_token.available && useNewToken && !dianToken.trim()) {
+    } else if (!hasAutoTokenReceived && jobOptions?.saved_token.available && useNewToken && !dianToken.trim()) {
       toast.error('Ingresa el nuevo token DIAN')
       return
+    }
+
+    // Validate token matches selected entity (instant check using identifier_suffix)
+    // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev)
+    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob) {
+      const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
+      if (tokenMismatchError) {
+        toast.error(tokenMismatchError)
+        return
+      }
+    }
+
+    // For manual token: check if validated and if validation is still fresh (< 5 min)
+    // Skip this check for: dev jobs, auto-token, or using saved token
+    const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
+
+    if (isUsingManualToken && selectedEntity) {
+      // Check if token was validated
+      if (!tokenValidatedAt || validationPhase !== 'success' && validationPhase !== 'success_sparkle') {
+        // Token not validated - focus input and show error
+        toast.error('El token DIAN no ha sido validado')
+        dianTokenInputRef.current?.focus()
+        return
+      }
+
+      // Check if validation is stale (> 5 min)
+      const validationAge = Date.now() - tokenValidatedAt.getTime()
+      if (validationAge > TOKEN_VALIDATION_MAX_AGE_MS) {
+        // Validation is stale - revalidate before creating job
+        toast.info('Revalidando token DIAN...')
+        setValidationPhase('validating')
+
+        try {
+          const result = await apiClient.quickValidateDianToken(dianToken, selectedEntity.id)
+
+          if (result.valid) {
+            setTokenValidatedAt(new Date())
+            setValidationPhase('success')
+            // Continue with job creation (don't return)
+          } else {
+            // Token is now invalid
+            const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
+            const errorMessage = getTokenErrorMessage(errorCode)
+            setDianTokenError(errorMessage)
+            setValidationPhase('error')
+            setTokenValidatedAt(null)
+            toast.error(errorMessage)
+            dianTokenInputRef.current?.focus()
+            return
+          }
+        } catch {
+          setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+          setValidationPhase('error')
+          toast.error('Error validando token DIAN')
+          dianTokenInputRef.current?.focus()
+          return
+        }
+      }
     }
 
     if (selectedSheetTypes.length === 0) {
@@ -247,12 +664,14 @@ function NewJobContent() {
     }
 
     // Determine token to send
-    let tokenToSend = dianToken
+    // Since we now validate and save tokens BEFORE job creation,
+    // we always use 'use_stored_token' - the token is already in DB
+    let tokenToSend: string
     if (isDevJob) {
       tokenToSend = ''
-    } else if (useAutoToken) {
-      tokenToSend = 'use_auto_token'
-    } else if (!dianToken.trim()) {
+    } else {
+      // Token was validated and saved during input validation
+      // Auto-token, saved token, or manually entered token - all stored in DB
       tokenToSend = 'use_stored_token'
     }
 
@@ -283,6 +702,10 @@ function NewJobContent() {
   const resetForm = () => {
     setStep('form')
     setDianToken('')
+    setDianTokenError(null)
+    setValidationPhase('idle')
+    setRepresentativeUpdated(false)
+    setTokenValidatedAt(null)
     setJobName('')
     setStartDate('')
     setEndDate('')
@@ -294,14 +717,25 @@ function NewJobContent() {
     setUseTotalConsolidation(true)
     setSelectedEntity(null)
     setUseNewToken(false)
-    setUseAutoToken(false)
     setCreatedJobId(null)
     setIsDevJob(false)
+    // Reset auto-token states
+    setAutoTokenRequestId(null)
+    setAutoTokenStatus('idle')
+    setAutoTokenError(null)
+    setAutoTokenStartedAt(null)
+    // Clear timeouts
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
+    if (autoTokenPollingRef.current) {
+      clearTimeout(autoTokenPollingRef.current)
+    }
   }
 
   // Derived states from job options
   const autoTokenAvailable = jobOptions?.auto_management.available || false
-  const autoTokenStatus = jobOptions?.auto_management.status || 'not_configured'
+  const autoTokenOAuthStatus = jobOptions?.auto_management.status || 'not_configured'
   const dianEmailMasked = jobOptions?.auto_management.dian_email_masked
   const savedTokenAvailable = jobOptions?.saved_token.available || false
   const tokenMasked = jobOptions?.saved_token.token_masked
@@ -368,7 +802,7 @@ function NewJobContent() {
                   variant="outline"
                   role="combobox"
                   aria-expanded={entitySearchOpen}
-                  className="w-full justify-between"
+                  className={`w-full justify-between ${entitySelectorShake ? 'animate-shake ring-2 ring-red-500' : ''}`}
                   disabled={loadingEntities}
                 >
                   {loadingEntities ? (
@@ -449,7 +883,7 @@ function NewJobContent() {
           </div>
 
           {/* OAuth expired/pending alerts */}
-          {selectedEntity && autoTokenStatus === 'oauth_expired' && (
+          {selectedEntity && autoTokenOAuthStatus === 'oauth_expired' && (
             <Alert className="border-red-600/70 bg-red-50">
               <XCircle className="h-5 w-5 text-red-600" />
               <AlertDescription className="ml-2">
@@ -469,7 +903,7 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {selectedEntity && autoTokenStatus === 'oauth_pending' && (
+          {selectedEntity && autoTokenOAuthStatus === 'oauth_pending' && (
             <Alert className="border-yellow-600/70 bg-yellow-50">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <AlertDescription className="ml-2">
@@ -489,143 +923,210 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Token DIAN section */}
-          {selectedEntity && (
-            <div className="space-y-4">
-              {/* Loading state */}
-              {loadingJobOptions && (
-                <Alert>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <AlertDescription className="ml-2">
-                    Verificando estado del token...
-                  </AlertDescription>
-                </Alert>
-              )}
+          {/* Token DIAN section - Clean unified design */}
+          <div className="space-y-2">
+            <Label htmlFor="dian-token">Token DIAN *</Label>
 
-              {/* Auto-token available */}
-              {!loadingJobOptions && autoTokenAvailable && (
-                <div className="border rounded-lg p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <Zap className="h-4 w-4 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-green-900">Gestion automatica disponible</h4>
-                          <p className="text-sm text-green-700 mt-0.5">
-                            AutoKufe puede solicitar tokens DIAN automaticamente
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3 ml-4">
-                          <Label htmlFor="use-auto-token" className="text-sm font-medium text-green-900 cursor-pointer">
-                            {useAutoToken ? 'Activado' : 'Usar automatico'}
-                          </Label>
+            {/* Auto-token request UI (when auto-token is being requested) */}
+            {(autoTokenStatus === 'pending' || autoTokenStatus === 'polling') && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-700">
+                      {getAutoTokenElapsedMessage()}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      El token llegara automaticamente cuando DIAN responda
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-token received success */}
+            {autoTokenStatus === 'received' && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-700">
+                      Token DIAN recibido!
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      El token ha sido guardado y esta listo para usar
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-token failed/timeout */}
+            {(autoTokenStatus === 'failed' || autoTokenStatus === 'timeout') && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-700">
+                      {autoTokenError || 'No se pudo obtener el token'}
+                    </p>
+                    <p className="text-xs text-red-600 mt-0.5">
+                      Puedes intentar de nuevo o pegar un token manualmente
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRequestAutoToken}
+                    className="border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    Reintentar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Normal token input (when not requesting auto-token) */}
+            {autoTokenStatus === 'idle' && (
+              <>
+                <div className="relative">
+                  <Input
+                    ref={dianTokenInputRef}
+                    id="dian-token"
+                    placeholder={
+                      loadingJobOptions
+                        ? 'Verificando opciones...'
+                        : !useNewToken && savedTokenAvailable
+                        ? `Usando token guardado (${tokenMasked || '****'})`
+                        : 'https://catalogo-vpfe.dian.gov.co/...'
+                    }
+                    value={dianToken}
+                    onChange={(e) => {
+                      handleDianTokenChange(e.target.value)
+                      // If user starts typing, disable stored token
+                      if (e.target.value.trim()) {
+                        if (!useNewToken && savedTokenAvailable) setUseNewToken(true)
+                      }
+                    }}
+                    disabled={loadingJobOptions || (!useNewToken && savedTokenAvailable)}
+                    className={`font-mono text-sm pr-10 ${
+                      dianTokenError || validationPhase === 'error'
+                        ? 'border-red-500 focus-visible:ring-red-500'
+                        : validationPhase === 'success' || validationPhase === 'success_sparkle' || (!useNewToken && savedTokenAvailable)
+                        ? 'border-green-500 focus-visible:ring-green-500'
+                        : ''
+                    } ${(!useNewToken && savedTokenAvailable) ? 'bg-green-50/50' : ''} ${validationPhase === 'success_sparkle' ? 'bg-amber-50/50' : ''}`}
+                  />
+                  {/* Status indicator inside input */}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {loadingJobOptions ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : !useNewToken && savedTokenAvailable ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : dianToken.trim() ? (
+                      validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : validationPhase === 'success_sparkle' ? (
+                        <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                      ) : validationPhase === 'success' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : validationPhase === 'error' || dianTokenError ? (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      ) : null
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Status message and options row */}
+                <div className="flex items-center justify-between">
+                  {/* Left: Status message */}
+                  <div className="flex-1">
+                    {loadingJobOptions ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Verificando opciones disponibles...
+                      </p>
+                    ) : dianTokenError ? (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <XCircle className="h-3 w-3" />
+                        {dianTokenError}
+                      </p>
+                    ) : !useNewToken && savedTokenAvailable ? (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Token guardado listo para usar
+                      </p>
+                    ) : validationPhase === 'success_sparkle' ? (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 animate-pulse" />
+                        Representante legal actualizado
+                      </p>
+                    ) : validationPhase === 'success' ? (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Token DIAN valido
+                      </p>
+                    ) : validationPhase === 'validating' ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Validando...
+                      </p>
+                    ) : validationPhase === 'verifying' ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Verificando con DIAN...
+                      </p>
+                    ) : validationPhase === 'updating' ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Actualizando datos...
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedEntity ? 'Pega la URL del token DIAN o solicita uno automatico' : 'Pega la URL completa del token DIAN'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right: Options */}
+                  {selectedEntity && !loadingJobOptions && (
+                    <div className="flex items-center gap-3 ml-4">
+                      {savedTokenAvailable && (
+                        <label className="flex items-center gap-1.5 cursor-pointer">
                           <Checkbox
-                            id="use-auto-token"
-                            checked={useAutoToken}
+                            checked={!useNewToken}
                             onCheckedChange={(checked) => {
-                              setUseAutoToken(checked as boolean)
                               if (checked) {
                                 setUseNewToken(false)
                                 setDianToken('')
+                                setDianTokenError(null)
+                                setValidationPhase('idle')
+                              } else {
+                                setUseNewToken(true)
                               }
                             }}
-                            className="h-5 w-5 data-[state=checked]:bg-green-600"
+                            className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
                           />
-                        </div>
-                      </div>
-                      {useAutoToken && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-green-200">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-900">
-                            Token DIAN se solicitara automaticamente
-                          </span>
-                        </div>
+                          <span className="text-xs text-muted-foreground">Guardado</span>
+                        </label>
+                      )}
+                      {autoTokenAvailable && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRequestAutoToken}
+                          className="h-7 px-2 text-xs"
+                        >
+                          <Zap className="h-3 w-3 mr-1" />
+                          Solicitar
+                        </Button>
                       )}
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual token (when not using auto-token) */}
-              {!loadingJobOptions && !useAutoToken && (
-                <div className="space-y-3">
-                  {/* Saved token available */}
-                  {savedTokenAvailable && (
-                    <Card className="border-green-200 bg-green-50/50">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 shrink-0">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <div>
-                              <p className="text-sm font-medium text-green-900">Token DIAN guardado disponible</p>
-                              <p className="text-xs text-green-700 font-mono mt-1">{tokenMasked || '****'}</p>
-                            </div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <Checkbox
-                                id="use-new-token"
-                                checked={useNewToken}
-                                onCheckedChange={(checked) => {
-                                  setUseNewToken(checked as boolean)
-                                  if (checked) setDianToken('')
-                                }}
-                              />
-                              <Label htmlFor="use-new-token" className="text-xs text-green-800 cursor-pointer">
-                                Solicitar nuevo token en su lugar
-                              </Label>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* New token input */}
-                  {(!savedTokenAvailable || useNewToken) && (
-                    <div className="space-y-2">
-                      <Label htmlFor="dian-token">Token DIAN *</Label>
-                      <Input
-                        id="dian-token"
-                        placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                        value={dianToken}
-                        onChange={(e) => {
-                          setDianToken(e.target.value)
-                          if (e.target.value.trim() && useAutoToken) {
-                            setUseAutoToken(false)
-                          }
-                        }}
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Pega la URL completa del token que obtuviste de la DIAN
-                      </p>
-                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {!selectedEntity && (
-            <div className="space-y-2">
-              <Label htmlFor="dian-token">Token DIAN *</Label>
-              <Input
-                id="dian-token"
-                placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                value={dianToken}
-                onChange={(e) => setDianToken(e.target.value)}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Pega la URL completa del token que obtuviste del portal DIAN
-              </p>
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
           {/* Job Name */}
           <div className="space-y-2">
@@ -772,7 +1273,8 @@ function NewJobContent() {
                           id="select-all-categories"
                           checked={selectedSheetTypes.length === 3}
                           onCheckedChange={(checked) => {
-                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : [])
+                            // Always keep at least one category selected
+                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
                           }}
                         />
                         <Label htmlFor="select-all-categories" className="font-medium cursor-pointer">
@@ -794,7 +1296,12 @@ function NewJobContent() {
                           <Checkbox
                             id={`category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
+                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
                             onCheckedChange={(checked) => {
+                              if (!checked && selectedSheetTypes.length === 1) {
+                                // Don't allow unchecking the last category
+                                return
+                              }
                               setSelectedSheetTypes(
                                 checked
                                   ? [...selectedSheetTypes, type.value]
@@ -824,9 +1331,11 @@ function NewJobContent() {
                   onCheckedChange={(checked) => {
                     setIsDevJob(checked as boolean)
                     if (checked) {
-                      setUseAutoToken(false)
                       setUseNewToken(false)
                       setDianToken('')
+                      // Reset auto-token if in progress
+                      setAutoTokenRequestId(null)
+                      setAutoTokenStatus('idle')
                     }
                   }}
                   className="h-5 w-5 data-[state=checked]:bg-yellow-600"
@@ -947,8 +1456,15 @@ function NewJobContent() {
                 !startDate ||
                 !endDate ||
                 (isDevJob && !devCacheStatus?.available) ||
-                (!isDevJob && !useAutoToken && !savedTokenAvailable && !dianToken.trim()) ||
-                (!isDevJob && !useAutoToken && savedTokenAvailable && useNewToken && !dianToken.trim())
+                // Auto-token in progress - wait for it to complete
+                (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
+                // No token available: need either auto-token received, saved token, or manual token
+                (!isDevJob && autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
+                (!isDevJob && autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
+                // Manual token validation in progress
+                (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
+                // Manual token has validation error
+                (!!dianToken.trim() && validationPhase === 'error')
               }
               className="flex-1"
               size="lg"
