@@ -302,7 +302,7 @@ export function useJob(jobId: string | undefined) {
       }
 
       const job: Job = {
-        id: jobData.job_id,
+        id: jobData.job_id || jobData.id || '',
         job_name: jobData.job_name,
         status: jobData.status,
         entity_id: jobData.entity_id,
