@@ -78,6 +78,7 @@ interface JobsListResponse {
 interface JobDetailResponse {
   job_data: {
     job_id: string
+    id?: string
     job_name: string
     status: string
     entity_id?: string
