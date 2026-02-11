@@ -43,6 +43,10 @@ export interface EntitySelectorItem {
   id: string
   display_name: string
   identifier_suffix: string
+  is_pseudo?: boolean
+  pseudo_date_range?: { start: string; end: string }
+  pseudo_categories?: string[]
+  pseudo_doc_count?: number
 }
 
 interface EntitiesResponse {

@@ -155,9 +155,12 @@ function NewJobContent() {
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
   const [entitySelectorShake, setEntitySelectorShake] = useState(false)
 
-  // Job creation options (fetched when entity is selected)
+  // Pseudo entity detection
+  const isPseudoEntity = selectedEntity?.is_pseudo === true
+
+  // Job creation options (fetched when entity is selected, skip for pseudo entities)
   const { data: jobOptions, isLoading: loadingJobOptions } = useEntityJobCreationOptions(
-    selectedEntity?.id
+    isPseudoEntity ? undefined : selectedEntity?.id
   )
 
   // Dev job mode state
@@ -529,12 +532,27 @@ function NewJobContent() {
     setAutoTokenStatus('idle')
     setAutoTokenError(null)
     setAutoTokenStartedAt(null)
+    // Reset dev job mode
+    setIsDevJob(false)
     // Clear timeouts
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current)
     }
     if (autoTokenPollingRef.current) {
       clearTimeout(autoTokenPollingRef.current)
+    }
+
+    // Pre-fill dates and categories for pseudo entities
+    if (entity.is_pseudo && entity.pseudo_date_range) {
+      const dr = entity.pseudo_date_range
+      setStartDate(dr.start)
+      setEndDate(dr.end)
+      // Set month inputs for display
+      if (dr.start) setStartMonth(dr.start.slice(0, 7))
+      if (dr.end) setEndMonth(dr.end.slice(0, 7))
+    }
+    if (entity.is_pseudo && entity.pseudo_categories) {
+      setSelectedSheetTypes(entity.pseudo_categories)
     }
   }
 
@@ -576,7 +594,9 @@ function NewJobContent() {
     // Auto-token received counts as having a valid saved token
     const hasAutoTokenReceived = autoTokenStatus === 'received'
 
-    if (isDevJob) {
+    if (isPseudoEntity) {
+      // Pseudo jobs don't need token validation
+    } else if (isDevJob) {
       if (!devCacheStatus?.available) {
         toast.error('El cache de raw Excel no esta disponible')
         return
@@ -590,8 +610,8 @@ function NewJobContent() {
     }
 
     // Validate token matches selected entity (instant check using identifier_suffix)
-    // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev)
-    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob) {
+    // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev, not pseudo)
+    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob && !isPseudoEntity) {
       const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
       if (tokenMismatchError) {
         toast.error(tokenMismatchError)
@@ -600,8 +620,8 @@ function NewJobContent() {
     }
 
     // For manual token: check if validated and if validation is still fresh (< 5 min)
-    // Skip this check for: dev jobs, auto-token, or using saved token
-    const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
+    // Skip this check for: dev jobs, auto-token, pseudo jobs, or using saved token
+    const isUsingManualToken = !isDevJob && !isPseudoEntity && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
 
     if (isUsingManualToken && selectedEntity) {
       // Check if token was validated
@@ -667,7 +687,7 @@ function NewJobContent() {
     // Since we now validate and save tokens BEFORE job creation,
     // we always use 'use_stored_token' - the token is already in DB
     let tokenToSend: string
-    if (isDevJob) {
+    if (isDevJob || isPseudoEntity) {
       tokenToSend = ''
     } else {
       // Token was validated and saved during input validation
@@ -679,7 +699,8 @@ function NewJobContent() {
       const result = await createJobMutation.mutateAsync({
         dianToken: tokenToSend,
         jobData: {
-          entity_id: selectedEntity?.id,
+          entity_id: isPseudoEntity ? undefined : selectedEntity?.id,
+          pseudo_entity_id: isPseudoEntity ? selectedEntity?.id : undefined,
           job_name: jobName.trim() || undefined,
           date_range: {
             start_date: startDate,
@@ -688,7 +709,8 @@ function NewJobContent() {
           document_categories: selectedSheetTypes,
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
-        }
+        },
+        isPseudoJob: isPseudoEntity,
       })
 
       setCreatedJobId(result.job_id || null)
@@ -882,8 +904,32 @@ function NewJobContent() {
             </div>
           </div>
 
+          {/* Pseudo entity info banner */}
+          {isPseudoEntity && selectedEntity && (
+            <Alert className="border-purple-300 bg-purple-50">
+              <FlaskConical className="h-5 w-5 text-purple-600" />
+              <AlertDescription className="ml-2">
+                <div className="space-y-1">
+                  <p className="text-base font-semibold text-purple-700">Pseudo Job (datos pseudonimizados)</p>
+                  <p className="text-sm text-purple-600">
+                    Este job usa datos de produccion pseudonimizados. No requiere token DIAN.
+                  </p>
+                  <div className="flex gap-4 mt-2 text-xs text-purple-600">
+                    <span>Documentos: <strong>{selectedEntity.pseudo_doc_count || 0}</strong></span>
+                    {selectedEntity.pseudo_date_range && (
+                      <span>Rango: <strong>{selectedEntity.pseudo_date_range.start}</strong> a <strong>{selectedEntity.pseudo_date_range.end}</strong></span>
+                    )}
+                    {selectedEntity.pseudo_categories && (
+                      <span>Categorias: <strong>{selectedEntity.pseudo_categories.join(', ')}</strong></span>
+                    )}
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* OAuth expired/pending alerts */}
-          {selectedEntity && autoTokenOAuthStatus === 'oauth_expired' && (
+          {selectedEntity && !isPseudoEntity && autoTokenOAuthStatus === 'oauth_expired' && (
             <Alert className="border-red-600/70 bg-red-50">
               <XCircle className="h-5 w-5 text-red-600" />
               <AlertDescription className="ml-2">
@@ -903,7 +949,7 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {selectedEntity && autoTokenOAuthStatus === 'oauth_pending' && (
+          {selectedEntity && !isPseudoEntity && autoTokenOAuthStatus === 'oauth_pending' && (
             <Alert className="border-yellow-600/70 bg-yellow-50">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <AlertDescription className="ml-2">
@@ -923,8 +969,8 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Token DIAN section - Clean unified design */}
-          <div className="space-y-2">
+          {/* Token DIAN section - Hidden for pseudo entities */}
+          {!isPseudoEntity && <div className="space-y-2">
             <Label htmlFor="dian-token">Token DIAN *</Label>
 
             {/* Auto-token request UI (when auto-token is being requested) */}
@@ -1126,7 +1172,7 @@ function NewJobContent() {
                 </div>
               </>
             )}
-          </div>
+          </div>}
 
           {/* Job Name */}
           <div className="space-y-2">
@@ -1152,6 +1198,7 @@ function NewJobContent() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Rango de Fechas *</Label>
+              {!isPseudoEntity && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Por:</span>
                 <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
@@ -1175,9 +1222,18 @@ function NewJobContent() {
                   </Button>
                 </div>
               </div>
+              )}
             </div>
 
-            {dateSelectionMode === 'months' ? (
+            {/* Pseudo entity: fixed date range display */}
+            {isPseudoEntity && startDate && endDate && (
+              <div className="text-sm text-muted-foreground bg-purple-50 border border-purple-200 rounded-md p-3">
+                <span className="font-medium">Rango fijo: </span>
+                {startDate} al {endDate}
+              </div>
+            )}
+
+            {!isPseudoEntity && (dateSelectionMode === 'months' ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1257,7 +1313,7 @@ function NewJobContent() {
                   />
                 </div>
               </div>
-            )}
+            ))}
           </div>
 
           {/* Document Categories */}
@@ -1272,6 +1328,7 @@ function NewJobContent() {
                         <Checkbox
                           id="select-all-categories"
                           checked={selectedSheetTypes.length === 3}
+                          disabled={isPseudoEntity}
                           onCheckedChange={(checked) => {
                             // Always keep at least one category selected
                             setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
@@ -1296,7 +1353,7 @@ function NewJobContent() {
                           <Checkbox
                             id={`category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
-                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
+                            disabled={isPseudoEntity || (selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value))}
                             onCheckedChange={(checked) => {
                               if (!checked && selectedSheetTypes.length === 1) {
                                 // Don't allow unchecking the last category
@@ -1321,8 +1378,8 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Dev Mode (staging only + dev role) */}
-          {isStaging && hasDevRole && (
+          {/* Dev Mode (staging only + dev role, not for pseudo entities) */}
+          {isStaging && hasDevRole && !isPseudoEntity && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -1456,15 +1513,19 @@ function NewJobContent() {
                 !startDate ||
                 !endDate ||
                 (isDevJob && !devCacheStatus?.available) ||
-                // Auto-token in progress - wait for it to complete
-                (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
-                // No token available: need either auto-token received, saved token, or manual token
-                (!isDevJob && autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
-                (!isDevJob && autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
-                // Manual token validation in progress
-                (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
-                // Manual token has validation error
-                (!!dianToken.trim() && validationPhase === 'error')
+                // Pseudo entities: only need entity + dates (already pre-filled)
+                // Non-pseudo, non-dev: need token
+                (!isPseudoEntity && !isDevJob && (
+                  // Auto-token in progress - wait for it to complete
+                  (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
+                  // No token available: need either auto-token received, saved token, or manual token
+                  (autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
+                  (autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
+                  // Manual token validation in progress
+                  (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
+                  // Manual token has validation error
+                  (!!dianToken.trim() && validationPhase === 'error')
+                ))
               }
               className="flex-1"
               size="lg"
