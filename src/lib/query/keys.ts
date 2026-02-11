@@ -24,6 +24,13 @@ export const queryKeys = {
       [...queryKeys.entities.detail(id), 'job-creation-options'] as const,
   },
 
+  // Pseudo bundles (per-entity, separate from entities cache)
+  pseudoBundles: {
+    all: ['pseudo-bundles'] as const,
+    list: (entityId: string) =>
+      [...queryKeys.pseudoBundles.all, 'list', entityId] as const,
+  },
+
   // Jobs
   jobs: {
     all: ['jobs'] as const,

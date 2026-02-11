@@ -323,7 +323,7 @@ export class ApiClient {
     dianToken: string,
     jobData: {
       entity_id?: string
-      pseudo_entity_id?: string
+      pseudo_bundle_id?: string
       job_name?: string
       date_range: { start_date: string; end_date: string }
       document_categories: string[]
@@ -338,6 +338,13 @@ export class ApiClient {
       is_dev_job: jobData.is_dev_job,  // Pass at top level for Backend
       is_pseudo_job: isPseudoJob,  // Pass at top level for Backend
     })
+  }
+
+  /**
+   * Get pseudo bundles for a pseudo entity (staging only)
+   */
+  async getPseudoBundles(entityId: string) {
+    return this.request('GET', `/pseudo/entities/${entityId}/bundles`)
   }
 
   /**

@@ -8,7 +8,7 @@ interface CreateJobData {
   dianToken: string
   jobData: {
     entity_id?: string
-    pseudo_entity_id?: string
+    pseudo_bundle_id?: string
     job_name?: string
     date_range: { start_date: string; end_date: string }
     document_categories: string[]
