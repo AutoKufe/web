@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -30,10 +31,13 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Loader2
+  Loader2,
+  KeyRound,
+  Send,
+  Layers,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useJobsWithPolling, useEntityFromList, type Job } from '@/lib/query'
+import { useJobsWithPolling, useEntityFromList, useProvideToken, type Job } from '@/lib/query'
 import { JobTableSkeleton } from '@/components/skeletons'
 
 // Error code translations and actions
@@ -89,6 +93,57 @@ const formatDateOnly = (dateString: string): string => {
   return date.toLocaleDateString()
 }
 
+// Inline token input for waiting_token jobs
+function TokenInput({ job }: { job: Job }) {
+  const [tokenUrl, setTokenUrl] = useState('')
+  const provideTokenMutation = useProvideToken()
+
+  const handleSubmit = () => {
+    if (!tokenUrl.trim()) return
+
+    provideTokenMutation.mutate(
+      { jobId: job.id, tokenUrl: tokenUrl.trim() },
+      {
+        onSuccess: () => {
+          toast.success('Token guardado. Job en cola de procesamiento.')
+          setTokenUrl('')
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Error al proporcionar token')
+        },
+      }
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 ml-6">
+      <KeyRound className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+      <Input
+        placeholder="Pega la URL del token DIAN..."
+        value={tokenUrl}
+        onChange={(e) => setTokenUrl(e.target.value)}
+        className="h-7 text-xs flex-1 max-w-[400px]"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSubmit()
+        }}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs px-2"
+        onClick={handleSubmit}
+        disabled={!tokenUrl.trim() || provideTokenMutation.isPending}
+      >
+        {provideTokenMutation.isPending ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Send className="h-3 w-3" />
+        )}
+      </Button>
+    </div>
+  )
+}
+
 // Job row component that handles entity lookup
 function JobRow({ job }: { job: Job }) {
   const [downloading, setDownloading] = useState(false)
@@ -107,7 +162,10 @@ function JobRow({ job }: { job: Job }) {
       case 'processing':
         return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
       case 'pending':
+      case 'queued':
         return <Clock className="h-4 w-4 text-yellow-500" />
+      case 'waiting_token':
+        return <KeyRound className="h-4 w-4 text-amber-500" />
       case 'failed':
       case 'creation_failed':
         return <XCircle className="h-4 w-4 text-red-500" />
@@ -121,6 +179,8 @@ function JobRow({ job }: { job: Job }) {
       completed: { variant: 'default', label: 'Completado' },
       processing: { variant: 'secondary', label: 'Procesando' },
       pending: { variant: 'outline', label: 'Pendiente' },
+      queued: { variant: 'outline', label: 'En cola' },
+      waiting_token: { variant: 'outline', label: 'Esperando token' },
       failed: { variant: 'destructive', label: 'Fallido' },
       creation_failed: { variant: 'destructive', label: 'Error en creacion' },
     }
@@ -170,6 +230,9 @@ function JobRow({ job }: { job: Job }) {
             {getStatusIcon(job.status)}
             <span className="font-medium">{job.job_name}</span>
           </div>
+          {job.status === 'waiting_token' && (
+            <TokenInput job={job} />
+          )}
           {job.status === 'creation_failed' && job.error_code && (
             <div className="ml-6 mt-1">
               <p className="text-xs text-red-600">
@@ -267,6 +330,12 @@ export default function JobsPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
+          <Link href="/trabajos/nuevo?mode=batch">
+            <Button variant="outline" className="gap-2">
+              <Layers className="h-4 w-4" />
+              Modo Lote
+            </Button>
+          </Link>
           <Link href="/trabajos/nuevo">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />

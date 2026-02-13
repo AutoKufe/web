@@ -94,6 +94,35 @@ export function useMarkJobAsFailed() {
 }
 
 /**
+ * Create batch jobs for multiple entities
+ */
+export function useCreateBatchJobs() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      entity_type_filter: 'natural' | 'juridica' | 'all'
+      start_date: string
+      end_date: string
+      document_categories: string[]
+      consolidation_interval: string | { value: number; unit: string } | null
+    }) => {
+      const response = await apiClient.createBatchJobs(params)
+
+      if (response.error) {
+        throw new Error(response.message || 'Error creating batch jobs')
+      }
+
+      return response.data!
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.usage })
+    },
+  })
+}
+
+/**
  * Provide a new token for a job in waiting_token status
  */
 export function useProvideToken() {

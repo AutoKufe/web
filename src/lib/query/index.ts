@@ -72,6 +72,7 @@ export {
 // Job mutations
 export {
   useCreateJob,
+  useCreateBatchJobs,
   useCancelJob,
   useMarkJobAsFailed,
   useProvideToken,

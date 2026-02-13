@@ -356,6 +356,35 @@ export class ApiClient {
     })
   }
 
+  /**
+   * Create batch jobs for multiple entities at once.
+   * All jobs start in waiting_token status.
+   */
+  async createBatchJobs(params: {
+    entity_type_filter: 'natural' | 'juridica' | 'all'
+    start_date: string
+    end_date: string
+    document_categories: string[]
+    consolidation_interval: string | { value: number; unit: string } | null
+  }) {
+    return this.request<{
+      success: boolean
+      created_count: number
+      failed_count: number
+      created_jobs: Array<{
+        job_id: string
+        entity_id: string
+        entity_name: string
+        status: string
+      }>
+      failed_jobs: Array<{
+        entity_id: string
+        entity_name: string
+        error: string
+      }>
+    }>('POST', '/jobs/create-batch', params)
+  }
+
   async listJobs(page = 1, pageSize = 10) {
     return this.request('GET', '/jobs/list', undefined, {
       page: page.toString(),

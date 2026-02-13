@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles, Layers } from 'lucide-react'
 // FlaskConical kept for dev mode
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
@@ -47,6 +47,7 @@ import {
   useEntityJobCreationOptions,
   useCachedExcelCheck,
   useCreateJob,
+  useCreateBatchJobs,
   type EntitySelectorItem,
 } from '@/lib/query'
 import { apiClient } from '@/lib/api/client'
@@ -1495,6 +1496,263 @@ function NewJobContent() {
   )
 }
 
+// ============================================================================
+// BATCH JOB CREATION
+// ============================================================================
+
+function BatchJobContent() {
+  const router = useRouter()
+  const { data: entitiesData } = useEntitiesSelector()
+
+  const [entityTypeFilter, setEntityTypeFilter] = useState<'all' | 'natural' | 'juridica'>('all')
+  const [dateMode, setDateMode] = useState<'months' | 'days'>('months')
+  const [startMonth, setStartMonth] = useState('')
+  const [endMonth, setEndMonth] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [categories, setCategories] = useState<string[]>(['ingresos', 'egresos'])
+  const [consolidation, setConsolidation] = useState('total')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const batchMutation = useCreateBatchJobs()
+
+  // Count entities matching the filter (approximation from selector data)
+  const entities = entitiesData?.entities || []
+  // EntitySelectorItem doesn't have type, so we show total count
+  // The backend will do the actual filtering
+  const entityCount = entities.length
+
+  const toggleCategory = (cat: string) => {
+    setCategories(prev =>
+      prev.includes(cat)
+        ? prev.filter(c => c !== cat)
+        : [...prev, cat]
+    )
+  }
+
+  const getDateRange = () => {
+    if (dateMode === 'months') {
+      if (!startMonth || !endMonth) return null
+      const start = `${startMonth}-01`
+      const [ey, em] = endMonth.split('-').map(Number)
+      const lastDay = new Date(ey, em, 0).getDate()
+      const end = `${endMonth}-${String(lastDay).padStart(2, '0')}`
+      return { start_date: start, end_date: end }
+    } else {
+      if (!startDate || !endDate) return null
+      return { start_date: startDate, end_date: endDate }
+    }
+  }
+
+  const handleSubmit = async () => {
+    const dateRange = getDateRange()
+    if (!dateRange) {
+      toast.error('Selecciona un rango de fechas')
+      return
+    }
+    if (categories.length === 0) {
+      toast.error('Selecciona al menos una categoria')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const result = await batchMutation.mutateAsync({
+        entity_type_filter: entityTypeFilter,
+        start_date: dateRange.start_date,
+        end_date: dateRange.end_date,
+        document_categories: categories,
+        consolidation_interval: consolidation,
+      })
+
+      toast.success(
+        `${result.created_count} trabajo${result.created_count !== 1 ? 's' : ''} creado${result.created_count !== 1 ? 's' : ''}` +
+        (result.failed_count > 0 ? ` (${result.failed_count} fallido${result.failed_count !== 1 ? 's' : ''})` : '')
+      )
+      router.push('/trabajos')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error creando trabajos en lote')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const typeLabels: Record<string, string> = {
+    all: 'Todas las entidades',
+    natural: 'Solo personas naturales',
+    juridica: 'Solo personas juridicas',
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/trabajos">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">Crear Trabajos en Lote</h1>
+          <p className="text-muted-foreground">
+            Crea trabajos para multiples entidades a la vez
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuracion del Lote</CardTitle>
+          <CardDescription>
+            Todos los trabajos se crearan en estado &quot;Esperando token&quot;.
+            Luego puedes proporcionar el token DIAN individualmente desde la lista de trabajos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Entity Type Filter */}
+          <div className="space-y-2">
+            <Label>Tipo de Entidad</Label>
+            <Select
+              value={entityTypeFilter}
+              onValueChange={(v) => setEntityTypeFilter(v as 'all' | 'natural' | 'juridica')}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las entidades</SelectItem>
+                <SelectItem value="natural">Solo personas naturales</SelectItem>
+                <SelectItem value="juridica">Solo personas juridicas</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {entityCount} entidad{entityCount !== 1 ? 'es' : ''} registrada{entityCount !== 1 ? 's' : ''} en total
+            </p>
+          </div>
+
+          {/* Date Range */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Rango de Fechas</Label>
+              <div className="flex gap-1">
+                <Button
+                  variant={dateMode === 'months' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setDateMode('months')}
+                >
+                  Meses
+                </Button>
+                <Button
+                  variant={dateMode === 'days' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setDateMode('days')}
+                >
+                  Dias
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {dateMode === 'months' ? (
+                <>
+                  <div>
+                    <Label className="text-xs">Desde</Label>
+                    <Input
+                      type="month"
+                      value={startMonth}
+                      onChange={(e) => setStartMonth(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hasta</Label>
+                    <Input
+                      type="month"
+                      value={endMonth}
+                      onChange={(e) => setEndMonth(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label className="text-xs">Desde</Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hasta</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Document Categories */}
+          <div className="space-y-2">
+            <Label>Categorias de Documentos</Label>
+            <div className="flex gap-4">
+              {(['ingresos', 'egresos', 'nominas'] as const).map((cat) => (
+                <label key={cat} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={categories.includes(cat)}
+                    onCheckedChange={() => toggleCategory(cat)}
+                  />
+                  <span className="text-sm capitalize">{cat}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Consolidation */}
+          <div className="space-y-2">
+            <Label>Consolidacion</Label>
+            <Select value={consolidation} onValueChange={setConsolidation}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="total">Total (un solo periodo)</SelectItem>
+                <SelectItem value='{"value":1,"unit":"months"}'>Mensual</SelectItem>
+                <SelectItem value='{"value":1,"unit":"weeks"}'>Semanal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Submit */}
+          <div className="flex justify-end pt-4 border-t">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || categories.length === 0 || !getDateRange()}
+              className="gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creando trabajos...
+                </>
+              ) : (
+                <>
+                  <Layers className="h-4 w-4" />
+                  Crear Trabajos en Lote
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function NewJobPage() {
   return (
     <Suspense fallback={
@@ -1505,7 +1763,18 @@ export default function NewJobPage() {
         </div>
       </div>
     }>
-      <NewJobContent />
+      <NewJobPageInner />
     </Suspense>
   )
+}
+
+function NewJobPageInner() {
+  const searchParams = useSearchParams()
+  const mode = searchParams.get('mode')
+
+  if (mode === 'batch') {
+    return <BatchJobContent />
+  }
+
+  return <NewJobContent />
 }
