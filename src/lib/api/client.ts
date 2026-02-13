@@ -369,6 +369,7 @@ export class ApiClient {
   }) {
     return this.request<{
       success: boolean
+      batch_id: string
       created_count: number
       failed_count: number
       created_jobs: Array<{
@@ -383,6 +384,112 @@ export class ApiClient {
         error: string
       }>
     }>('POST', '/jobs/create-batch', params)
+  }
+
+  // === BATCHES ===
+
+  async listBatches(page = 1, pageSize = 20) {
+    return this.request<{
+      success: boolean
+      batches: Array<{
+        id: string
+        entity_type_filter: string
+        start_date: string
+        end_date: string
+        document_categories: string[]
+        consolidation_interval: string
+        total_jobs: number
+        completed_jobs: number
+        failed_jobs: number
+        processing_jobs: number
+        queued_jobs: number
+        waiting_token_jobs: number
+        created_at: string
+      }>
+      total_count: number
+      per_page: number
+    }>('GET', '/jobs/batches', undefined, {
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    })
+  }
+
+  async getBatchDetail(batchId: string) {
+    return this.request<{
+      success: boolean
+      batch: {
+        id: string
+        entity_type_filter: string
+        start_date: string
+        end_date: string
+        document_categories: string[]
+        consolidation_interval: string
+        total_jobs: number
+        created_at: string
+      }
+      jobs: Array<{
+        id: string
+        job_name: string
+        entity_id: string
+        status: string
+        start_date: string
+        end_date: string
+        total_documents: number
+        processed_documents: number
+        error_message: string | null
+        error_code: string | null
+        created_at: string
+        completed_at: string | null
+        progress_percentage: number
+        stage: string
+      }>
+    }>('GET', `/jobs/batches/${batchId}`)
+  }
+
+  async downloadBatchExcels(batchId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+    try {
+      const headers: HeadersInit = {}
+
+      if (this.accessToken) {
+        headers['Authorization'] = `Bearer ${this.accessToken}`
+      }
+
+      const response = await fetch(`${API_BASE}/jobs/batches/${batchId}/download-all`, {
+        method: 'GET',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return {
+          success: false,
+          error: errorData.detail?.message || errorData.message || 'Error descargando archivos'
+        }
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const contentType = response.headers.get('Content-Type') || ''
+      let filename = contentType.includes('zip') ? `batch_${batchId.slice(0, 8)}.zip` : 'reporte.xlsx'
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '')
+        }
+      }
+
+      return {
+        success: true,
+        blob,
+        filename
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error de red'
+      }
+    }
   }
 
   async listJobs(page = 1, pageSize = 10) {

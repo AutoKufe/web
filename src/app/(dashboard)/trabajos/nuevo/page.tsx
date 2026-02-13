@@ -1563,7 +1563,12 @@ function BatchJobContent() {
         `${result.created_count} trabajo${result.created_count !== 1 ? 's' : ''} creado${result.created_count !== 1 ? 's' : ''}` +
         (result.failed_count > 0 ? ` (${result.failed_count} fallido${result.failed_count !== 1 ? 's' : ''})` : '')
       )
-      router.push('/trabajos')
+      // Navigate to batch detail page
+      if (result.batch_id) {
+        router.push(`/trabajos/batch/${result.batch_id}`)
+      } else {
+        router.push('/trabajos')
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error creando trabajos en lote')
     } finally {

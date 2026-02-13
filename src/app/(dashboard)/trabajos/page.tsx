@@ -34,9 +34,17 @@ import {
   Loader2,
   KeyRound,
   Send,
+  Layers,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useJobsWithPolling, useEntityFromList, useProvideToken, type Job } from '@/lib/query'
+import {
+  useJobsWithPolling,
+  useEntityFromList,
+  useProvideToken,
+  useBatchesWithPolling,
+  type Job,
+  type JobBatch,
+} from '@/lib/query'
 import { JobTableSkeleton } from '@/components/skeletons'
 
 // Error code translations and actions
@@ -92,6 +100,12 @@ const formatDateOnly = (dateString: string): string => {
   return date.toLocaleDateString()
 }
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  natural: 'Naturales',
+  juridica: 'Juridicas',
+  all: 'Todas',
+}
+
 // Inline token input for waiting_token jobs
 function TokenInput({ job }: { job: Job }) {
   const [tokenUrl, setTokenUrl] = useState('')
@@ -140,6 +154,94 @@ function TokenInput({ job }: { job: Job }) {
         )}
       </Button>
     </div>
+  )
+}
+
+// Batch row component
+function BatchRow({ batch }: { batch: JobBatch }) {
+  const totalActive = batch.processing_jobs + batch.queued_jobs + batch.waiting_token_jobs
+  const totalDone = batch.completed_jobs + batch.failed_jobs
+
+  const getBatchStatus = () => {
+    if (batch.completed_jobs === batch.total_jobs) {
+      return <Badge variant="default">Completado</Badge>
+    }
+    if (batch.failed_jobs === batch.total_jobs) {
+      return <Badge variant="destructive">Fallido</Badge>
+    }
+    if (batch.processing_jobs > 0) {
+      return <Badge variant="secondary">Procesando</Badge>
+    }
+    if (batch.waiting_token_jobs > 0) {
+      return <Badge variant="outline">Esperando tokens</Badge>
+    }
+    if (batch.queued_jobs > 0) {
+      return <Badge variant="outline">En cola</Badge>
+    }
+    return <Badge variant="outline">Pendiente</Badge>
+  }
+
+  const getBatchIcon = () => {
+    if (batch.completed_jobs === batch.total_jobs) {
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />
+    }
+    if (batch.processing_jobs > 0) {
+      return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+    }
+    if (batch.waiting_token_jobs > 0) {
+      return <KeyRound className="h-4 w-4 text-amber-500" />
+    }
+    if (batch.failed_jobs === batch.total_jobs) {
+      return <XCircle className="h-4 w-4 text-red-500" />
+    }
+    return <Clock className="h-4 w-4 text-yellow-500" />
+  }
+
+  const categories = Array.isArray(batch.document_categories)
+    ? batch.document_categories
+    : []
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {getBatchIcon()}
+          <div>
+            <p className="font-medium">
+              Lote - {ENTITY_TYPE_LABELS[batch.entity_type_filter] || batch.entity_type_filter}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {categories.join(', ')}
+            </p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-sm">
+        {formatDateOnly(batch.start_date)} - {formatDateOnly(batch.end_date)}
+      </TableCell>
+      <TableCell>{getBatchStatus()}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1.5 text-sm">
+          <span className="text-green-600">{batch.completed_jobs}</span>
+          <span className="text-muted-foreground">/</span>
+          <span>{batch.total_jobs}</span>
+          {batch.failed_jobs > 0 && (
+            <span className="text-red-500 text-xs ml-1">({batch.failed_jobs} fallidos)</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {new Date(batch.created_at).toLocaleDateString()}
+      </TableCell>
+      <TableCell>
+        <Link href={`/trabajos/batch/${batch.id}`}>
+          <Button variant="ghost" size="sm" className="gap-1">
+            <ExternalLink className="h-3.5 w-3.5" />
+            Ver
+          </Button>
+        </Link>
+      </TableCell>
+    </TableRow>
   )
 }
 
@@ -306,9 +408,16 @@ export default function JobsPage() {
 
   // React Query with auto-polling for active jobs
   const { data, isLoading, isFetching, refetch } = useJobsWithPolling(page, 10)
+  const { data: batchData, isLoading: batchLoading, refetch: refetchBatches } = useBatchesWithPolling(1, 10)
 
   const jobs = data?.jobs || []
   const totalPages = data?.totalPages || 1
+  const batches = batchData?.batches || []
+
+  const handleRefresh = () => {
+    refetch()
+    refetchBatches()
+  }
 
   return (
     <div className="space-y-6">
@@ -324,7 +433,7 @@ export default function JobsPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             disabled={isFetching}
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -338,10 +447,62 @@ export default function JobsPage() {
         </div>
       </div>
 
+      {/* Batches Section */}
+      {(batchLoading || batches.length > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Lotes
+            </CardTitle>
+            <CardDescription>
+              {batchData?.totalCount || 0} lote{(batchData?.totalCount || 0) !== 1 ? 's' : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {batchLoading ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lote</TableHead>
+                    <TableHead>Rango</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Progreso</TableHead>
+                    <TableHead>Creado</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <JobTableSkeleton rows={2} />
+                </TableBody>
+              </Table>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lote</TableHead>
+                    <TableHead>Rango</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Progreso</TableHead>
+                    <TableHead>Creado</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {batches.map((batch) => (
+                    <BatchRow key={batch.id} batch={batch} />
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Jobs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Historial de Trabajos</CardTitle>
+          <CardTitle>Trabajos Individuales</CardTitle>
           <CardDescription>
             {data?.totalCount || 0} trabajo{(data?.totalCount || 0) !== 1 ? 's' : ''} encontrado{(data?.totalCount || 0) !== 1 ? 's' : ''}
           </CardDescription>
@@ -367,7 +528,7 @@ export default function JobsPage() {
           ) : jobs.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">No tienes trabajos aun</p>
+              <p className="text-muted-foreground mb-4">No tienes trabajos individuales aun</p>
               <Link href="/trabajos/nuevo">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />

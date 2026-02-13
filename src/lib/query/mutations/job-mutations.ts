@@ -113,10 +113,18 @@ export function useCreateBatchJobs() {
         throw new Error(response.message || 'Error creating batch jobs')
       }
 
-      return response.data!
+      return response as {
+        success: boolean
+        created_count: number
+        failed_count: number
+        batch_id: string
+        created_jobs: Array<{ job_id: string; entity_id: string; entity_name: string; status: string }>
+        failed_jobs: Array<{ entity_id: string; entity_name: string; error: string }>
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.usage })
     },
   })
