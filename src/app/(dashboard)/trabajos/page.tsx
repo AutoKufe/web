@@ -34,7 +34,6 @@ import {
   Loader2,
   KeyRound,
   Send,
-  Layers,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useJobsWithPolling, useEntityFromList, useProvideToken, type Job } from '@/lib/query'
@@ -330,12 +329,6 @@ export default function JobsPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </Button>
-          <Link href="/trabajos/nuevo?mode=batch">
-            <Button variant="outline" className="gap-2">
-              <Layers className="h-4 w-4" />
-              Modo Lote
-            </Button>
-          </Link>
           <Link href="/trabajos/nuevo">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />

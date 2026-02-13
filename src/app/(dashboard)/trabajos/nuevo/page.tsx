@@ -1770,11 +1770,87 @@ export default function NewJobPage() {
 
 function NewJobPageInner() {
   const searchParams = useSearchParams()
-  const mode = searchParams.get('mode')
+  const initialMode = searchParams.get('mode')
+  const [mode, setMode] = useState<'choose' | 'single' | 'batch'>(
+    initialMode === 'batch' ? 'batch' : initialMode === 'single' ? 'single' : 'choose'
+  )
+
+  if (mode === 'single') {
+    return <NewJobContent />
+  }
 
   if (mode === 'batch') {
     return <BatchJobContent />
   }
 
-  return <NewJobContent />
+  // Mode selection screen
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/trabajos">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">Nuevo Trabajo</h1>
+          <p className="text-muted-foreground">
+            Selecciona como quieres crear los trabajos
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setMode('single')}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Job Individual</CardTitle>
+                <CardDescription>
+                  Un trabajo para una entidad
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Selecciona una entidad, proporciona el token DIAN y configura el rango de fechas.
+              El trabajo se lanza inmediatamente.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setMode('batch')}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Layers className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Jobs en Lote</CardTitle>
+                <CardDescription>
+                  Multiples trabajos a la vez
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Crea trabajos para todas tus entidades (o filtradas por tipo).
+              Luego proporciona el token DIAN de cada una desde la lista.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
 }
