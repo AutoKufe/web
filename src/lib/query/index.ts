@@ -63,8 +63,10 @@ export {
 // Entity mutations
 export {
   useRegisterEntity,
+  useRegisterEntityManual,
   useDeleteEntity,
   useCleanupEntityStorage,
+  type ManualEntityData,
 } from './mutations/entity-mutations'
 
 // Job mutations

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,12 +50,21 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   useEntities,
   useDianEmails,
   useRegisterEntity,
+  useRegisterEntityManual,
   useCleanupEntityStorage,
   type Entity,
   type DianEmail,
+  type ManualEntityData,
 } from '@/lib/query'
 import { EntityTableSkeleton } from '@/components/skeletons'
 
@@ -100,13 +109,25 @@ export default function EntitiesPage() {
   const { data: entitiesData, isLoading, refetch, isFetching } = useEntities()
   const { data: dianEmailsData } = useDianEmails()
   const registerMutation = useRegisterEntity()
+  const registerManualMutation = useRegisterEntityManual()
   const cleanupMutation = useCleanupEntityStorage()
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('')
   const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
+  const [registerMode, setRegisterMode] = useState<'manual' | 'token'>('manual')
   const [registerToken, setRegisterToken] = useState('')
   const [page, setPage] = useState(1)
+
+  // Manual registration form state
+  const [manualForm, setManualForm] = useState<ManualEntityData>({
+    entity_type: 'natural',
+    document_type: 'CC',
+    document_number: '',
+    full_name: '',
+    company_name: '',
+    company_nit: '',
+  })
 
   // Dev mode state
   const { isDev: hasDevRole } = useUserRoles()
@@ -163,6 +184,19 @@ export default function EntitiesPage() {
     setPage(1)
   }
 
+  const resetRegisterDialog = useCallback(() => {
+    setRegisterMode('manual')
+    setRegisterToken('')
+    setManualForm({
+      entity_type: 'natural',
+      document_type: 'CC',
+      document_number: '',
+      full_name: '',
+      company_name: '',
+      company_nit: '',
+    })
+  }, [])
+
   const handleRegisterEntity = async () => {
     if (!registerToken.trim()) {
       toast.error('Ingresa el token DIAN')
@@ -173,7 +207,49 @@ export default function EntitiesPage() {
       await registerMutation.mutateAsync(registerToken)
       toast.success('Entidad registrada exitosamente')
       setRegisterDialogOpen(false)
-      setRegisterToken('')
+      resetRegisterDialog()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error registrando entidad')
+    }
+  }
+
+  const handleRegisterManual = async () => {
+    // Validate required fields
+    if (!manualForm.document_number.trim()) {
+      toast.error('Ingresa el numero de documento')
+      return
+    }
+    if (!manualForm.full_name.trim()) {
+      toast.error('Ingresa el nombre completo')
+      return
+    }
+    if (manualForm.entity_type === 'juridica') {
+      if (!manualForm.company_nit?.trim()) {
+        toast.error('Ingresa el NIT de la empresa')
+        return
+      }
+      if (!manualForm.company_name?.trim()) {
+        toast.error('Ingresa la razon social')
+        return
+      }
+    }
+
+    try {
+      const data: ManualEntityData = {
+        entity_type: manualForm.entity_type,
+        document_type: manualForm.document_type,
+        document_number: manualForm.document_number,
+        full_name: manualForm.full_name,
+      }
+      if (manualForm.entity_type === 'juridica') {
+        data.company_name = manualForm.company_name
+        data.company_nit = manualForm.company_nit
+      }
+
+      await registerManualMutation.mutateAsync(data)
+      toast.success('Entidad registrada exitosamente')
+      setRegisterDialogOpen(false)
+      resetRegisterDialog()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error registrando entidad')
     }
@@ -215,50 +291,223 @@ export default function EntitiesPage() {
         <div className="lg:col-span-2 space-y-3">
           {/* Register Button */}
           <div className="flex justify-end gap-2">
-            <Dialog open={registerDialogOpen} onOpenChange={setRegisterDialogOpen}>
+            <Dialog open={registerDialogOpen} onOpenChange={(open) => {
+              setRegisterDialogOpen(open)
+              if (!open) resetRegisterDialog()
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
                   Registrar Entidad
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
                   <DialogTitle>Registrar Nueva Entidad</DialogTitle>
                   <DialogDescription>
-                    Ingresa el token DIAN para registrar una nueva empresa.
-                    Puedes obtenerlo desde el portal de la DIAN.
+                    {registerMode === 'manual'
+                      ? 'Ingresa los datos de la entidad. El token DIAN se proporcionara al crear un job.'
+                      : 'Ingresa el token DIAN para registrar automaticamente.'}
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dian-token">Token DIAN (URL)</Label>
-                    <Input
-                      id="dian-token"
-                      placeholder="https://catalogo-vpfe.dian.gov.co/..."
-                      value={registerToken}
-                      onChange={(e) => setRegisterToken(e.target.value)}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Pega la URL completa del token que obtuviste de la DIAN
-                    </p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setRegisterDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleRegisterEntity}
-                    disabled={registerMutation.isPending || !registerToken.trim()}
-                  >
-                    {registerMutation.isPending ? 'Registrando...' : 'Registrar'}
-                  </Button>
-                </DialogFooter>
+
+                {registerMode === 'manual' ? (
+                  <>
+                    <div className="space-y-4 py-2">
+                      {/* Entity Type */}
+                      <div className="space-y-2">
+                        <Label>Tipo de persona</Label>
+                        <Select
+                          value={manualForm.entity_type}
+                          onValueChange={(v) =>
+                            setManualForm((prev) => ({
+                              ...prev,
+                              entity_type: v as 'natural' | 'juridica',
+                              document_type: v === 'juridica' ? 'CC' : prev.document_type,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="natural">Persona Natural</SelectItem>
+                            <SelectItem value="juridica">Persona Juridica</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Juridica-specific fields */}
+                      {manualForm.entity_type === 'juridica' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="company-nit">NIT</Label>
+                            <Input
+                              id="company-nit"
+                              placeholder="900123456"
+                              value={manualForm.company_nit || ''}
+                              onChange={(e) =>
+                                setManualForm((prev) => ({ ...prev, company_nit: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="company-name">Razon Social</Label>
+                            <Input
+                              id="company-name"
+                              placeholder="EMPRESA EJEMPLO S.A.S."
+                              value={manualForm.company_name || ''}
+                              onChange={(e) =>
+                                setManualForm((prev) => ({ ...prev, company_name: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="border-t pt-3">
+                            <p className="text-xs text-muted-foreground mb-3">Representante Legal</p>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Document type + number */}
+                      <div className="grid grid-cols-[140px_1fr] gap-3">
+                        <div className="space-y-2">
+                          <Label>Tipo doc.</Label>
+                          <Select
+                            value={manualForm.document_type}
+                            onValueChange={(v) =>
+                              setManualForm((prev) => ({ ...prev, document_type: v }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CC">CC</SelectItem>
+                              <SelectItem value="CE">CE</SelectItem>
+                              <SelectItem value="PA">Pasaporte</SelectItem>
+                              <SelectItem value="TI">TI</SelectItem>
+                              <SelectItem value="PEP">PEP</SelectItem>
+                              <SelectItem value="PPT">PPT</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-number">Numero</Label>
+                          <Input
+                            id="doc-number"
+                            placeholder="1234567890"
+                            value={manualForm.document_number}
+                            onChange={(e) =>
+                              setManualForm((prev) => ({ ...prev, document_number: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {/* Full name */}
+                      <div className="space-y-2">
+                        <Label htmlFor="full-name">
+                          {manualForm.entity_type === 'juridica'
+                            ? 'Nombre del representante legal'
+                            : 'Nombre completo'}
+                        </Label>
+                        <Input
+                          id="full-name"
+                          placeholder="Juan Perez Garcia"
+                          value={manualForm.full_name}
+                          onChange={(e) =>
+                            setManualForm((prev) => ({ ...prev, full_name: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter className="flex-col gap-3 sm:flex-col">
+                      <div className="flex gap-2 w-full justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setRegisterDialogOpen(false)
+                            resetRegisterDialog()
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={handleRegisterManual}
+                          disabled={registerManualMutation.isPending}
+                        >
+                          {registerManualMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Registrando...
+                            </>
+                          ) : (
+                            'Registrar'
+                          )}
+                        </Button>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground underline"
+                        onClick={() => setRegisterMode('token')}
+                      >
+                        Registrar con token DIAN
+                      </button>
+                    </DialogFooter>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="dian-token">Token DIAN (URL)</Label>
+                        <Input
+                          id="dian-token"
+                          placeholder="https://catalogo-vpfe.dian.gov.co/..."
+                          value={registerToken}
+                          onChange={(e) => setRegisterToken(e.target.value)}
+                          className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Pega la URL completa del token que obtuviste de la DIAN
+                        </p>
+                      </div>
+                    </div>
+                    <DialogFooter className="flex-col gap-3 sm:flex-col">
+                      <div className="flex gap-2 w-full justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setRegisterDialogOpen(false)
+                            resetRegisterDialog()
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={handleRegisterEntity}
+                          disabled={registerMutation.isPending || !registerToken.trim()}
+                        >
+                          {registerMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Registrando...
+                            </>
+                          ) : (
+                            'Registrar'
+                          )}
+                        </Button>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground underline"
+                        onClick={() => setRegisterMode('manual')}
+                      >
+                        Registrar manualmente
+                      </button>
+                    </DialogFooter>
+                  </>
+                )}
               </DialogContent>
             </Dialog>
           </div>
