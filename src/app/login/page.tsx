@@ -115,12 +115,6 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              ¿No tienes cuenta?{' '}
-              <Link href="/register" className="text-primary hover:underline">
-                Regístrate
-              </Link>
-            </p>
           </CardFooter>
         </form>
       </Card>

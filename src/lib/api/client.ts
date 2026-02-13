@@ -323,28 +323,18 @@ export class ApiClient {
     dianToken: string,
     jobData: {
       entity_id?: string
-      pseudo_bundle_id?: string
       job_name?: string
       date_range: { start_date: string; end_date: string }
       document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
       is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
     },
-    isPseudoJob?: boolean
   ) {
     return this.request('POST', '/jobs/create-job', {
       dian_token: dianToken,
       job_data: jobData,
       is_dev_job: jobData.is_dev_job,  // Pass at top level for Backend
-      is_pseudo_job: isPseudoJob,  // Pass at top level for Backend
     })
-  }
-
-  /**
-   * Get pseudo bundles for a pseudo entity (staging only)
-   */
-  async getPseudoBundles(entityId: string) {
-    return this.request('GET', `/pseudo/entities/${entityId}/bundles`)
   }
 
   /**

@@ -43,9 +43,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Registration disabled (single-user mode) - redirect to login
+  if (request.nextUrl.pathname === '/register') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
   // Redirect logged-in users away from auth pages
-  const isPublicAuthRoute = request.nextUrl.pathname === '/login' ||
-                            request.nextUrl.pathname === '/register'
+  const isPublicAuthRoute = request.nextUrl.pathname === '/login'
 
   if (isPublicAuthRoute && user) {
     const url = request.nextUrl.clone()

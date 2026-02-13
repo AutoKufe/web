@@ -43,8 +43,6 @@ export interface EntitySelectorItem {
   id: string
   display_name: string
   identifier_suffix: string
-  is_pseudo?: boolean
-  bundle_count?: number
 }
 
 interface EntitiesResponse {
@@ -364,47 +362,6 @@ export function useEntityJobCreationOptions(entityId: string | undefined) {
     },
     enabled: !!entityId,
     staleTime: staleTime.jobCreationOptions,
-  })
-}
-
-/**
- * Pseudo bundle data (one per production job)
- */
-export interface PseudoBundle {
-  id: string
-  source_job_id?: string
-  date_range: { start: string; end: string }
-  document_categories: string[]
-  doc_count: number
-  source_job_completed_at?: string
-  created_at: string
-}
-
-/**
- * Fetch pseudo bundles for a pseudo entity
- *
- * Each bundle represents data from one production job.
- * Used in the job creation page to let admins choose which bundle to replay.
- */
-export function usePseudoBundles(entityId: string | undefined) {
-  return useQuery<PseudoBundle[]>({
-    queryKey: queryKeys.pseudoBundles.list(entityId!),
-    queryFn: async () => {
-      const response = await apiClient.getPseudoBundles(entityId!)
-
-      if (response.error) {
-        throw new Error(response.message || 'Error fetching pseudo bundles')
-      }
-
-      const data = response as unknown as {
-        success: boolean
-        bundles: PseudoBundle[]
-      }
-      return data.bundles || []
-    },
-    enabled: !!entityId,
-    staleTime: staleTime.entities,
-    gcTime: gcTime.entities,
   })
 }
 

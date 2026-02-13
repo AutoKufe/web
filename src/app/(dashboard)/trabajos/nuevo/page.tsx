@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
+// FlaskConical kept for dev mode
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -46,9 +47,7 @@ import {
   useEntityJobCreationOptions,
   useCachedExcelCheck,
   useCreateJob,
-  usePseudoBundles,
   type EntitySelectorItem,
-  type PseudoBundle,
 } from '@/lib/query'
 import { apiClient } from '@/lib/api/client'
 
@@ -157,36 +156,9 @@ function NewJobContent() {
   const [entitySearchOpen, setEntitySearchOpen] = useState(false)
   const [entitySelectorShake, setEntitySelectorShake] = useState(false)
 
-  // Pseudo entity detection
-  const isPseudoEntity = selectedEntity?.is_pseudo === true
-
-  // Pseudo bundle selection (fetched when pseudo entity is selected)
-  const { data: pseudoBundles, isLoading: loadingBundles } = usePseudoBundles(
-    isPseudoEntity ? selectedEntity?.id : undefined
-  )
-  const [selectedBundle, setSelectedBundle] = useState<PseudoBundle | null>(null)
-
-  // Auto-select bundle when only one available
-  useEffect(() => {
-    if (!pseudoBundles || pseudoBundles.length === 0) {
-      setSelectedBundle(null)
-      return
-    }
-    if (pseudoBundles.length === 1) {
-      const bundle = pseudoBundles[0]
-      setSelectedBundle(bundle)
-      // Pre-fill dates and categories from auto-selected bundle
-      setStartDate(bundle.date_range.start)
-      setEndDate(bundle.date_range.end)
-      if (bundle.date_range.start) setStartMonth(bundle.date_range.start.slice(0, 7))
-      if (bundle.date_range.end) setEndMonth(bundle.date_range.end.slice(0, 7))
-      setSelectedSheetTypes(bundle.document_categories)
-    }
-  }, [pseudoBundles])
-
-  // Job creation options (fetched when entity is selected, skip for pseudo entities)
+  // Job creation options (fetched when entity is selected)
   const { data: jobOptions, isLoading: loadingJobOptions } = useEntityJobCreationOptions(
-    isPseudoEntity ? undefined : selectedEntity?.id
+    selectedEntity?.id
   )
 
   // Dev job mode state
@@ -568,8 +540,6 @@ function NewJobContent() {
       clearTimeout(autoTokenPollingRef.current)
     }
 
-    // Reset bundle selection (bundles will be fetched by usePseudoBundles hook)
-    setSelectedBundle(null)
   }
 
   const handleSubmit = async () => {
@@ -610,13 +580,7 @@ function NewJobContent() {
     // Auto-token received counts as having a valid saved token
     const hasAutoTokenReceived = autoTokenStatus === 'received'
 
-    if (isPseudoEntity) {
-      // Pseudo jobs need a bundle selected
-      if (!selectedBundle) {
-        toast.error('Selecciona un bundle de datos')
-        return
-      }
-    } else if (isDevJob) {
+    if (isDevJob) {
       if (!devCacheStatus?.available) {
         toast.error('El cache de raw Excel no esta disponible')
         return
@@ -631,7 +595,7 @@ function NewJobContent() {
 
     // Validate token matches selected entity (instant check using identifier_suffix)
     // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev, not pseudo)
-    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob && !isPseudoEntity) {
+    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob) {
       const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
       if (tokenMismatchError) {
         toast.error(tokenMismatchError)
@@ -641,7 +605,7 @@ function NewJobContent() {
 
     // For manual token: check if validated and if validation is still fresh (< 5 min)
     // Skip this check for: dev jobs, auto-token, pseudo jobs, or using saved token
-    const isUsingManualToken = !isDevJob && !isPseudoEntity && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
+    const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
 
     if (isUsingManualToken && selectedEntity) {
       // Check if token was validated
@@ -707,7 +671,7 @@ function NewJobContent() {
     // Since we now validate and save tokens BEFORE job creation,
     // we always use 'use_stored_token' - the token is already in DB
     let tokenToSend: string
-    if (isDevJob || isPseudoEntity) {
+    if (isDevJob) {
       tokenToSend = ''
     } else {
       // Token was validated and saved during input validation
@@ -719,8 +683,7 @@ function NewJobContent() {
       const result = await createJobMutation.mutateAsync({
         dianToken: tokenToSend,
         jobData: {
-          entity_id: isPseudoEntity ? undefined : selectedEntity?.id,
-          pseudo_bundle_id: isPseudoEntity ? selectedBundle?.id : undefined,
+          entity_id: selectedEntity?.id,
           job_name: jobName.trim() || undefined,
           date_range: {
             start_date: startDate,
@@ -730,7 +693,6 @@ function NewJobContent() {
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
         },
-        isPseudoJob: isPseudoEntity,
       })
 
       setCreatedJobId(result.job_id || null)
@@ -761,7 +723,6 @@ function NewJobContent() {
     setUseNewToken(false)
     setCreatedJobId(null)
     setIsDevJob(false)
-    setSelectedBundle(null)
     // Reset auto-token states
     setAutoTokenRequestId(null)
     setAutoTokenStatus('idle')
@@ -925,95 +886,8 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Pseudo entity info banner + bundle selector */}
-          {isPseudoEntity && selectedEntity && (
-            <Alert className="border-purple-300 bg-purple-50">
-              <FlaskConical className="h-5 w-5 text-purple-600" />
-              <AlertDescription className="ml-2">
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-base font-semibold text-purple-700">Pseudo Job (datos pseudonimizados)</p>
-                    <p className="text-sm text-purple-600">
-                      Este job usa datos de produccion pseudonimizados. No requiere token DIAN.
-                    </p>
-                  </div>
-
-                  {/* Bundle selector */}
-                  {loadingBundles ? (
-                    <div className="flex items-center gap-2 text-sm text-purple-600">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando datos disponibles...
-                    </div>
-                  ) : !pseudoBundles || pseudoBundles.length === 0 ? (
-                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
-                      No hay datos disponibles para esta entidad. Ejecuta un job en produccion primero.
-                    </div>
-                  ) : pseudoBundles.length === 1 ? (
-                    /* Single bundle: show info directly */
-                    <div className="flex gap-4 text-xs text-purple-600">
-                      <span>Documentos: <strong>{pseudoBundles[0].doc_count}</strong></span>
-                      <span>Rango: <strong>{pseudoBundles[0].date_range.start}</strong> a <strong>{pseudoBundles[0].date_range.end}</strong></span>
-                      <span>Categorias: <strong>{pseudoBundles[0].document_categories.join(', ')}</strong></span>
-                    </div>
-                  ) : (
-                    /* Multiple bundles: show selector */
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-purple-700">Seleccionar datos:</p>
-                      <div className="space-y-1.5">
-                        {pseudoBundles.map((bundle) => {
-                          const isSelected = selectedBundle?.id === bundle.id
-                          const jobDate = bundle.source_job_completed_at
-                            ? new Date(bundle.source_job_completed_at).toLocaleDateString('es-CO')
-                            : bundle.created_at
-                              ? new Date(bundle.created_at).toLocaleDateString('es-CO')
-                              : 'Fecha desconocida'
-                          return (
-                            <label
-                              key={bundle.id}
-                              className={`flex items-start gap-3 p-2.5 rounded-md border cursor-pointer transition-colors ${
-                                isSelected
-                                  ? 'border-purple-500 bg-purple-100/60'
-                                  : 'border-purple-200 bg-white hover:bg-purple-50'
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name="pseudo-bundle"
-                                checked={isSelected}
-                                onChange={() => {
-                                  setSelectedBundle(bundle)
-                                  setStartDate(bundle.date_range.start)
-                                  setEndDate(bundle.date_range.end)
-                                  if (bundle.date_range.start) setStartMonth(bundle.date_range.start.slice(0, 7))
-                                  if (bundle.date_range.end) setEndMonth(bundle.date_range.end.slice(0, 7))
-                                  setSelectedSheetTypes(bundle.document_categories)
-                                }}
-                                className="mt-0.5 accent-purple-600"
-                              />
-                              <div className="flex-1 text-xs text-purple-700">
-                                <div className="flex items-center gap-2 font-medium">
-                                  <span>Job del {jobDate}</span>
-                                  <span className="text-purple-400">|</span>
-                                  <span>{bundle.date_range.start} a {bundle.date_range.end}</span>
-                                </div>
-                                <div className="flex gap-3 mt-0.5 text-purple-500">
-                                  <span>{bundle.document_categories.join(', ')}</span>
-                                  <span>{bundle.doc_count} docs</span>
-                                </div>
-                              </div>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* OAuth expired/pending alerts */}
-          {selectedEntity && !isPseudoEntity && autoTokenOAuthStatus === 'oauth_expired' && (
+          {selectedEntity && autoTokenOAuthStatus === 'oauth_expired' && (
             <Alert className="border-red-600/70 bg-red-50">
               <XCircle className="h-5 w-5 text-red-600" />
               <AlertDescription className="ml-2">
@@ -1033,7 +907,7 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {selectedEntity && !isPseudoEntity && autoTokenOAuthStatus === 'oauth_pending' && (
+          {selectedEntity && autoTokenOAuthStatus === 'oauth_pending' && (
             <Alert className="border-yellow-600/70 bg-yellow-50">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <AlertDescription className="ml-2">
@@ -1053,8 +927,8 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Token DIAN section - Hidden for pseudo entities */}
-          {!isPseudoEntity && <div className="space-y-2">
+          {/* Token DIAN section */}
+          <div className="space-y-2">
             <Label htmlFor="dian-token">Token DIAN *</Label>
 
             {/* Auto-token request UI (when auto-token is being requested) */}
@@ -1256,7 +1130,7 @@ function NewJobContent() {
                 </div>
               </>
             )}
-          </div>}
+          </div>
 
           {/* Job Name */}
           <div className="space-y-2">
@@ -1282,7 +1156,6 @@ function NewJobContent() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Rango de Fechas *</Label>
-              {!isPseudoEntity && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Por:</span>
                 <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
@@ -1306,18 +1179,9 @@ function NewJobContent() {
                   </Button>
                 </div>
               </div>
-              )}
             </div>
 
-            {/* Pseudo entity: fixed date range display */}
-            {isPseudoEntity && startDate && endDate && (
-              <div className="text-sm text-muted-foreground bg-purple-50 border border-purple-200 rounded-md p-3">
-                <span className="font-medium">Rango fijo: </span>
-                {startDate} al {endDate}
-              </div>
-            )}
-
-            {!isPseudoEntity && (dateSelectionMode === 'months' ? (
+            {dateSelectionMode === 'months' ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1397,7 +1261,7 @@ function NewJobContent() {
                   />
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
           {/* Document Categories */}
@@ -1412,7 +1276,6 @@ function NewJobContent() {
                         <Checkbox
                           id="select-all-categories"
                           checked={selectedSheetTypes.length === 3}
-                          disabled={isPseudoEntity}
                           onCheckedChange={(checked) => {
                             // Always keep at least one category selected
                             setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
@@ -1437,7 +1300,7 @@ function NewJobContent() {
                           <Checkbox
                             id={`category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
-                            disabled={isPseudoEntity || (selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value))}
+                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
                             onCheckedChange={(checked) => {
                               if (!checked && selectedSheetTypes.length === 1) {
                                 // Don't allow unchecking the last category
@@ -1463,7 +1326,7 @@ function NewJobContent() {
           </div>
 
           {/* Dev Mode (staging only + dev role, not for pseudo entities) */}
-          {isStaging && hasDevRole && !isPseudoEntity && (
+          {isStaging && hasDevRole && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -1597,10 +1460,8 @@ function NewJobContent() {
                 !startDate ||
                 !endDate ||
                 (isDevJob && !devCacheStatus?.available) ||
-                // Pseudo entities: need bundle selected + dates
-                (isPseudoEntity && !selectedBundle) ||
-                // Non-pseudo, non-dev: need token
-                (!isPseudoEntity && !isDevJob && (
+                // Non-dev: need token
+                (!isDevJob && (
                   // Auto-token in progress - wait for it to complete
                   (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
                   // No token available: need either auto-token received, saved token, or manual token

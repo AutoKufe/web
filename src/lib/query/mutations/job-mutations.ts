@@ -8,14 +8,12 @@ interface CreateJobData {
   dianToken: string
   jobData: {
     entity_id?: string
-    pseudo_bundle_id?: string
     job_name?: string
     date_range: { start_date: string; end_date: string }
     document_categories: string[]
     consolidation_interval: string | { value: number; unit: string } | null
     is_dev_job?: boolean
   }
-  isPseudoJob?: boolean
 }
 
 /**
@@ -26,7 +24,7 @@ export function useCreateJob() {
 
   return useMutation({
     mutationFn: async (data: CreateJobData) => {
-      const response = await apiClient.createJob(data.dianToken, data.jobData, data.isPseudoJob)
+      const response = await apiClient.createJob(data.dianToken, data.jobData)
 
       if (response.error) {
         throw new Error(response.message || 'Error creating job')
