@@ -29,6 +29,36 @@ export function useRegisterEntity() {
 }
 
 /**
+ * Register a new entity manually (without DIAN token)
+ */
+export interface ManualEntityData {
+  entity_type: 'natural' | 'juridica'
+  document_type: string
+  document_number: string
+  company_nit?: string
+}
+
+export function useRegisterEntityManual() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: ManualEntityData) => {
+      const response = await apiClient.registerEntityManual(data)
+
+      if (response.error) {
+        throw new Error(response.message || 'Error registering entity')
+      }
+
+      return response
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.entities.selector() })
+    },
+  })
+}
+
+/**
  * Delete an entity
  */
 export function useDeleteEntity() {

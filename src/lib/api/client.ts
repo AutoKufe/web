@@ -137,6 +137,15 @@ export class ApiClient {
     return this.request('POST', '/entities/register', { dian_token: dianToken })
   }
 
+  async registerEntityManual(data: {
+    entity_type: 'natural' | 'juridica'
+    document_type: string
+    document_number: string
+    company_nit?: string
+  }) {
+    return this.request('POST', '/entities/register-manual', data as unknown as Record<string, unknown>)
+  }
+
   async getEntity(entityId: string) {
     return this.request('GET', `/entities/${entityId}`)
   }
