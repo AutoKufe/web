@@ -12,12 +12,9 @@ export default function LandingPage() {
     windowLocation: typeof window !== 'undefined' ? window.location.href : 'SSR'
   })
 
-  // In staging: use relative links (/login, /register) on same domain
+  // In staging: use relative links on same domain
   // In production: use absolute links to app.autokufe.com
   const loginUrl = environment === 'staging' ? '/login' : 'https://app.autokufe.com/login'
-  const registerUrl = environment === 'staging' ? '/register' : 'https://app.autokufe.com/register'
-
-  console.log('🔗 [LANDING PAGE LINKS]', { loginUrl, registerUrl })
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
@@ -48,15 +45,10 @@ export default function LandingPage() {
             de forma automatica. Ahorra horas de trabajo manual.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href={registerUrl}>
+            <Link href={loginUrl}>
               <Button size="lg" className="w-full sm:w-auto">
                 <Zap className="mr-2 h-5 w-5" />
-                Comenzar Gratis
-              </Button>
-            </Link>
-            <Link href={loginUrl}>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Ya tengo cuenta
+                Iniciar Sesion
               </Button>
             </Link>
           </div>

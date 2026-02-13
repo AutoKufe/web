@@ -328,7 +328,7 @@ export class ApiClient {
       document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
       is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
-    }
+    },
   ) {
     return this.request('POST', '/jobs/create-job', {
       dian_token: dianToken,

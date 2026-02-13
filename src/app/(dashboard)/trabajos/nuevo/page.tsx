@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
+// FlaskConical kept for dev mode
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -529,6 +530,8 @@ function NewJobContent() {
     setAutoTokenStatus('idle')
     setAutoTokenError(null)
     setAutoTokenStartedAt(null)
+    // Reset dev job mode
+    setIsDevJob(false)
     // Clear timeouts
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current)
@@ -536,6 +539,7 @@ function NewJobContent() {
     if (autoTokenPollingRef.current) {
       clearTimeout(autoTokenPollingRef.current)
     }
+
   }
 
   const handleSubmit = async () => {
@@ -590,7 +594,7 @@ function NewJobContent() {
     }
 
     // Validate token matches selected entity (instant check using identifier_suffix)
-    // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev)
+    // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev, not pseudo)
     if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob) {
       const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
       if (tokenMismatchError) {
@@ -600,7 +604,7 @@ function NewJobContent() {
     }
 
     // For manual token: check if validated and if validation is still fresh (< 5 min)
-    // Skip this check for: dev jobs, auto-token, or using saved token
+    // Skip this check for: dev jobs, auto-token, pseudo jobs, or using saved token
     const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
 
     if (isUsingManualToken && selectedEntity) {
@@ -688,7 +692,7 @@ function NewJobContent() {
           document_categories: selectedSheetTypes,
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
-        }
+        },
       })
 
       setCreatedJobId(result.job_id || null)
@@ -923,7 +927,7 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {/* Token DIAN section - Clean unified design */}
+          {/* Token DIAN section */}
           <div className="space-y-2">
             <Label htmlFor="dian-token">Token DIAN *</Label>
 
@@ -1321,7 +1325,7 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Dev Mode (staging only + dev role) */}
+          {/* Dev Mode (staging only + dev role, not for pseudo entities) */}
           {isStaging && hasDevRole && (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
               <div className="flex items-center gap-2">
@@ -1456,15 +1460,18 @@ function NewJobContent() {
                 !startDate ||
                 !endDate ||
                 (isDevJob && !devCacheStatus?.available) ||
-                // Auto-token in progress - wait for it to complete
-                (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
-                // No token available: need either auto-token received, saved token, or manual token
-                (!isDevJob && autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
-                (!isDevJob && autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
-                // Manual token validation in progress
-                (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
-                // Manual token has validation error
-                (!!dianToken.trim() && validationPhase === 'error')
+                // Non-dev: need token
+                (!isDevJob && (
+                  // Auto-token in progress - wait for it to complete
+                  (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
+                  // No token available: need either auto-token received, saved token, or manual token
+                  (autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
+                  (autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
+                  // Manual token validation in progress
+                  (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
+                  // Manual token has validation error
+                  (!!dianToken.trim() && validationPhase === 'error')
+                ))
               }
               className="flex-1"
               size="lg"
