@@ -120,12 +120,10 @@ export default function EntitiesPage() {
   const [page, setPage] = useState(1)
 
   // Manual registration form state
-  const [manualForm, setManualForm] = useState<ManualEntityData>({
-    entity_type: 'natural',
+  const [manualForm, setManualForm] = useState({
+    entity_type: 'natural' as 'natural' | 'juridica',
     document_type: 'CC',
     document_number: '',
-    full_name: '',
-    company_name: '',
     company_nit: '',
   })
 
@@ -191,8 +189,6 @@ export default function EntitiesPage() {
       entity_type: 'natural',
       document_type: 'CC',
       document_number: '',
-      full_name: '',
-      company_name: '',
       company_nit: '',
     })
   }, [])
@@ -214,24 +210,13 @@ export default function EntitiesPage() {
   }
 
   const handleRegisterManual = async () => {
-    // Validate required fields
     if (!manualForm.document_number.trim()) {
       toast.error('Ingresa el numero de documento')
       return
     }
-    if (!manualForm.full_name.trim()) {
-      toast.error('Ingresa el nombre completo')
+    if (manualForm.entity_type === 'juridica' && !manualForm.company_nit?.trim()) {
+      toast.error('Ingresa el NIT de la empresa')
       return
-    }
-    if (manualForm.entity_type === 'juridica') {
-      if (!manualForm.company_nit?.trim()) {
-        toast.error('Ingresa el NIT de la empresa')
-        return
-      }
-      if (!manualForm.company_name?.trim()) {
-        toast.error('Ingresa la razon social')
-        return
-      }
     }
 
     try {
@@ -239,10 +224,8 @@ export default function EntitiesPage() {
         entity_type: manualForm.entity_type,
         document_type: manualForm.document_type,
         document_number: manualForm.document_number,
-        full_name: manualForm.full_name,
       }
       if (manualForm.entity_type === 'juridica') {
-        data.company_name = manualForm.company_name
         data.company_nit = manualForm.company_nit
       }
 
@@ -323,7 +306,6 @@ export default function EntitiesPage() {
                             setManualForm((prev) => ({
                               ...prev,
                               entity_type: v as 'natural' | 'juridica',
-                              document_type: v === 'juridica' ? 'CC' : prev.document_type,
                             }))
                           }
                         >
@@ -337,41 +319,27 @@ export default function EntitiesPage() {
                         </Select>
                       </div>
 
-                      {/* Juridica-specific fields */}
+                      {/* Juridica: NIT */}
                       {manualForm.entity_type === 'juridica' && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="company-nit">NIT</Label>
-                            <Input
-                              id="company-nit"
-                              placeholder="900123456"
-                              value={manualForm.company_nit || ''}
-                              onChange={(e) =>
-                                setManualForm((prev) => ({ ...prev, company_nit: e.target.value }))
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="company-name">Razon Social</Label>
-                            <Input
-                              id="company-name"
-                              placeholder="EMPRESA EJEMPLO S.A.S."
-                              value={manualForm.company_name || ''}
-                              onChange={(e) =>
-                                setManualForm((prev) => ({ ...prev, company_name: e.target.value }))
-                              }
-                            />
-                          </div>
-                          <div className="border-t pt-3">
-                            <p className="text-xs text-muted-foreground mb-3">Representante Legal</p>
-                          </div>
-                        </>
+                        <div className="space-y-2">
+                          <Label htmlFor="company-nit">NIT de la empresa</Label>
+                          <Input
+                            id="company-nit"
+                            placeholder="900123456"
+                            value={manualForm.company_nit}
+                            onChange={(e) =>
+                              setManualForm((prev) => ({ ...prev, company_nit: e.target.value }))
+                            }
+                          />
+                        </div>
                       )}
 
                       {/* Document type + number */}
                       <div className="grid grid-cols-[140px_1fr] gap-3">
                         <div className="space-y-2">
-                          <Label>Tipo doc.</Label>
+                          <Label>
+                            {manualForm.entity_type === 'juridica' ? 'Tipo doc. RL' : 'Tipo doc.'}
+                          </Label>
                           <Select
                             value={manualForm.document_type}
                             onValueChange={(v) =>
@@ -392,7 +360,9 @@ export default function EntitiesPage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="doc-number">Numero</Label>
+                          <Label htmlFor="doc-number">
+                            {manualForm.entity_type === 'juridica' ? 'Numero doc. RL' : 'Numero'}
+                          </Label>
                           <Input
                             id="doc-number"
                             placeholder="1234567890"
@@ -404,22 +374,9 @@ export default function EntitiesPage() {
                         </div>
                       </div>
 
-                      {/* Full name */}
-                      <div className="space-y-2">
-                        <Label htmlFor="full-name">
-                          {manualForm.entity_type === 'juridica'
-                            ? 'Nombre del representante legal'
-                            : 'Nombre completo'}
-                        </Label>
-                        <Input
-                          id="full-name"
-                          placeholder="Juan Perez Garcia"
-                          value={manualForm.full_name}
-                          onChange={(e) =>
-                            setManualForm((prev) => ({ ...prev, full_name: e.target.value }))
-                          }
-                        />
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        El nombre y razon social se completaran automaticamente al usar un token DIAN.
+                      </p>
                     </div>
 
                     <DialogFooter className="flex-col gap-3 sm:flex-col">

@@ -35,8 +35,6 @@ export interface ManualEntityData {
   entity_type: 'natural' | 'juridica'
   document_type: string
   document_number: string
-  full_name: string
-  company_name?: string
   company_nit?: string
 }
 
