@@ -35,6 +35,15 @@ export const queryKeys = {
       [...queryKeys.jobs.all, 'cached-excel', { entityId, startDate, endDate }] as const,
   },
 
+  // Batches
+  batches: {
+    all: ['batches'] as const,
+    list: (page?: number) =>
+      ['batches', 'list', { page }] as const,
+    detail: (id: string) =>
+      ['batches', 'detail', id] as const,
+  },
+
   // DIAN Emails
   dianEmails: {
     all: ['dian-emails'] as const,

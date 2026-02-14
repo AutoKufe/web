@@ -41,6 +41,14 @@ export {
   type JobSummary,
 } from './hooks/use-jobs'
 
+// Batch hooks
+export {
+  useBatchesWithPolling,
+  useBatchDetail,
+  type JobBatch,
+  type BatchJob,
+} from './hooks/use-batches'
+
 // DIAN Email hooks
 export {
   useDianEmails,
@@ -72,6 +80,7 @@ export {
 // Job mutations
 export {
   useCreateJob,
+  useCreateBatchJobs,
   useCancelJob,
   useMarkJobAsFailed,
   useProvideToken,

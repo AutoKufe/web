@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles, Layers } from 'lucide-react'
 // FlaskConical kept for dev mode
 import { useUserRoles } from '@/lib/hooks/use-user-roles'
 import { toast } from 'sonner'
@@ -47,6 +47,7 @@ import {
   useEntityJobCreationOptions,
   useCachedExcelCheck,
   useCreateJob,
+  useCreateBatchJobs,
   type EntitySelectorItem,
 } from '@/lib/query'
 import { apiClient } from '@/lib/api/client'
@@ -1495,6 +1496,389 @@ function NewJobContent() {
   )
 }
 
+// ============================================================================
+// BATCH JOB CREATION
+// ============================================================================
+
+function BatchJobContent() {
+  const router = useRouter()
+  const { data: entitiesData } = useEntitiesSelector()
+
+  const [entityTypeFilter, setEntityTypeFilter] = useState<'all' | 'natural' | 'juridica'>('all')
+
+  // Date selection - same logic as individual job form
+  const [dateSelectionMode, setDateSelectionMode] = useState<'days' | 'months'>('months')
+  const [startMonth, setStartMonth] = useState('')
+  const [endMonth, setEndMonth] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  // Categories - same as individual (all 3 selected by default)
+  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
+
+  // Consolidation - same as individual
+  const [consolidationValue, setConsolidationValue] = useState('1')
+  const [consolidationUnit, setConsolidationUnit] = useState('months')
+  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true)
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const batchMutation = useCreateBatchJobs()
+
+  const entities = entitiesData?.entities || []
+  const entityCount = entities.length
+
+  const handleSubmit = async () => {
+    if (!startDate || !endDate) {
+      toast.error('Selecciona un rango de fechas')
+      return
+    }
+    if (selectedSheetTypes.length === 0) {
+      toast.error('Selecciona al menos una categoria')
+      return
+    }
+
+    // Build consolidation interval (same logic as individual)
+    let consolidationInterval: string | { value: number; unit: string }
+    if (useTotalConsolidation) {
+      consolidationInterval = 'total'
+    } else {
+      consolidationInterval = {
+        value: parseInt(consolidationValue),
+        unit: consolidationUnit
+      }
+    }
+
+    setIsSubmitting(true)
+    try {
+      const result = await batchMutation.mutateAsync({
+        entity_type_filter: entityTypeFilter,
+        start_date: startDate,
+        end_date: endDate,
+        document_categories: selectedSheetTypes,
+        consolidation_interval: consolidationInterval,
+      })
+
+      toast.success(
+        `${result.created_count} trabajo${result.created_count !== 1 ? 's' : ''} creado${result.created_count !== 1 ? 's' : ''}` +
+        (result.failed_count > 0 ? ` (${result.failed_count} fallido${result.failed_count !== 1 ? 's' : ''})` : '')
+      )
+      // Navigate to batch detail page
+      if (result.batch_id) {
+        router.push(`/trabajos/batch/${result.batch_id}`)
+      } else {
+        router.push('/trabajos')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error creando trabajos en lote')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/trabajos">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">Crear Trabajos en Lote</h1>
+          <p className="text-muted-foreground">
+            Crea trabajos para multiples entidades a la vez
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuracion del Lote</CardTitle>
+          <CardDescription>
+            Todos los trabajos se crearan en estado &quot;Esperando token&quot;.
+            Luego puedes proporcionar el token DIAN individualmente desde la lista de trabajos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Entity Type Filter */}
+          <div className="space-y-2">
+            <Label>Tipo de Entidad *</Label>
+            <Select
+              value={entityTypeFilter}
+              onValueChange={(v) => setEntityTypeFilter(v as 'all' | 'natural' | 'juridica')}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las entidades</SelectItem>
+                <SelectItem value="natural">Solo personas naturales</SelectItem>
+                <SelectItem value="juridica">Solo personas juridicas</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {entityCount} entidad{entityCount !== 1 ? 'es' : ''} registrada{entityCount !== 1 ? 's' : ''} en total
+            </p>
+          </div>
+
+          {/* Date Range - same as individual job form */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Periodo de Consulta *</Label>
+              <div className="flex rounded-md overflow-hidden border">
+                <Button
+                  type="button"
+                  variant={dateSelectionMode === 'months' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={() => setDateSelectionMode('months')}
+                >
+                  Meses
+                </Button>
+                <Button
+                  type="button"
+                  variant={dateSelectionMode === 'days' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3"
+                  onClick={() => setDateSelectionMode('days')}
+                >
+                  Dias
+                </Button>
+              </div>
+            </div>
+
+            {dateSelectionMode === 'months' ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-start-month">Mes Inicial</Label>
+                    <Input
+                      id="batch-start-month"
+                      type="month"
+                      value={startMonth}
+                      max={getColombiaMonth()}
+                      onChange={(e) => {
+                        const selectedMonth = e.target.value
+                        setStartMonth(selectedMonth)
+                        if (selectedMonth) {
+                          const [year, month] = selectedMonth.split('-')
+                          setStartDate(`${year}-${month}-01`)
+                          const currentMonth = getColombiaMonth()
+                          if (selectedMonth === currentMonth && !endMonth) {
+                            setEndMonth(currentMonth)
+                            setEndDate(getColombiaToday())
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="batch-end-month">Mes Final</Label>
+                    <Input
+                      id="batch-end-month"
+                      type="month"
+                      value={endMonth}
+                      min={startMonth || undefined}
+                      max={getColombiaMonth()}
+                      onChange={(e) => {
+                        setEndMonth(e.target.value)
+                        if (e.target.value) {
+                          const [year, month] = e.target.value.split('-')
+                          const currentMonth = getColombiaMonth()
+                          if (e.target.value === currentMonth) {
+                            setEndDate(getColombiaToday())
+                          } else {
+                            const lastDay = new Date(parseInt(year), parseInt(month), 0)
+                            setEndDate(lastDay.toISOString().split('T')[0])
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                {startMonth && endMonth && (
+                  <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                    <span className="font-medium">Rango: </span>
+                    {startDate} al {endDate}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="batch-start-date">Fecha Inicio</Label>
+                  <Input
+                    id="batch-start-date"
+                    type="date"
+                    value={startDate}
+                    max={getColombiaToday()}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="batch-end-date">Fecha Final</Label>
+                  <Input
+                    id="batch-end-date"
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    max={getColombiaToday()}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Document Categories - same table as individual */}
+          <div className="space-y-2">
+            <Label>Categorias de Documentos a Incluir *</Label>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-sm">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="batch-select-all-categories"
+                          checked={selectedSheetTypes.length === 3}
+                          onCheckedChange={(checked) => {
+                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
+                          }}
+                        />
+                        <Label htmlFor="batch-select-all-categories" className="font-medium cursor-pointer">
+                          Seleccionar todas
+                        </Label>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { value: 'ingresos', label: 'Ingresos' },
+                    { value: 'egresos', label: 'Egresos' },
+                    { value: 'nominas', label: 'Nominas' },
+                  ].map((type) => (
+                    <tr key={type.value} className="border-t">
+                      <td className="p-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`batch-category-${type.value}`}
+                            checked={selectedSheetTypes.includes(type.value)}
+                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
+                            onCheckedChange={(checked) => {
+                              if (!checked && selectedSheetTypes.length === 1) return
+                              setSelectedSheetTypes(
+                                checked
+                                  ? [...selectedSheetTypes, type.value]
+                                  : selectedSheetTypes.filter((t) => t !== type.value)
+                              )
+                            }}
+                          />
+                          <Label htmlFor={`batch-category-${type.value}`} className="text-sm font-normal cursor-pointer">
+                            {type.label}
+                          </Label>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Consolidation Interval - same as individual */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Intervalo de Consolidado *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">Intervalo de Consolidado</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Define el intervalo de tiempo para la hoja resumen en el Excel.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="batch-use-total-consolidation"
+                checked={useTotalConsolidation}
+                onCheckedChange={(checked) => setUseTotalConsolidation(checked as boolean)}
+              />
+              <Label htmlFor="batch-use-total-consolidation" className="text-sm font-normal cursor-pointer">
+                Consolidado Total (sin dividir por intervalos)
+              </Label>
+            </div>
+
+            {!useTotalConsolidation && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={consolidationValue}
+                    onChange={(e) => setConsolidationValue(e.target.value)}
+                    className="w-24"
+                  />
+                  <Select value={consolidationUnit} onValueChange={setConsolidationUnit}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">{consolidationValue === '1' ? 'Dia' : 'Dias'}</SelectItem>
+                      <SelectItem value="weeks">{consolidationValue === '1' ? 'Semana' : 'Semanas'}</SelectItem>
+                      <SelectItem value="months">{consolidationValue === '1' ? 'Mes' : 'Meses'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
+          <div className="flex gap-4 pt-4 border-t">
+            <Link href="/trabajos" className="flex-1">
+              <Button variant="outline" className="w-full" size="lg">
+                Cancelar
+              </Button>
+            </Link>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || selectedSheetTypes.length === 0 || !startDate || !endDate}
+              className="flex-1 gap-2"
+              size="lg"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creando trabajos...
+                </>
+              ) : (
+                <>
+                  <Layers className="h-4 w-4" />
+                  Crear Trabajos en Lote
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function NewJobPage() {
   return (
     <Suspense fallback={
@@ -1505,7 +1889,94 @@ export default function NewJobPage() {
         </div>
       </div>
     }>
-      <NewJobContent />
+      <NewJobPageInner />
     </Suspense>
+  )
+}
+
+function NewJobPageInner() {
+  const searchParams = useSearchParams()
+  const initialMode = searchParams.get('mode')
+  const [mode, setMode] = useState<'choose' | 'single' | 'batch'>(
+    initialMode === 'batch' ? 'batch' : initialMode === 'single' ? 'single' : 'choose'
+  )
+
+  if (mode === 'single') {
+    return <NewJobContent />
+  }
+
+  if (mode === 'batch') {
+    return <BatchJobContent />
+  }
+
+  // Mode selection screen
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/trabajos">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">Nuevo Trabajo</h1>
+          <p className="text-muted-foreground">
+            Selecciona como quieres crear los trabajos
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setMode('single')}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Job Individual</CardTitle>
+                <CardDescription>
+                  Un trabajo para una entidad
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Selecciona una entidad, proporciona el token DIAN y configura el rango de fechas.
+              El trabajo se lanza inmediatamente.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer hover:border-primary transition-colors"
+          onClick={() => setMode('batch')}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Layers className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Jobs en Lote</CardTitle>
+                <CardDescription>
+                  Multiples trabajos a la vez
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Crea trabajos para todas tus entidades (o filtradas por tipo).
+              Luego proporciona el token DIAN de cada una desde la lista.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

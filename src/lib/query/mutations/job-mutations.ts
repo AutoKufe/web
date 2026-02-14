@@ -94,6 +94,43 @@ export function useMarkJobAsFailed() {
 }
 
 /**
+ * Create batch jobs for multiple entities
+ */
+export function useCreateBatchJobs() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      entity_type_filter: 'natural' | 'juridica' | 'all'
+      start_date: string
+      end_date: string
+      document_categories: string[]
+      consolidation_interval: string | { value: number; unit: string } | null
+    }) => {
+      const response = await apiClient.createBatchJobs(params)
+
+      if (response.error) {
+        throw new Error(response.message || 'Error creating batch jobs')
+      }
+
+      return response as {
+        success: boolean
+        created_count: number
+        failed_count: number
+        batch_id: string
+        created_jobs: Array<{ job_id: string; entity_id: string; entity_name: string; status: string }>
+        failed_jobs: Array<{ entity_id: string; entity_name: string; error: string }>
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.batches.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.usage })
+    },
+  })
+}
+
+/**
  * Provide a new token for a job in waiting_token status
  */
 export function useProvideToken() {
