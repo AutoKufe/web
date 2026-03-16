@@ -200,8 +200,12 @@ export default function EntitiesPage() {
     }
 
     try {
-      await registerMutation.mutateAsync(registerToken)
-      toast.success('Entidad registrada exitosamente')
+      const result = await registerMutation.mutateAsync(registerToken)
+      if (result.status === 'duplicate_token_updated') {
+        toast.success(result.message || 'Entidad ya existe. Token DIAN actualizado.')
+      } else {
+        toast.success('Entidad registrada exitosamente')
+      }
       setRegisterDialogOpen(false)
       resetRegisterDialog()
     } catch (err) {
