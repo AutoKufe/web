@@ -289,7 +289,17 @@ function NewJobContent() {
     }, 800)
   }, [])
 
-  // Handler for token input with instant validation
+  // Auto-select entity from token URL without resetting token state
+  const autoSelectEntityFromToken = (tokenUrl: string) => {
+    const rk = extractRkFromToken(tokenUrl)
+    if (!rk) return null
+
+    const rkSuffix = rk.slice(-4)
+    const matchingEntity = entities.find(e => e.identifier_suffix === rkSuffix)
+    return matchingEntity || null
+  }
+
+  // Handler for token input with instant validation + auto-entity-detection
   const handleDianTokenChange = (value: string) => {
     setDianToken(value)
 
@@ -298,22 +308,50 @@ function NewJobContent() {
     setRepresentativeUpdated(false)
     setTokenValidatedAt(null)
 
-    // Instant validation: check entity match (for juridica by rk suffix)
-    if (selectedEntity && value.trim()) {
-      const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
-      setDianTokenError(error)
+    const isValidLookingToken = value.trim() && value.includes('catalogo-vpfe.dian.gov.co')
 
-      // If entity match is OK, trigger server validation with entity_id
-      if (!error) {
+    if (selectedEntity && isValidLookingToken) {
+      const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
+
+      if (error) {
+        // Token doesn't match selected entity - try to auto-detect correct one
+        const correctEntity = autoSelectEntityFromToken(value)
+        if (correctEntity) {
+          // Found the correct entity - auto-switch without resetting token
+          setSelectedEntity(correctEntity)
+          setDianTokenError(null)
+          // Reset auto-token states for new entity
+          setAutoTokenRequestId(null)
+          setAutoTokenStatus('idle')
+          setAutoTokenError(null)
+          setAutoTokenStartedAt(null)
+          // Validate with server
+          validateTokenWithServer(value, correctEntity.id)
+          toast.success(`Entidad cambiada a ${correctEntity.display_name} (****${correctEntity.identifier_suffix})`)
+        } else {
+          // No matching entity found
+          setDianTokenError(error)
+        }
+      } else {
+        // Entity match is OK, trigger server validation
+        setDianTokenError(null)
         validateTokenWithServer(value, selectedEntity.id)
       }
-    } else if (value.trim() && value.includes('catalogo-vpfe.dian.gov.co')) {
-      // No entity selected but valid-looking token pasted - prompt to select entity first
-      setDianTokenError('Selecciona una entidad primero')
-      setValidationPhase('error')
-      // Shake the entity selector to draw attention
-      setEntitySelectorShake(true)
-      setTimeout(() => setEntitySelectorShake(false), 600)
+    } else if (isValidLookingToken) {
+      // No entity selected - auto-detect from token
+      const detectedEntity = autoSelectEntityFromToken(value)
+      if (detectedEntity) {
+        setSelectedEntity(detectedEntity)
+        setDianTokenError(null)
+        validateTokenWithServer(value, detectedEntity.id)
+        toast.success(`Entidad detectada: ${detectedEntity.display_name} (****${detectedEntity.identifier_suffix})`)
+      } else {
+        // Token valid but no matching entity registered
+        const rk = extractRkFromToken(value)
+        const rkSuffix = rk ? rk.slice(-4) : '????'
+        setDianTokenError(`No hay entidad registrada que termine en ${rkSuffix}`)
+        setValidationPhase('error')
+      }
     } else {
       setDianTokenError(null)
     }
