@@ -106,13 +106,44 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   all: 'Todas',
 }
 
-// Inline token input for waiting_token jobs
+// Extract 'rk' parameter from DIAN token URL
+const extractRkFromToken = (tokenUrl: string): string | null => {
+  try {
+    const url = new URL(tokenUrl)
+    return url.searchParams.get('rk')
+  } catch {
+    const match = tokenUrl.match(/[?&]rk=(\d+)/)
+    return match ? match[1] : null
+  }
+}
+
+// Inline token input for waiting_token jobs with entity mismatch detection
 function TokenInput({ job }: { job: Job }) {
   const [tokenUrl, setTokenUrl] = useState('')
+  const [mismatchError, setMismatchError] = useState<string | null>(null)
   const provideTokenMutation = useProvideToken()
+  const cachedEntity = useEntityFromList(job.entity_id)
+
+  const handleTokenChange = (value: string) => {
+    setTokenUrl(value)
+    setMismatchError(null)
+
+    // Client-side validation: check token matches job's entity
+    if (value.trim() && value.includes('catalogo-vpfe.dian.gov.co') && cachedEntity?.identifier_suffix) {
+      const rk = extractRkFromToken(value)
+      if (rk) {
+        const rkSuffix = rk.slice(-4)
+        if (rkSuffix !== cachedEntity.identifier_suffix) {
+          setMismatchError(
+            `Este token es de otra entidad (****${rkSuffix}), no de ${cachedEntity.display_name} (****${cachedEntity.identifier_suffix})`
+          )
+        }
+      }
+    }
+  }
 
   const handleSubmit = () => {
-    if (!tokenUrl.trim()) return
+    if (!tokenUrl.trim() || mismatchError) return
 
     provideTokenMutation.mutate(
       { jobId: job.id, tokenUrl: tokenUrl.trim() },
@@ -120,6 +151,7 @@ function TokenInput({ job }: { job: Job }) {
         onSuccess: () => {
           toast.success('Token guardado. Job en cola de procesamiento.')
           setTokenUrl('')
+          setMismatchError(null)
         },
         onError: (error) => {
           toast.error(error.message || 'Error al proporcionar token')
@@ -129,30 +161,35 @@ function TokenInput({ job }: { job: Job }) {
   }
 
   return (
-    <div className="flex items-center gap-2 mt-2 ml-6">
-      <KeyRound className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-      <Input
-        placeholder="Pega la URL del token DIAN..."
-        value={tokenUrl}
-        onChange={(e) => setTokenUrl(e.target.value)}
-        className="h-7 text-xs flex-1 max-w-[400px]"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSubmit()
-        }}
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 text-xs px-2"
-        onClick={handleSubmit}
-        disabled={!tokenUrl.trim() || provideTokenMutation.isPending}
-      >
-        {provideTokenMutation.isPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <Send className="h-3 w-3" />
-        )}
-      </Button>
+    <div className="mt-2 ml-6">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+        <Input
+          placeholder="Pega la URL del token DIAN..."
+          value={tokenUrl}
+          onChange={(e) => handleTokenChange(e.target.value)}
+          className={`h-7 text-xs flex-1 max-w-[400px] ${mismatchError ? 'border-red-400' : ''}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSubmit()
+          }}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs px-2"
+          onClick={handleSubmit}
+          disabled={!tokenUrl.trim() || !!mismatchError || provideTokenMutation.isPending}
+        >
+          {provideTokenMutation.isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Send className="h-3 w-3" />
+          )}
+        </Button>
+      </div>
+      {mismatchError && (
+        <p className="text-[10px] text-red-500 mt-1 ml-6">{mismatchError}</p>
+      )}
     </div>
   )
 }
