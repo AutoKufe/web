@@ -52,6 +52,7 @@ interface ErrorCodeInfo {
   message: string
   actionLabel?: string
   getActionUrl?: (job: Job) => string
+  isWarning?: boolean  // true = yellow (external issue), false/undefined = red (system error)
 }
 
 const ERROR_CODES: Record<string, ErrorCodeInfo> = {
@@ -89,6 +90,12 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
   },
   WORKFLOW_ERROR: {
     message: 'Error inesperado durante la creacion del trabajo.'
+  },
+  DIAN_UNAVAILABLE: {
+    message: 'La DIAN no respondio a tiempo. Reintenta en unos minutos.',
+    actionLabel: 'Reintentar',
+    getActionUrl: (job) => `/trabajos/nuevo?entity_id=${job.entity_id}`,
+    isWarning: true
   }
 }
 
@@ -371,9 +378,9 @@ function JobRow({ job }: { job: Job }) {
           {job.status === 'waiting_token' && (
             <TokenInput job={job} />
           )}
-          {job.status === 'creation_failed' && job.error_code && (
+          {(job.status === 'creation_failed' || job.status === 'failed') && job.error_code && (
             <div className="ml-6 mt-1">
-              <p className="text-xs text-red-600">
+              <p className={`text-xs ${ERROR_CODES[job.error_code]?.isWarning ? 'text-amber-600' : 'text-red-600'}`}>
                 {ERROR_CODES[job.error_code]?.message || `Error desconocido: ${job.error_code}`}
               </p>
               {ERROR_CODES[job.error_code]?.actionLabel && ERROR_CODES[job.error_code]?.getActionUrl && (
