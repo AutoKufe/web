@@ -190,35 +190,6 @@ function NewJobContent() {
   // Ref for token input focus
   const dianTokenInputRef = useRef<HTMLInputElement>(null)
 
-  // Entity creation from token (inline, no navigation)
-  const [creatingEntity, setCreatingEntity] = useState(false)
-
-  const handleCreateEntityFromToken = useCallback(async (tokenUrl: string) => {
-    setCreatingEntity(true)
-    const toastId = toast.loading('Registrando entidad...')
-    try {
-      await apiClient.registerEntity(tokenUrl)
-      const result = await refetchEntities()
-      const newEntities = result.data?.entities || []
-      const rk = extractRkFromToken(tokenUrl)
-      const rkSuffix = rk ? rk.slice(-4) : ''
-      const newEntity = newEntities.find((e: EntitySelectorItem) => e.identifier_suffix === rkSuffix)
-      if (newEntity) {
-        setSelectedEntity(newEntity)
-        setDianTokenError(null)
-        toast.success(`Entidad registrada: ${newEntity.display_name}`, { id: toastId })
-        validateTokenWithServer(tokenUrl, newEntity.id)
-      } else {
-        toast.success('Entidad registrada. Seleccionala en el listado.', { id: toastId })
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Error registrando entidad'
-      toast.error(errMsg, { id: toastId })
-    } finally {
-      setCreatingEntity(false)
-    }
-  }, [refetchEntities, validateTokenWithServer])
-
   // Debounce ref for server validation
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -317,6 +288,35 @@ function NewJobContent() {
       }
     }, 800)
   }, [])
+
+  // Entity creation from token (inline, no navigation)
+  const [creatingEntity, setCreatingEntity] = useState(false)
+
+  const handleCreateEntityFromToken = async (tokenUrl: string) => {
+    setCreatingEntity(true)
+    const toastId = toast.loading('Registrando entidad...')
+    try {
+      await apiClient.registerEntity(tokenUrl)
+      const result = await refetchEntities()
+      const newEntities = result.data?.entities || []
+      const rk = extractRkFromToken(tokenUrl)
+      const rkSuffix = rk ? rk.slice(-4) : ''
+      const newEntity = newEntities.find((e: EntitySelectorItem) => e.identifier_suffix === rkSuffix)
+      if (newEntity) {
+        setSelectedEntity(newEntity)
+        setDianTokenError(null)
+        toast.success(`Entidad registrada: ${newEntity.display_name}`, { id: toastId })
+        validateTokenWithServer(tokenUrl, newEntity.id)
+      } else {
+        toast.success('Entidad registrada. Seleccionala en el listado.', { id: toastId })
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Error registrando entidad'
+      toast.error(errMsg, { id: toastId })
+    } finally {
+      setCreatingEntity(false)
+    }
+  }
 
   // Auto-select entity from token URL without resetting token state
   const autoSelectEntityFromToken = (tokenUrl: string) => {
