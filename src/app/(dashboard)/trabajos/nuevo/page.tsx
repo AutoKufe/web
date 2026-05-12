@@ -190,6 +190,9 @@ function NewJobContent() {
   // Ref for token input focus
   const dianTokenInputRef = useRef<HTMLInputElement>(null)
 
+  // Track which NIT suffix we've already offered entity creation for (avoids repeated toasts)
+  const offeredCreationForSuffix = useRef<string | null>(null)
+
   // Debounce ref for server validation
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -289,6 +292,43 @@ function NewJobContent() {
     }, 800)
   }, [])
 
+  // Entity creation from token (inline, no navigation)
+  const [creatingEntity, setCreatingEntity] = useState(false)
+
+  const handleCreateEntityFromToken = async (tokenUrl: string) => {
+    setCreatingEntity(true)
+    const toastId = toast.loading('Registrando entidad...')
+    try {
+      const regResult = await apiClient.registerEntity(tokenUrl) as { error?: string; message?: string }
+      if (regResult?.error) {
+        toast.error(regResult.message || 'No se pudo registrar la entidad', { id: toastId })
+        offeredCreationForSuffix.current = null
+        return
+      }
+      const result = await refetchEntities()
+      const newEntities = result.data?.entities || []
+      const rk = extractRkFromToken(tokenUrl)
+      const rkSuffix = rk ? rk.slice(-4) : ''
+      const newEntity = newEntities.find((e: EntitySelectorItem) => e.identifier_suffix === rkSuffix)
+      if (newEntity) {
+        setSelectedEntity(newEntity)
+        setDianTokenError(null)
+        offeredCreationForSuffix.current = null
+        toast.success(`Entidad registrada: ${newEntity.display_name}`, { id: toastId })
+        validateTokenWithServer(tokenUrl, newEntity.id)
+      } else {
+        toast.error('Entidad creada pero no se encontro en el listado. Recarga la pagina.', { id: toastId })
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Error registrando entidad'
+      toast.error(errMsg, { id: toastId })
+      offeredCreationForSuffix.current = null
+    } finally {
+      setCreatingEntity(false)
+    }
+  }
+
+
   // Auto-select entity from token URL without resetting token state
   const autoSelectEntityFromToken = (tokenUrl: string) => {
     const rk = extractRkFromToken(tokenUrl)
@@ -307,6 +347,7 @@ function NewJobContent() {
     setValidationPhase('idle')
     setRepresentativeUpdated(false)
     setTokenValidatedAt(null)
+    if (!value.trim()) offeredCreationForSuffix.current = null
 
     const isValidLookingToken = value.trim() && value.includes('catalogo-vpfe.dian.gov.co')
 
@@ -346,11 +387,23 @@ function NewJobContent() {
         validateTokenWithServer(value, detectedEntity.id)
         toast.success(`Entidad detectada: ${detectedEntity.display_name} (****${detectedEntity.identifier_suffix})`)
       } else {
-        // Token valid but no matching entity registered
+        // Token valid but no matching entity - offer inline creation (once per suffix)
         const rk = extractRkFromToken(value)
         const rkSuffix = rk ? rk.slice(-4) : '????'
-        setDianTokenError(`No hay entidad registrada que termine en ${rkSuffix}`)
-        setValidationPhase('error')
+        setDianTokenError(null)
+        setValidationPhase('idle')
+        if (offeredCreationForSuffix.current !== rkSuffix) {
+          offeredCreationForSuffix.current = rkSuffix
+          const capturedToken = value
+          toast(`No hay entidad registrada con NIT ****${rkSuffix}`, {
+            description: 'Puedes crearla ahora sin salir de este formulario',
+            action: {
+              label: 'Crear entidad',
+              onClick: () => handleCreateEntityFromToken(capturedToken),
+            },
+            duration: 15000,
+          })
+        }
       }
     } else {
       setDianTokenError(null)

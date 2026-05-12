@@ -493,9 +493,10 @@ export class ApiClient {
   }
 
   async listJobs(page = 1, pageSize = 10) {
+    const offset = (page - 1) * pageSize
     return this.request('GET', '/jobs/list', undefined, {
-      page: page.toString(),
-      page_size: pageSize.toString(),
+      limit: pageSize.toString(),
+      offset: offset.toString(),
     })
   }
 
