@@ -302,7 +302,7 @@ function NewJobContent() {
       const regResult = await apiClient.registerEntity(tokenUrl) as { error?: string; message?: string }
       if (regResult?.error) {
         toast.error(regResult.message || 'No se pudo registrar la entidad', { id: toastId })
-        offeredCreationForSuffix.current = null // Allow re-offer after failure
+        offeredCreationForSuffix.current = null
         return
       }
       const result = await refetchEntities()
@@ -327,6 +327,7 @@ function NewJobContent() {
       setCreatingEntity(false)
     }
   }
+
 
   // Auto-select entity from token URL without resetting token state
   const autoSelectEntityFromToken = (tokenUrl: string) => {
