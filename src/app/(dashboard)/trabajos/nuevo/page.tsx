@@ -192,6 +192,8 @@ function NewJobContent() {
 
   // Track which NIT suffix we've already offered entity creation for (avoids repeated toasts)
   const offeredCreationForSuffix = useRef<string | null>(null)
+  // Toast ID for the "create entity" offer, so we can dismiss it after creation
+  const createEntityToastId = useRef<string | number | null>(null)
 
   // Debounce ref for server validation
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -314,6 +316,11 @@ function NewJobContent() {
         setSelectedEntity(newEntity)
         setDianTokenError(null)
         offeredCreationForSuffix.current = null
+        // Dismiss the "create entity" offer toast so it can't be clicked again
+        if (createEntityToastId.current !== null) {
+          toast.dismiss(createEntityToastId.current)
+          createEntityToastId.current = null
+        }
         toast.success(`Entidad registrada: ${newEntity.display_name}`, { id: toastId })
         validateTokenWithServer(tokenUrl, newEntity.id)
       } else {
@@ -395,7 +402,7 @@ function NewJobContent() {
         if (offeredCreationForSuffix.current !== rkSuffix) {
           offeredCreationForSuffix.current = rkSuffix
           const capturedToken = value
-          toast(`No hay entidad registrada con NIT ****${rkSuffix}`, {
+          createEntityToastId.current = toast(`No hay entidad registrada con NIT ****${rkSuffix}`, {
             description: 'Puedes crearla ahora sin salir de este formulario',
             action: {
               label: 'Crear entidad',
@@ -627,6 +634,12 @@ function NewJobContent() {
     setAutoTokenStartedAt(null)
     // Reset dev job mode
     setIsDevJob(false)
+    // Dismiss any pending "create entity" offer
+    offeredCreationForSuffix.current = null
+    if (createEntityToastId.current !== null) {
+      toast.dismiss(createEntityToastId.current)
+      createEntityToastId.current = null
+    }
     // Clear timeouts
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current)
@@ -634,7 +647,6 @@ function NewJobContent() {
     if (autoTokenPollingRef.current) {
       clearTimeout(autoTokenPollingRef.current)
     }
-
   }
 
   const handleSubmit = async () => {
