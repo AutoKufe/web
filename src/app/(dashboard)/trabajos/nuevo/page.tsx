@@ -547,6 +547,9 @@ function NewJobContent() {
   // Sheet types (multi-select)
   const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
 
+  // Job type
+  const [jobType, setJobType] = useState<'formularios' | 'detallado'>('formularios')
+
   // Date selection mode
   const [dateSelectionMode, setDateSelectionMode] = useState<'days' | 'months'>('months')
   const [startMonth, setStartMonth] = useState('')
@@ -784,6 +787,7 @@ function NewJobContent() {
           document_categories: selectedSheetTypes,
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
+          job_type: jobType,
         },
       })
 
@@ -808,6 +812,7 @@ function NewJobContent() {
     setStartMonth('')
     setEndMonth('')
     setSelectedSheetTypes(['ingresos', 'egresos', 'nominas'])
+    setJobType('formularios')
     setConsolidationValue('1')
     setConsolidationUnit('months')
     setUseTotalConsolidation(true)
@@ -1354,6 +1359,20 @@ function NewJobContent() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Job Type */}
+          <div className="space-y-2">
+            <Label>Tipo de Trabajo *</Label>
+            <Select value={jobType} onValueChange={(v) => setJobType(v as 'formularios' | 'detallado')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="formularios">Formularios (completo — incluye Exogena)</SelectItem>
+                <SelectItem value="detallado">Detallado (ingresos, egresos, nominas, alertas)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Document Categories */}
