@@ -13,6 +13,7 @@ interface CreateJobData {
     document_categories: string[]
     consolidation_interval: string | { value: number; unit: string } | null
     is_dev_job?: boolean
+    job_type?: 'formularios' | 'detallado'
   }
 }
 

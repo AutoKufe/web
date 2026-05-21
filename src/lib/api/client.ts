@@ -337,6 +337,7 @@ export class ApiClient {
       document_categories: string[]
       consolidation_interval: string | { value: number; unit: string } | null
       is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
+      job_type?: 'formularios' | 'detallado'
     },
   ) {
     return this.request('POST', '/jobs/create-job', {
