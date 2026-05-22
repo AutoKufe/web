@@ -341,27 +341,76 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {job.stage && (
-                <>
+              {/* Download progress bar (shown when Core is downloading from DIAN) */}
+              {(() => {
+                const total = job.listing_doc_count || 0
+                const downloaded = job.docs_downloaded || 0
+                const isDownloading = job.status === 'processing' && total > 0 && downloaded > 0
+                if (!isDownloading) return null
+
+                const pct = Math.min(Math.round((downloaded / total) * 100), 100)
+
+                // ETA calculation
+                let etaText: string | null = null
+                if (job.download_started_at && downloaded > 0 && downloaded < total) {
+                  const elapsedMs = Date.now() - new Date(job.download_started_at).getTime()
+                  const docsPerMs = downloaded / elapsedMs
+                  const remaining = total - downloaded
+                  const etaMs = remaining / docsPerMs
+                  const etaMin = Math.round(etaMs / 60000)
+                  if (etaMin >= 1) {
+                    etaText = etaMin >= 60
+                      ? `~${Math.round(etaMin / 60)}h ${etaMin % 60}min restantes`
+                      : `~${etaMin} min restantes`
+                  }
+                }
+
+                return (
                   <div>
                     <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{job.stage}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {job.progress_percentage || 0}%
-                      </span>
+                      <span className="text-sm font-medium">Descargando documentos DIAN</span>
+                      <span className="text-sm text-muted-foreground">{pct}%</span>
                     </div>
                     <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary transition-all duration-500"
-                        style={{ width: `${job.progress_percentage || 0}%` }}
+                        style={{ width: `${pct}%` }}
                       />
                     </div>
+                    <div className="flex justify-between mt-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        {downloaded.toLocaleString()} / {total.toLocaleString()} docs
+                      </span>
+                      {etaText && (
+                        <span className="text-xs text-muted-foreground">{etaText}</span>
+                      )}
+                    </div>
                   </div>
-                </>
+                )
+              })()}
+
+              {/* Generic progress bar from stage/progress_percentage */}
+              {job.stage && !(job.listing_doc_count && job.docs_downloaded) && (
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium">{job.stage}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {job.progress_percentage || 0}%
+                    </span>
+                  </div>
+                  <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500"
+                      style={{ width: `${job.progress_percentage || 0}%` }}
+                    />
+                  </div>
+                </div>
               )}
-              {job.docs_total && job.docs_total > 0 && (
-                <p className="text-sm">
-                  Documentos: <strong>{job.docs_processed || 0}</strong> de <strong>{job.docs_total}</strong>
+
+              {/* Total doc count (when no download progress yet) */}
+              {job.listing_doc_count && job.listing_doc_count > 0 && !job.docs_downloaded && (
+                <p className="text-sm text-muted-foreground">
+                  Total de documentos: <strong>{job.listing_doc_count.toLocaleString()}</strong>
                 </p>
               )}
             </div>
