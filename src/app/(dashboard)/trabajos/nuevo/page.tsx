@@ -50,6 +50,7 @@ import {
   useCreateBatchJobs,
   type EntitySelectorItem,
 } from '@/lib/query'
+import { DuplicateJobError } from '@/lib/query/mutations/job-mutations'
 import { apiClient } from '@/lib/api/client'
 
 // Helper to get Colombia local date (UTC-5)
@@ -807,6 +808,11 @@ function NewJobContent() {
       setStep('success')
       toast.success('Trabajo creado exitosamente')
     } catch (err) {
+      if (err instanceof DuplicateJobError && err.existingJobId) {
+        toast.error('Ya existe un trabajo activo con los mismos parámetros. Redirigiendo...')
+        router.push(`/trabajos/${err.existingJobId}`)
+        return
+      }
       toast.error(err instanceof Error ? err.message : 'Error creando trabajo')
     }
   }

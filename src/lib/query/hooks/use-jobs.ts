@@ -23,6 +23,10 @@ export interface Job {
   docs_processed?: number
   docs_total?: number
   docs_unique?: number
+  // Real-time download progress
+  docs_downloaded?: number        // running count updated every ~50 docs
+  listing_doc_count?: number      // total docs from DIAN listing Excel
+  download_started_at?: string    // ISO timestamp when download phase began
   created_at: string
   updated_at?: string
   completed_at?: string
@@ -88,6 +92,9 @@ interface JobDetailResponse {
     processed_documents?: number
     total_documents?: number
     unique_documents?: number
+    docs_downloaded?: number
+    listing_doc_count?: number
+    download_started_at?: string
     created_at: string
     updated_at?: string
     completed_at?: string
@@ -315,6 +322,9 @@ export function useJob(jobId: string | undefined) {
         docs_processed: jobData.processed_documents,
         docs_total: jobData.total_documents,
         docs_unique: jobData.unique_documents,
+        docs_downloaded: jobData.docs_downloaded,
+        listing_doc_count: jobData.listing_doc_count,
+        download_started_at: jobData.download_started_at,
         created_at: jobData.created_at,
         updated_at: jobData.updated_at,
         completed_at: jobData.completed_at,

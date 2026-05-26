@@ -20,6 +20,17 @@ interface CreateJobData {
 /**
  * Create a new job
  */
+export class DuplicateJobError extends Error {
+  existingJobId: string
+  existingStatus: string
+  constructor(message: string, existingJobId: string, existingStatus: string) {
+    super(message)
+    this.name = 'DuplicateJobError'
+    this.existingJobId = existingJobId
+    this.existingStatus = existingStatus
+  }
+}
+
 export function useCreateJob() {
   const queryClient = useQueryClient()
 
@@ -28,6 +39,14 @@ export function useCreateJob() {
       const response = await apiClient.createJob(data.dianToken, data.jobData)
 
       if (response.error) {
+        const detail = (response as Record<string, unknown>).detail as Record<string, unknown> | undefined
+        if (detail?.code === 'duplicate_active_job') {
+          throw new DuplicateJobError(
+            response.message || 'Ya existe un trabajo activo con los mismos parámetros.',
+            String(detail.existing_job_id || ''),
+            String(detail.existing_status || '')
+          )
+        }
         throw new Error(response.message || 'Error creating job')
       }
 
