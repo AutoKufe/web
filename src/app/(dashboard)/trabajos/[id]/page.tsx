@@ -353,8 +353,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 </div>
               )}
 
-              {/* Processing: downloading listing from DIAN (no count yet) */}
-              {job.status === 'processing' && !job.listing_doc_count && (
+              {/* Processing: downloading listing from DIAN (no count yet, no stage) */}
+              {job.status === 'processing' && !job.listing_doc_count && !job.stage && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Obteniendo lista de documentos DIAN...</p>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -424,22 +424,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               })()}
 
               {/* Generic stage progress (fallback when no download counters) */}
-              {job.stage && job.status === 'processing' && !job.listing_doc_count && (
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm font-medium">{job.stage}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {job.progress_percentage || 0}%
-                    </span>
+              {job.stage && job.status === 'processing' && !job.listing_doc_count && (() => {
+                const stageLabels: Record<string, string> = {
+                  'downloading_raw_excel': 'Descargando listado DIAN...',
+                  'processing_excel': 'Procesando listado DIAN...',
+                  'setup': 'Inicializando...',
+                  'download': 'Descargando documentos...',
+                  'analysis': 'Analizando documentos...',
+                  'excel_generation': 'Generando Excel...',
+                  'upload': 'Subiendo archivos...',
+                }
+                const label = stageLabels[job.stage] || job.stage
+                const pct = job.progress_percentage || 0
+                return (
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">{label}</span>
+                      {pct > 0 && <span className="text-sm text-muted-foreground">{pct}%</span>}
+                    </div>
+                    <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${pct > 0 ? 'bg-primary' : 'bg-primary/40 animate-pulse w-full'}`}
+                        style={pct > 0 ? { width: `${pct}%` } : undefined}
+                      />
+                    </div>
                   </div>
-                  <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${job.progress_percentage || 0}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           </CardContent>
         </Card>
