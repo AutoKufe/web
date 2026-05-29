@@ -341,27 +341,61 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Download progress bar (shown when Core is downloading from DIAN) */}
-              {(() => {
-                const total = job.listing_doc_count || 0
-                const downloaded = job.docs_downloaded || 0
-                const isDownloading = job.status === 'processing' && total > 0 && downloaded > 0
-                if (!isDownloading) return null
+              {/* Pending / queued: waiting to start */}
+              {(job.status === 'pending' || job.status === 'queued') && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {job.status === 'queued' ? 'En cola, iniciando pronto...' : 'Preparando la maquina de procesamiento...'}
+                  </p>
+                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+                  </div>
+                </div>
+              )}
 
+              {/* Processing: downloading listing from DIAN (no count yet) */}
+              {job.status === 'processing' && !job.listing_doc_count && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Obteniendo lista de documentos DIAN...</p>
+                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+                  </div>
+                </div>
+              )}
+
+              {/* Processing: listing known, download starting (no docs yet) */}
+              {job.status === 'processing' && job.listing_doc_count && job.listing_doc_count > 0 && !job.docs_downloaded && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Iniciando descarga de <strong>{job.listing_doc_count.toLocaleString()}</strong> documentos...
+                  </p>
+                  <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+                  </div>
+                </div>
+              )}
+
+              {/* Processing: active download with real progress */}
+              {job.status === 'processing' && job.listing_doc_count && job.listing_doc_count > 0 && job.docs_downloaded && job.docs_downloaded > 0 && (() => {
+                const total = job.listing_doc_count
+                const downloaded = job.docs_downloaded
                 const pct = Math.min(Math.round((downloaded / total) * 100), 100)
 
-                // ETA calculation
                 let etaText: string | null = null
                 if (job.download_started_at && downloaded > 0 && downloaded < total) {
                   const elapsedMs = Date.now() - new Date(job.download_started_at).getTime()
-                  const docsPerMs = downloaded / elapsedMs
-                  const remaining = total - downloaded
-                  const etaMs = remaining / docsPerMs
-                  const etaMin = Math.round(etaMs / 60000)
-                  if (etaMin >= 1) {
-                    etaText = etaMin >= 60
-                      ? `~${Math.round(etaMin / 60)}h ${etaMin % 60}min restantes`
-                      : `~${etaMin} min restantes`
+                  if (elapsedMs > 0) {
+                    const docsPerMs = downloaded / elapsedMs
+                    const remaining = total - downloaded
+                    const etaMs = remaining / docsPerMs
+                    const etaMin = Math.round(etaMs / 60000)
+                    if (etaMin >= 1) {
+                      etaText = etaMin >= 60
+                        ? `~${Math.round(etaMin / 60)}h ${etaMin % 60}min restantes`
+                        : `~${etaMin} min restantes`
+                    } else {
+                      etaText = 'menos de 1 min restante'
+                    }
                   }
                 }
 
@@ -389,8 +423,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 )
               })()}
 
-              {/* Generic progress bar from stage/progress_percentage */}
-              {job.stage && !(job.listing_doc_count && job.docs_downloaded) && (
+              {/* Generic stage progress (fallback when no download counters) */}
+              {job.stage && job.status === 'processing' && !job.listing_doc_count && (
                 <div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm font-medium">{job.stage}</span>
@@ -405,13 +439,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     />
                   </div>
                 </div>
-              )}
-
-              {/* Total doc count (when no download progress yet) */}
-              {job.listing_doc_count && job.listing_doc_count > 0 && !job.docs_downloaded && (
-                <p className="text-sm text-muted-foreground">
-                  Total de documentos: <strong>{job.listing_doc_count.toLocaleString()}</strong>
-                </p>
               )}
             </div>
           </CardContent>
