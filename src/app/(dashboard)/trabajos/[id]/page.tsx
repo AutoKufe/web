@@ -367,7 +367,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) === 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Iniciando descarga de <strong>{job.listing_doc_count.toLocaleString()}</strong> documentos...
+                    Iniciando descarga de <strong>{(job.listing_doc_count ?? 0).toLocaleString()}</strong> documentos...
                   </p>
                   <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
                     <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
