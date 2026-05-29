@@ -364,10 +364,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               )}
 
               {/* Processing: listing known, download starting (no docs yet) */}
-              {job.status === 'processing' && job.listing_doc_count && job.listing_doc_count > 0 && !job.docs_downloaded && (
+              {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) === 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Iniciando descarga de <strong>{job.listing_doc_count.toLocaleString()}</strong> documentos...
+                    Iniciando descarga de <strong>{(job.listing_doc_count ?? 0).toLocaleString()}</strong> documentos...
                   </p>
                   <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
                     <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
@@ -376,9 +376,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               )}
 
               {/* Processing: active download with real progress */}
-              {job.status === 'processing' && job.listing_doc_count && job.listing_doc_count > 0 && job.docs_downloaded && job.docs_downloaded > 0 && (() => {
-                const total = job.listing_doc_count
-                const downloaded = job.docs_downloaded
+              {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) > 0 && (() => {
+                const total = job.listing_doc_count ?? 0
+                const downloaded = job.docs_downloaded ?? 0
                 const pct = Math.min(Math.round((downloaded / total) * 100), 100)
 
                 let etaText: string | null = null
