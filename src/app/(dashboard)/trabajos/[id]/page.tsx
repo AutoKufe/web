@@ -377,8 +377,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
               {/* Processing: active download with real progress */}
               {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) > 0 && (() => {
-                const total = job.listing_doc_count
-                const downloaded = job.docs_downloaded
+                const total = job.listing_doc_count ?? 0
+                const downloaded = job.docs_downloaded ?? 0
                 const pct = Math.min(Math.round((downloaded / total) * 100), 100)
 
                 let etaText: string | null = null
