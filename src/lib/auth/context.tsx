@@ -56,6 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           apiClient.setAccessToken(session.access_token)
         }
+
+        // Recovery links (implicit flow, #access_token=...&type=recovery) can
+        // land on any page — the fragment survives client-side redirects.
+        // The SDK auto-detects it and fires this event regardless of route,
+        // so catching it here (app-wide) is the only reliable place to send
+        // the user to the actual "set new password" screen.
+        if (event === 'PASSWORD_RECOVERY') {
+          router.replace('/update-password')
+        }
       }
     )
 
