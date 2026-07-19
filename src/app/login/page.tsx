@@ -1,83 +1,112 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (searchParams.get("error") === "recovery_failed") {
+      setError(
+        "El link de recuperación expiró o ya fue usado. Pedí uno nuevo.",
+      );
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+    });
 
     if (error) {
       const messages: Record<string, string> = {
-        'Invalid login credentials': 'Correo o contraseña incorrectos',
-        'Email not confirmed': 'Debes confirmar tu correo electrónico',
-        'Too many requests': 'Demasiados intentos. Intenta de nuevo más tarde',
-      }
-      setError(messages[error.message] || error.message)
-      setLoading(false)
-      return
+        "Invalid login credentials": "Correo o contraseña incorrectos",
+        "Email not confirmed": "Debes confirmar tu correo electrónico",
+        "Too many requests": "Demasiados intentos. Intenta de nuevo más tarde",
+      };
+      setError(messages[error.message] || error.message);
+      setLoading(false);
+      return;
     }
 
     // STAGING SECURITY: Verify dev role before allowing session to persist
-    const hostname = window.location.hostname
-    const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'production'
-    const isStagingDomain = hostname.includes('dev.autokufe.com')
+    const hostname = window.location.hostname;
+    const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || "production";
+    const isStagingDomain = hostname.includes("dev.autokufe.com");
 
-    if (isStagingDomain || environment === 'staging') {
+    if (isStagingDomain || environment === "staging") {
       // User successfully authenticated, but we need to verify they have dev access
-      const userId = data.user?.id
+      const userId = data.user?.id;
 
       if (userId) {
         const { data: roles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .is('revoked_at', null)
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .is("revoked_at", null);
 
-        const userRoles = roles?.map(r => r.role) || []
-        const hasDevAccess = userRoles.includes('dev') || userRoles.includes('super_admin')
+        const userRoles = roles?.map((r) => r.role) || [];
+        const hasDevAccess =
+          userRoles.includes("dev") || userRoles.includes("super_admin");
 
         if (!hasDevAccess) {
           // User doesn't have dev role - sign them out immediately
-          await supabase.auth.signOut()
-          setError('El ambiente de staging está reservado para desarrolladores. Si necesitas acceso, contacta al equipo de desarrollo.')
-          setLoading(false)
-          return
+          await supabase.auth.signOut();
+          setError(
+            "El ambiente de staging está reservado para desarrolladores. Si necesitas acceso, contacta al equipo de desarrollo.",
+          );
+          setLoading(false);
+          return;
         }
       }
     }
 
     // Redirect based on domain
-    const isAdminDomain = hostname.includes('admin.')
-    router.push(isAdminDomain ? '/support' : '/dashboard')
-    router.refresh()
-  }
+    const isAdminDomain = hostname.includes("admin.");
+    router.push(isAdminDomain ? "/support" : "/dashboard");
+    router.refresh();
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">AutoKufe</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">
+            AutoKufe
+          </CardTitle>
           <CardDescription className="text-center">
             Ingresa tus credenciales para acceder
           </CardDescription>
@@ -113,11 +142,11 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Ingresando...' : 'Ingresar'}
+              {loading ? "Ingresando..." : "Ingresar"}
             </Button>
           </CardFooter>
         </form>
       </Card>
     </div>
-  )
+  );
 }
