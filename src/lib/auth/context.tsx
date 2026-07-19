@@ -35,6 +35,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
+    // Recovery emails triggered from the Supabase Dashboard use the classic
+    // implicit flow (#access_token=...&refresh_token=...&type=recovery),
+    // regardless of this client's flowType. This client is hardcoded to
+    // "pkce" (see @supabase/ssr's createBrowserClient), and in PKCE mode
+    // detectSessionInUrl only looks for a ?code= param — it never processes
+    // an implicit-flow hash, so the PASSWORD_RECOVERY event never fires on
+    // its own. The hash has to be parsed and exchanged for a session by hand.
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    if (hash.includes("access_token") && hash.includes("type=recovery")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(() => {
+          window.history.replaceState(null, "", window.location.pathname);
+          router.replace("/update-password");
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
     const initAuth = async () => {
       const {
         data: { session },
