@@ -53,7 +53,11 @@ export function useUploadListingExcel() {
         throw new Error(response.message || "Error subiendo el Excel");
       }
 
-      return response as { file_id: string; row_count: number };
+      return response as {
+        file_id: string;
+        row_count: number;
+        date_range: { start_date: string; end_date: string };
+      };
     },
   });
 }

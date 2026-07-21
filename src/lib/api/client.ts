@@ -362,6 +362,7 @@ export class ApiClient {
   ): Promise<{
     file_id?: string;
     row_count?: number;
+    date_range?: { start_date: string; end_date: string };
     error?: string;
     message?: string;
   }> {
@@ -391,7 +392,11 @@ export class ApiClient {
         };
       }
 
-      return json as { file_id: string; row_count: number };
+      return json as {
+        file_id: string;
+        row_count: number;
+        date_range: { start_date: string; end_date: string };
+      };
     } catch (error) {
       return {
         error: "network_error",
