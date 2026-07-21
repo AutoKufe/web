@@ -38,6 +38,13 @@ export class DuplicateJobError extends Error {
  * Upload the DIAN listing Excel the user exported manually. Returns
  * file_id to use as jobData.listing_excel_file_id in useCreateJob.
  */
+export class EntityNotDetectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EntityNotDetectedError";
+  }
+}
+
 export function useUploadListingExcel() {
   return useMutation({
     mutationFn: async ({
@@ -45,11 +52,16 @@ export function useUploadListingExcel() {
       entityId,
     }: {
       file: File;
-      entityId: string;
+      entityId?: string;
     }) => {
       const response = await apiClient.uploadListingExcel(file, entityId);
 
       if (response.error) {
+        if (response.error === "entity_not_detected") {
+          throw new EntityNotDetectedError(
+            response.message || "No se pudo detectar la entidad",
+          );
+        }
         throw new Error(response.message || "Error subiendo el Excel");
       }
 
@@ -57,6 +69,13 @@ export function useUploadListingExcel() {
         file_id: string;
         row_count: number;
         date_range: { start_date: string; end_date: string };
+        entity: {
+          id: string;
+          display_name: string | null;
+          identifier_suffix: string | null;
+          type: string | null;
+        };
+        entity_auto_detected: boolean;
       };
     },
   });

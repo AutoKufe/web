@@ -74,7 +74,10 @@ import {
   useUploadListingExcel,
   type EntitySelectorItem,
 } from "@/lib/query";
-import { DuplicateJobError } from "@/lib/query/mutations/job-mutations";
+import {
+  DuplicateJobError,
+  EntityNotDetectedError,
+} from "@/lib/query/mutations/job-mutations";
 import { apiClient } from "@/lib/api/client";
 
 // Helper to get Colombia local date (UTC-5)
@@ -221,6 +224,13 @@ function NewJobContent() {
   const [listingExcelError, setListingExcelError] = useState<string | null>(
     null,
   );
+  const [listingExcelEntityAutoDetected, setListingExcelEntityAutoDetected] =
+    useState(false);
+  // Entity auto-detection from the uploaded Excel failed (missing NIT
+  // Receptor column, entity not registered yet, etc) — reveal the manual
+  // entity selector as a fallback so the user can pick it and retry.
+  const [showManualEntityFallback, setShowManualEntityFallback] =
+    useState(false);
   const uploadListingExcelMutation = useUploadListingExcel();
 
   // Token DIAN
@@ -1108,109 +1118,118 @@ function NewJobContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Entity Selector */}
-          <div className="space-y-2">
-            <Label>Entidad *</Label>
-            <Popover open={entitySearchOpen} onOpenChange={setEntitySearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={entitySearchOpen}
-                  className={`w-full justify-between ${entitySelectorShake ? "animate-shake ring-2 ring-red-500" : ""}`}
-                  disabled={
-                    loadingEntities ||
-                    (listingSource === "user_uploaded_excel" &&
-                      !!listingExcelFileId)
-                  }
-                >
-                  {loadingEntities ? (
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Cargando entidades...
-                    </span>
-                  ) : selectedEntity ? (
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedEntity.display_name}</span>
-                      <span className="text-muted-foreground font-mono text-xs">
-                        ****{selectedEntity.identifier_suffix}
+          {/* Entity Selector — hidden in user_uploaded_excel mode since the
+              entity is auto-detected from the file itself, unless
+              auto-detection failed and the user needs to pick it manually
+              as a fallback (showManualEntityFallback). */}
+          {(listingSource !== "user_uploaded_excel" ||
+            showManualEntityFallback) && (
+            <div className="space-y-2">
+              <Label>Entidad *</Label>
+              <Popover
+                open={entitySearchOpen}
+                onOpenChange={setEntitySearchOpen}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={entitySearchOpen}
+                    className={`w-full justify-between ${entitySelectorShake ? "animate-shake ring-2 ring-red-500" : ""}`}
+                    disabled={
+                      loadingEntities ||
+                      (listingSource === "user_uploaded_excel" &&
+                        !!listingExcelFileId)
+                    }
+                  >
+                    {loadingEntities ? (
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando entidades...
                       </span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">
-                      Selecciona una entidad...
-                    </span>
-                  )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-[var(--radix-popover-trigger-width)] p-0"
-                align="start"
-              >
-                <Command>
-                  <CommandInput placeholder="Buscar por nombre o identificador..." />
-                  <CommandList className="max-h-[300px]">
-                    <CommandEmpty>
-                      <div className="py-6 text-center">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          No se encontraron entidades
-                        </p>
-                        <Link href="/entidades">
-                          <Button variant="outline" size="sm">
-                            <Building2 className="h-4 w-4 mr-2" />
-                            Registrar Entidad
-                          </Button>
-                        </Link>
+                    ) : selectedEntity ? (
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedEntity.display_name}</span>
+                        <span className="text-muted-foreground font-mono text-xs">
+                          ****{selectedEntity.identifier_suffix}
+                        </span>
                       </div>
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {entities.map((entity) => (
-                        <CommandItem
-                          key={entity.id}
-                          value={`${entity.display_name} ${entity.identifier_suffix}`}
-                          onSelect={() => handleSelectEntity(entity)}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              selectedEntity?.id === entity.id
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }`}
-                          />
-                          <div className="flex items-center gap-2 flex-1">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span>{entity.display_name}</span>
-                            <span className="text-muted-foreground font-mono text-xs">
-                              ****{entity.identifier_suffix}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {listingSource === "user_uploaded_excel" && listingExcelFileId
-                  ? "Bloqueada: quita el archivo subido para cambiar de entidad"
-                  : "Selecciona la entidad para la cual deseas procesar documentos"}
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => refetchEntities()}
-                disabled={loadingEntities}
-              >
-                <RefreshCw
-                  className={`h-3 w-3 ${loadingEntities ? "animate-spin" : ""}`}
-                />
-              </Button>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Selecciona una entidad...
+                      </span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
+                >
+                  <Command>
+                    <CommandInput placeholder="Buscar por nombre o identificador..." />
+                    <CommandList className="max-h-[300px]">
+                      <CommandEmpty>
+                        <div className="py-6 text-center">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            No se encontraron entidades
+                          </p>
+                          <Link href="/entidades">
+                            <Button variant="outline" size="sm">
+                              <Building2 className="h-4 w-4 mr-2" />
+                              Registrar Entidad
+                            </Button>
+                          </Link>
+                        </div>
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {entities.map((entity) => (
+                          <CommandItem
+                            key={entity.id}
+                            value={`${entity.display_name} ${entity.identifier_suffix}`}
+                            onSelect={() => handleSelectEntity(entity)}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                selectedEntity?.id === entity.id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }`}
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                              <span>{entity.display_name}</span>
+                              <span className="text-muted-foreground font-mono text-xs">
+                                ****{entity.identifier_suffix}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {showManualEntityFallback
+                    ? "No pudimos detectar la entidad automáticamente — selecciónala y vuelve a subir el archivo"
+                    : "Selecciona la entidad para la cual deseas procesar documentos"}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refetchEntities()}
+                  disabled={loadingEntities}
+                >
+                  <RefreshCw
+                    className={`h-3 w-3 ${loadingEntities ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Listing source: upload DIAN Excel manually (staging only + dev role,
               while this mode is being validated — see plan Fase 3). Placed
@@ -1227,15 +1246,16 @@ function NewJobContent() {
                     setListingSource(
                       checked ? "user_uploaded_excel" : "dian_scraping",
                     );
-                    if (!checked) {
-                      setListingExcelFile(null);
-                      setListingExcelFileId(null);
-                      setListingExcelRowCount(null);
-                      setListingExcelDateRange(null);
-                      setListingExcelError(null);
-                      setStartDate("");
-                      setEndDate("");
-                    }
+                    setListingExcelFile(null);
+                    setListingExcelFileId(null);
+                    setListingExcelRowCount(null);
+                    setListingExcelDateRange(null);
+                    setListingExcelError(null);
+                    setListingExcelEntityAutoDetected(false);
+                    setShowManualEntityFallback(false);
+                    setSelectedEntity(null);
+                    setStartDate("");
+                    setEndDate("");
                   }}
                   className="h-5 w-5 data-[state=checked]:bg-blue-600"
                 />
@@ -1253,20 +1273,13 @@ function NewJobContent() {
               {listingSource === "user_uploaded_excel" && (
                 <div className="pl-7 space-y-2">
                   <p className="text-xs text-blue-700">
-                    Sube el Excel exportado del portal de la DIAN. El token DIAN
-                    y el rango de fechas no aplican en este modo — la descarga
-                    de documentos se hace vía el portal público (sin token) y el
-                    rango se detecta del propio Excel.
+                    Sube el Excel exportado del portal de la DIAN. La entidad se
+                    detecta automáticamente del archivo, y el token DIAN / rango
+                    de fechas no aplican en este modo — la descarga se hace vía
+                    el portal público (sin token).
                   </p>
 
-                  {!selectedEntity ? (
-                    <Alert className="border-blue-300 bg-blue-100">
-                      <AlertCircle className="h-4 w-4 text-blue-700" />
-                      <AlertDescription className="text-blue-800 text-sm ml-2">
-                        Selecciona una entidad arriba antes de subir el Excel
-                      </AlertDescription>
-                    </Alert>
-                  ) : listingExcelFileId ? (
+                  {listingExcelFileId ? (
                     <div className="space-y-2">
                       <Alert className="border-green-200 bg-green-50">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -1280,6 +1293,18 @@ function NewJobContent() {
                               {listingExcelDateRange.end_date}
                             </>
                           )}
+                          {selectedEntity && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <Building2 className="h-3.5 w-3.5" />
+                              <span>
+                                {listingExcelEntityAutoDetected
+                                  ? "Entidad detectada: "
+                                  : "Entidad seleccionada: "}
+                                <strong>{selectedEntity.display_name}</strong>{" "}
+                                ****{selectedEntity.identifier_suffix}
+                              </span>
+                            </div>
+                          )}
                         </AlertDescription>
                       </Alert>
                       <Button
@@ -1292,6 +1317,9 @@ function NewJobContent() {
                           setListingExcelRowCount(null);
                           setListingExcelDateRange(null);
                           setListingExcelError(null);
+                          setListingExcelEntityAutoDetected(false);
+                          setShowManualEntityFallback(false);
+                          setSelectedEntity(null);
                           setStartDate("");
                           setEndDate("");
                         }}
@@ -1307,7 +1335,7 @@ function NewJobContent() {
                         disabled={uploadListingExcelMutation.isPending}
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (!file || !selectedEntity) return;
+                          if (!file) return;
                           setListingExcelFile(file);
                           setListingExcelFileId(null);
                           setListingExcelError(null);
@@ -1315,19 +1343,41 @@ function NewJobContent() {
                             const result =
                               await uploadListingExcelMutation.mutateAsync({
                                 file,
-                                entityId: selectedEntity.id,
+                                // Manual fallback: if auto-detection already
+                                // failed once and the user picked an entity
+                                // above, retry with it as an explicit override.
+                                entityId: showManualEntityFallback
+                                  ? selectedEntity?.id
+                                  : undefined,
                               });
                             setListingExcelFileId(result.file_id);
                             setListingExcelRowCount(result.row_count);
                             setListingExcelDateRange(result.date_range);
+                            setListingExcelEntityAutoDetected(
+                              result.entity_auto_detected,
+                            );
+                            setShowManualEntityFallback(false);
+                            setSelectedEntity({
+                              id: result.entity.id,
+                              display_name: result.entity.display_name || "",
+                              identifier_suffix:
+                                result.entity.identifier_suffix || "",
+                            });
                             setStartDate(result.date_range.start_date);
                             setEndDate(result.date_range.end_date);
                           } catch (err) {
-                            setListingExcelError(
-                              err instanceof Error
-                                ? err.message
-                                : "Error subiendo el Excel",
-                            );
+                            if (err instanceof EntityNotDetectedError) {
+                              setShowManualEntityFallback(true);
+                              setListingExcelError(
+                                `${err.message} Selecciona la entidad manualmente arriba y vuelve a subir el archivo.`,
+                              );
+                            } else {
+                              setListingExcelError(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Error subiendo el Excel",
+                              );
+                            }
                           }
                         }}
                       />
@@ -1336,6 +1386,13 @@ function NewJobContent() {
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Subiendo y validando Excel...
                         </div>
+                      )}
+                      {showManualEntityFallback && selectedEntity && (
+                        <p className="text-xs text-blue-700">
+                          Entidad seleccionada manualmente:{" "}
+                          <strong>{selectedEntity.display_name}</strong> — sube
+                          el archivo de nuevo para continuar
+                        </p>
                       )}
                       {listingExcelError && (
                         <Alert className="border-red-200 bg-red-50">

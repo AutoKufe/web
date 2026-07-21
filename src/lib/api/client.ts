@@ -358,17 +358,28 @@ export class ApiClient {
    */
   async uploadListingExcel(
     file: File,
-    entityId: string,
+    entityId?: string,
   ): Promise<{
     file_id?: string;
     row_count?: number;
     date_range?: { start_date: string; end_date: string };
+    entity?: {
+      id: string;
+      display_name: string | null;
+      identifier_suffix: string | null;
+      type: string | null;
+    };
+    entity_auto_detected?: boolean;
     error?: string;
     message?: string;
   }> {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("entity_id", entityId);
+    // entity_id is an optional manual override — normally the entity is
+    // auto-detected from the file's own NIT Emisor/Receptor columns.
+    if (entityId) {
+      formData.append("entity_id", entityId);
+    }
 
     const headers: HeadersInit = {};
     if (this.accessToken) {
@@ -396,6 +407,13 @@ export class ApiClient {
         file_id: string;
         row_count: number;
         date_range: { start_date: string; end_date: string };
+        entity: {
+          id: string;
+          display_name: string | null;
+          identifier_suffix: string | null;
+          type: string | null;
+        };
+        entity_auto_detected: boolean;
       };
     } catch (error) {
       return {
