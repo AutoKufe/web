@@ -2,44 +2,44 @@
  * API Client for AutoKufe Backend
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.autokufe.com'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.autokufe.com";
 
 interface ApiResponse<T = unknown> {
-  success?: boolean
-  status?: string
-  error?: string
-  message?: string
-  data?: T
-  [key: string]: unknown
+  success?: boolean;
+  status?: string;
+  error?: string;
+  message?: string;
+  data?: T;
+  [key: string]: unknown;
 }
 
 export class ApiClient {
-  private accessToken: string | null = null
+  private accessToken: string | null = null;
 
   setAccessToken(token: string | null) {
-    this.accessToken = token
+    this.accessToken = token;
   }
 
   private async request<T>(
     method: string,
     endpoint: string,
     data?: Record<string, unknown>,
-    params?: Record<string, string>
+    params?: Record<string, string>,
   ): Promise<ApiResponse<T>> {
-    const url = new URL(`${API_BASE}${endpoint}`)
+    const url = new URL(`${API_BASE}${endpoint}`);
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, value)
-      })
+        url.searchParams.append(key, value);
+      });
     }
 
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    }
+      "Content-Type": "application/json",
+    };
 
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
     }
 
     try {
@@ -47,72 +47,78 @@ export class ApiClient {
         method,
         headers,
         body: data ? JSON.stringify(data) : undefined,
-      })
+      });
 
-      const json = await response.json()
+      const json = await response.json();
 
       if (!response.ok) {
         return {
-          error: json.detail?.error || json.error || 'Unknown error',
-          message: json.detail?.message || json.message || 'Request failed',
+          error: json.detail?.error || json.error || "Unknown error",
+          message: json.detail?.message || json.message || "Request failed",
           ...json,
-        }
+        };
       }
 
-      return json
+      return json;
     } catch (error) {
       return {
-        error: 'network_error',
-        message: error instanceof Error ? error.message : 'Network error',
-      }
+        error: "network_error",
+        message: error instanceof Error ? error.message : "Network error",
+      };
     }
   }
 
   // Health check
   async health() {
-    return this.request('GET', '/health')
+    return this.request("GET", "/health");
   }
 
   // Auth check
   async authCheck() {
-    return this.request('GET', '/auth-check')
+    return this.request("GET", "/auth-check");
   }
 
   // === ENTITIES ===
-  async listEntities(page = 1, pageSize = 10, since?: string, cachedPrefixes?: string[], verifyIds?: string[]) {
+  async listEntities(
+    page = 1,
+    pageSize = 10,
+    since?: string,
+    cachedPrefixes?: string[],
+    verifyIds?: string[],
+  ) {
     const params: Record<string, string> = {
       page: page.toString(),
       page_size: pageSize.toString(),
-    }
+    };
 
     if (since) {
-      params.since = since
+      params.since = since;
     }
 
     if (cachedPrefixes && cachedPrefixes.length > 0) {
-      params.cached_prefixes = cachedPrefixes.join(',')
+      params.cached_prefixes = cachedPrefixes.join(",");
     }
 
     if (verifyIds && verifyIds.length > 0) {
-      params.verify_ids = verifyIds.join(',')
+      params.verify_ids = verifyIds.join(",");
     }
 
-    return this.request('GET', '/entities/', undefined, params)
+    return this.request("GET", "/entities/", undefined, params);
   }
 
   async searchEntities(params: {
-    name?: string
-    last_digits?: string
-    entity_type?: string
-    page_size?: number
+    name?: string;
+    last_digits?: string;
+    entity_type?: string;
+    page_size?: number;
   }) {
-    const searchParams: Record<string, string> = {}
-    if (params.name) searchParams.name = params.name
-    if (params.last_digits) searchParams.last_digits = params.last_digits
-    if (params.entity_type) searchParams.entity_type = params.entity_type
-    if (params.page_size) searchParams.page_size = params.page_size.toString()
+    const searchParams: Record<string, string> = {};
+    if (params.name) searchParams.name = params.name;
+    if (params.last_digits) searchParams.last_digits = params.last_digits;
+    if (params.entity_type) searchParams.entity_type = params.entity_type;
+    if (params.page_size) searchParams.page_size = params.page_size.toString();
 
-    return this.request('GET', '/entities/search', undefined, searchParams)
+    return this.request("GET", "/entities/search", undefined, searchParams);
   }
 
   /**
@@ -120,90 +126,101 @@ export class ApiClient {
    * Uses selector_updated_at for granular cache invalidation
    */
   async listEntitiesSelector(since?: string, cachedPrefixes?: string[]) {
-    const params: Record<string, string> = {}
+    const params: Record<string, string> = {};
 
     if (since) {
-      params.since = since
+      params.since = since;
     }
 
     if (cachedPrefixes && cachedPrefixes.length > 0) {
-      params.cached_prefixes = cachedPrefixes.join(',')
+      params.cached_prefixes = cachedPrefixes.join(",");
     }
 
-    return this.request('GET', '/entities/selector', undefined, params)
+    return this.request("GET", "/entities/selector", undefined, params);
   }
 
   async registerEntity(dianToken: string) {
-    return this.request('POST', '/entities/register', { dian_token: dianToken })
+    return this.request("POST", "/entities/register", {
+      dian_token: dianToken,
+    });
   }
 
   async registerEntityManual(data: {
-    entity_type: 'natural' | 'juridica'
-    document_type: string
-    document_number: string
-    company_nit?: string
+    entity_type: "natural" | "juridica";
+    document_type: string;
+    document_number: string;
+    company_nit?: string;
   }) {
-    return this.request('POST', '/entities/register-manual', data as unknown as Record<string, unknown>)
+    return this.request(
+      "POST",
+      "/entities/register-manual",
+      data as unknown as Record<string, unknown>,
+    );
   }
 
   async getEntity(entityId: string) {
-    return this.request('GET', `/entities/${entityId}`)
+    return this.request("GET", `/entities/${entityId}`);
   }
 
   async deleteEntity(entityId: string) {
-    return this.request('DELETE', `/entities/${entityId}`)
+    return this.request("DELETE", `/entities/${entityId}`);
   }
 
   async updateEntityTaxConfig(
     entityId: string,
     config: {
-      ciiu?: string | null
-      contributor_type?: 'ordinario' | 'gran_contribuyente' | 'regimen_simple'
-      is_iva_responsible?: boolean
-      is_withholding_agent?: boolean
-      is_self_withholder?: boolean
-    }
+      ciiu?: string | null;
+      contributor_type?: "ordinario" | "gran_contribuyente" | "regimen_simple";
+      is_iva_responsible?: boolean;
+      is_withholding_agent?: boolean;
+      is_self_withholder?: boolean;
+    },
   ) {
     return this.request<{
-      status: string
+      status: string;
       entity: {
-        id: string
-        ciiu: string | null
-        contributor_type: string | null
-        is_iva_responsible: boolean
-        is_withholding_agent: boolean
-        is_self_withholder: boolean
-        updated_at: string
-      }
-    }>('PATCH', `/entities/${entityId}/tax-config`, config as Record<string, unknown>)
+        id: string;
+        ciiu: string | null;
+        contributor_type: string | null;
+        is_iva_responsible: boolean;
+        is_withholding_agent: boolean;
+        is_self_withholder: boolean;
+        updated_at: string;
+      };
+    }>(
+      "PATCH",
+      `/entities/${entityId}/tax-config`,
+      config as Record<string, unknown>,
+    );
   }
 
   async getEntityTokenStatus(entityId: string) {
-    return this.request('GET', `/entities/${entityId}/token-status`)
+    return this.request("GET", `/entities/${entityId}/token-status`);
   }
 
   async getEntityAutoTokenStatus(entityId: string) {
     return this.request<{
-      auto_token_available: boolean
-      status: 'available' | 'not_configured' | 'token_not_received' | 'email_expired'
-      dian_email_masked?: string
-    }>('GET', `/entities/${entityId}/auto-token-status`)
+      auto_token_available: boolean;
+      status:
+        "available" | "not_configured" | "token_not_received" | "email_expired";
+      dian_email_masked?: string;
+    }>("GET", `/entities/${entityId}/auto-token-status`);
   }
 
   async getEntityJobCreationOptions(entityId: string) {
     return this.request<{
       auto_management: {
-        available: boolean
-        status: string
-        message: string
-        dian_email_masked?: string
-      }
+        available: boolean;
+        status: string;
+        message: string;
+        dian_email_masked?: string;
+      };
       saved_token: {
-        available: boolean
-        token_masked?: string
-      }
-      recommended_option: 'auto' | 'saved' | 'manual'
-    }>('GET', `/entities/${entityId}/job-creation-options`)
+        available: boolean;
+        token_masked?: string;
+      };
+      recommended_option: "auto" | "saved" | "manual";
+    }>("GET", `/entities/${entityId}/job-creation-options`);
   }
 
   /**
@@ -212,49 +229,51 @@ export class ApiClient {
    */
   async cleanupEntityStorage(entityId: string) {
     return this.request<{
-      success: boolean
-      files_deleted: number
-      files_failed?: number
-      space_freed_mb: number
-      entity_name?: string
-    }>('POST', `/entities/${entityId}/cleanup-storage`)
+      success: boolean;
+      files_deleted: number;
+      files_failed?: number;
+      space_freed_mb: number;
+      entity_name?: string;
+    }>("POST", `/entities/${entityId}/cleanup-storage`);
   }
 
   // === DIAN EMAILS ===
   async listDianEmails() {
     return this.request<{
-      success: boolean
+      success: boolean;
       dian_emails: Array<{
-        dian_email_id: string
-        email: string
-        status: string
-        requested_at: string
-        authorized_at?: string
-        deactivated_at?: string
-        has_filter: boolean
-      }>
-      total: number
-    }>('GET', '/dian-emails/list')
+        dian_email_id: string;
+        email: string;
+        status: string;
+        requested_at: string;
+        authorized_at?: string;
+        deactivated_at?: string;
+        has_filter: boolean;
+      }>;
+      total: number;
+    }>("GET", "/dian-emails/list");
   }
 
   async registerDianEmail(dianEmail: string) {
-    return this.request('POST', '/dian-emails/register', { dian_email: dianEmail })
+    return this.request("POST", "/dian-emails/register", {
+      dian_email: dianEmail,
+    });
   }
 
   async getDianEmailDetails(dianEmailId: string) {
-    return this.request('GET', `/dian-emails/${dianEmailId}/details`)
+    return this.request("GET", `/dian-emails/${dianEmailId}/details`);
   }
 
   async deactivateDianEmail(dianEmailId: string) {
-    return this.request('POST', `/dian-emails/${dianEmailId}/deactivate`)
+    return this.request("POST", `/dian-emails/${dianEmailId}/deactivate`);
   }
 
   async reactivateDianEmail(dianEmailId: string) {
-    return this.request('POST', `/dian-emails/${dianEmailId}/reactivate`)
+    return this.request("POST", `/dian-emails/${dianEmailId}/reactivate`);
   }
 
   async regenerateOAuthUrl(dianEmailId: string) {
-    return this.request('POST', `/dian-emails/${dianEmailId}/regenerate-oauth`)
+    return this.request("POST", `/dian-emails/${dianEmailId}/regenerate-oauth`);
   }
 
   // === DIAN TOKEN VALIDATION ===
@@ -271,16 +290,16 @@ export class ApiClient {
    */
   async quickValidateDianToken(tokenUrl: string, entityId?: string) {
     return this.request<{
-      valid: boolean
-      status: 'valid' | 'expired' | 'invalid' | 'error'
-      error_code?: string
-      token_saved?: boolean
-      representative_updated?: boolean
-      new_representative_name?: string
-    }>('POST', '/dian/quick-validate', {
+      valid: boolean;
+      status: "valid" | "expired" | "invalid" | "error";
+      error_code?: string;
+      token_saved?: boolean;
+      representative_updated?: boolean;
+      new_representative_name?: string;
+    }>("POST", "/dian/quick-validate", {
       token_url: tokenUrl,
-      entity_id: entityId
-    })
+      entity_id: entityId,
+    });
   }
 
   /**
@@ -289,13 +308,13 @@ export class ApiClient {
    */
   async requestAutoToken(entityId: string) {
     return this.request<{
-      success: boolean
-      request_id?: string
-      error_code?: string
-      retry_after_seconds?: number
-    }>('POST', '/dian/auto-token/request', {
-      entity_id: entityId
-    })
+      success: boolean;
+      request_id?: string;
+      error_code?: string;
+      retry_after_seconds?: number;
+    }>("POST", "/dian/auto-token/request", {
+      entity_id: entityId,
+    });
   }
 
   /**
@@ -304,14 +323,14 @@ export class ApiClient {
    */
   async getAutoTokenStatus(requestId: string) {
     return this.request<{
-      success: boolean
-      request_id?: string
-      status?: 'pending' | 'polling' | 'received' | 'failed' | 'timeout'
-      requested_at?: string
-      polling_started_at?: string
-      received_at?: string
-      error_code?: string
-    }>('GET', `/dian/auto-token/status/${requestId}`)
+      success: boolean;
+      request_id?: string;
+      status?: "pending" | "polling" | "received" | "failed" | "timeout";
+      requested_at?: string;
+      polling_started_at?: string;
+      received_at?: string;
+      error_code?: string;
+    }>("GET", `/dian/auto-token/status/${requestId}`);
   }
 
   /**
@@ -320,41 +339,108 @@ export class ApiClient {
    */
   async getActiveAutoTokenRequest(entityId: string) {
     return this.request<{
-      has_active_request: boolean
-      request_id?: string
-      status?: 'pending' | 'polling'
-      requested_at?: string
-    }>('GET', `/dian/auto-token/active/${entityId}`)
+      has_active_request: boolean;
+      request_id?: string;
+      status?: "pending" | "polling";
+      requested_at?: string;
+    }>("GET", `/dian/auto-token/active/${entityId}`);
   }
 
   // === JOBS ===
+
+  /**
+   * Upload the DIAN listing Excel the user exported manually. Returns a
+   * file_id to pass as job_data.listing_excel_file_id when creating a job
+   * with listing_source: 'user_uploaded_excel'.
+   *
+   * Uses FormData/fetch directly instead of request() — request() always
+   * JSON-serializes the body, which doesn't support multipart file uploads.
+   */
+  async uploadListingExcel(
+    file: File,
+    entityId: string,
+  ): Promise<{
+    file_id?: string;
+    row_count?: number;
+    error?: string;
+    message?: string;
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("entity_id", entityId);
+
+    const headers: HeadersInit = {};
+    if (this.accessToken) {
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/jobs/listing-excel/upload`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        return {
+          error: json.detail?.error || json.error || "upload_failed",
+          message:
+            json.detail?.message || json.message || "Error subiendo el Excel",
+        };
+      }
+
+      return json as { file_id: string; row_count: number };
+    } catch (error) {
+      return {
+        error: "network_error",
+        message: error instanceof Error ? error.message : "Error de red",
+      };
+    }
+  }
+
   async createJob(
     dianToken: string,
     jobData: {
-      entity_id?: string
-      job_name?: string
-      date_range: { start_date: string; end_date: string }
-      document_categories: string[]
-      consolidation_interval: string | { value: number; unit: string } | null
-      is_dev_job?: boolean  // Dev jobs use cached raw Excel (staging only)
-      job_type?: 'formularios' | 'detallado'
+      entity_id?: string;
+      job_name?: string;
+      date_range: { start_date: string; end_date: string };
+      document_categories: string[];
+      consolidation_interval: string | { value: number; unit: string } | null;
+      is_dev_job?: boolean; // Dev jobs use cached raw Excel (staging only)
+      job_type?: "formularios" | "detallado";
+      listing_source?: "dian_scraping" | "user_uploaded_excel";
+      download_mode?: "token_http" | "public_portal_captcha";
+      listing_excel_file_id?: string; // Required when listing_source is user_uploaded_excel
     },
   ) {
-    return this.request('POST', '/jobs/create-job', {
+    return this.request("POST", "/jobs/create-job", {
       dian_token: dianToken,
       job_data: jobData,
-      is_dev_job: jobData.is_dev_job,  // Pass at top level for Backend
-    })
+      is_dev_job: jobData.is_dev_job, // Pass at top level for Backend
+      listing_source: jobData.listing_source,
+      download_mode: jobData.download_mode,
+    });
   }
 
   /**
    * Check if cached raw Excel is available for dev jobs (staging only)
    */
-  async checkCachedRawExcel(entityId: string, startDate: string, endDate: string) {
-    return this.request('GET', `/jobs/check-cached-excel/${entityId}`, undefined, {
-      start_date: startDate,
-      end_date: endDate,
-    })
+  async checkCachedRawExcel(
+    entityId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    return this.request(
+      "GET",
+      `/jobs/check-cached-excel/${entityId}`,
+      undefined,
+      {
+        start_date: startDate,
+        end_date: endDate,
+      },
+    );
   }
 
   /**
@@ -362,151 +448,166 @@ export class ApiClient {
    * All jobs start in waiting_token status.
    */
   async createBatchJobs(params: {
-    entity_type_filter: 'natural' | 'juridica' | 'all'
-    start_date: string
-    end_date: string
-    document_categories: string[]
-    consolidation_interval: string | { value: number; unit: string } | null
+    entity_type_filter: "natural" | "juridica" | "all";
+    start_date: string;
+    end_date: string;
+    document_categories: string[];
+    consolidation_interval: string | { value: number; unit: string } | null;
   }) {
     return this.request<{
-      success: boolean
-      batch_id: string
-      created_count: number
-      failed_count: number
+      success: boolean;
+      batch_id: string;
+      created_count: number;
+      failed_count: number;
       created_jobs: Array<{
-        job_id: string
-        entity_id: string
-        entity_name: string
-        status: string
-      }>
+        job_id: string;
+        entity_id: string;
+        entity_name: string;
+        status: string;
+      }>;
       failed_jobs: Array<{
-        entity_id: string
-        entity_name: string
-        error: string
-      }>
-    }>('POST', '/jobs/create-batch', params)
+        entity_id: string;
+        entity_name: string;
+        error: string;
+      }>;
+    }>("POST", "/jobs/create-batch", params);
   }
 
   // === BATCHES ===
 
   async listBatches(page = 1, pageSize = 20) {
     return this.request<{
-      success: boolean
+      success: boolean;
       batches: Array<{
-        id: string
-        entity_type_filter: string
-        start_date: string
-        end_date: string
-        document_categories: string[]
-        consolidation_interval: string
-        total_jobs: number
-        completed_jobs: number
-        failed_jobs: number
-        processing_jobs: number
-        queued_jobs: number
-        waiting_token_jobs: number
-        created_at: string
-      }>
-      total_count: number
-      per_page: number
-    }>('GET', '/jobs/batches', undefined, {
+        id: string;
+        entity_type_filter: string;
+        start_date: string;
+        end_date: string;
+        document_categories: string[];
+        consolidation_interval: string;
+        total_jobs: number;
+        completed_jobs: number;
+        failed_jobs: number;
+        processing_jobs: number;
+        queued_jobs: number;
+        waiting_token_jobs: number;
+        created_at: string;
+      }>;
+      total_count: number;
+      per_page: number;
+    }>("GET", "/jobs/batches", undefined, {
       page: page.toString(),
       page_size: pageSize.toString(),
-    })
+    });
   }
 
   async getBatchDetail(batchId: string) {
     return this.request<{
-      success: boolean
+      success: boolean;
       batch: {
-        id: string
-        entity_type_filter: string
-        start_date: string
-        end_date: string
-        document_categories: string[]
-        consolidation_interval: string
-        total_jobs: number
-        created_at: string
-      }
+        id: string;
+        entity_type_filter: string;
+        start_date: string;
+        end_date: string;
+        document_categories: string[];
+        consolidation_interval: string;
+        total_jobs: number;
+        created_at: string;
+      };
       jobs: Array<{
-        id: string
-        job_name: string
-        entity_id: string
-        status: string
-        start_date: string
-        end_date: string
-        total_documents: number
-        processed_documents: number
-        error_message: string | null
-        error_code: string | null
-        created_at: string
-        completed_at: string | null
-        progress_percentage: number
-        stage: string
-      }>
-    }>('GET', `/jobs/batches/${batchId}`)
+        id: string;
+        job_name: string;
+        entity_id: string;
+        status: string;
+        start_date: string;
+        end_date: string;
+        total_documents: number;
+        processed_documents: number;
+        error_message: string | null;
+        error_code: string | null;
+        created_at: string;
+        completed_at: string | null;
+        progress_percentage: number;
+        stage: string;
+      }>;
+    }>("GET", `/jobs/batches/${batchId}`);
   }
 
-  async downloadBatchExcels(batchId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+  async downloadBatchExcels(batchId: string): Promise<{
+    success: boolean;
+    blob?: Blob;
+    filename?: string;
+    error?: string;
+  }> {
     try {
-      const headers: HeadersInit = {}
+      const headers: HeadersInit = {};
 
       if (this.accessToken) {
-        headers['Authorization'] = `Bearer ${this.accessToken}`
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
-      const response = await fetch(`${API_BASE}/jobs/batches/${batchId}/download-all`, {
-        method: 'GET',
-        headers,
-      })
+      const response = await fetch(
+        `${API_BASE}/jobs/batches/${batchId}/download-all`,
+        {
+          method: "GET",
+          headers,
+        },
+      );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
-          error: errorData.detail?.message || errorData.message || 'Error descargando archivos'
-        }
+          error:
+            errorData.detail?.message ||
+            errorData.message ||
+            "Error descargando archivos",
+        };
       }
 
-      const blob = await response.blob()
-      const contentDisposition = response.headers.get('Content-Disposition')
-      const contentType = response.headers.get('Content-Type') || ''
-      let filename = contentType.includes('zip') ? `batch_${batchId.slice(0, 8)}.zip` : 'reporte.xlsx'
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const contentType = response.headers.get("Content-Type") || "";
+      let filename = contentType.includes("zip")
+        ? `batch_${batchId.slice(0, 8)}.zip`
+        : "reporte.xlsx";
 
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+        );
         if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '')
+          filename = filenameMatch[1].replace(/['"]/g, "");
         }
       }
 
       return {
         success: true,
         blob,
-        filename
-      }
+        filename,
+      };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Error de red'
-      }
+        error: error instanceof Error ? error.message : "Error de red",
+      };
     }
   }
 
   async listJobs(page = 1, pageSize = 10) {
-    const offset = (page - 1) * pageSize
-    return this.request('GET', '/jobs/list', undefined, {
+    const offset = (page - 1) * pageSize;
+    return this.request("GET", "/jobs/list", undefined, {
       limit: pageSize.toString(),
       offset: offset.toString(),
-    })
+    });
   }
 
   async getJobStatus(jobId: string) {
-    return this.request('GET', `/jobs/${jobId}/status`)
+    return this.request("GET", `/jobs/${jobId}/status`);
   }
 
   async cancelJob(jobId: string) {
-    return this.request('POST', `/jobs/${jobId}/cancel`)
+    return this.request("POST", `/jobs/${jobId}/cancel`);
   }
 
   /**
@@ -514,7 +615,7 @@ export class ApiClient {
    * Used for testing error flows in development
    */
   async markJobAsFailed(jobId: string) {
-    return this.request('POST', `/jobs/${jobId}/mark-failed`)
+    return this.request("POST", `/jobs/${jobId}/mark-failed`);
   }
 
   /**
@@ -523,211 +624,240 @@ export class ApiClient {
    */
   async provideToken(jobId: string, tokenUrl: string) {
     return this.request<{
-      success: boolean
-      message: string
-      job_id: string
-      new_status: string
-    }>('POST', `/jobs/${jobId}/provide-token`, { token_url: tokenUrl })
+      success: boolean;
+      message: string;
+      job_id: string;
+      new_status: string;
+    }>("POST", `/jobs/${jobId}/provide-token`, { token_url: tokenUrl });
   }
 
-  async downloadExcel(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+  async downloadExcel(jobId: string): Promise<{
+    success: boolean;
+    blob?: Blob;
+    filename?: string;
+    error?: string;
+  }> {
     try {
-      const headers: HeadersInit = {}
+      const headers: HeadersInit = {};
 
       if (this.accessToken) {
-        headers['Authorization'] = `Bearer ${this.accessToken}`
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
-      const response = await fetch(`${API_BASE}/storage/download-excel/${jobId}`, {
-        method: 'GET',
-        headers,
-      })
+      const response = await fetch(
+        `${API_BASE}/storage/download-excel/${jobId}`,
+        {
+          method: "GET",
+          headers,
+        },
+      );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
-          error: errorData.detail?.message || errorData.message || 'Error descargando Excel'
-        }
+          error:
+            errorData.detail?.message ||
+            errorData.message ||
+            "Error descargando Excel",
+        };
       }
 
-      const blob = await response.blob()
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = 'reporte.xlsx'
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "reporte.xlsx";
 
       if (contentDisposition) {
         // Parse filename from Content-Disposition header
         // Format: attachment; filename="name.xlsx"
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+        );
         if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '')
+          filename = filenameMatch[1].replace(/['"]/g, "");
         }
       }
 
       return {
         success: true,
         blob,
-        filename
-      }
+        filename,
+      };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Error de red'
-      }
+        error: error instanceof Error ? error.message : "Error de red",
+      };
     }
   }
 
   // === SUBSCRIPTIONS ===
   async getSubscription() {
-    return this.request('GET', '/subscriptions/me')
+    return this.request("GET", "/subscriptions/me");
   }
 
   async getUsage() {
-    return this.request('GET', '/subscriptions/usage')
+    return this.request("GET", "/subscriptions/usage");
   }
 
   async canDownload(docCount = 1) {
-    return this.request('GET', '/subscriptions/can-download', undefined, {
+    return this.request("GET", "/subscriptions/can-download", undefined, {
       doc_count: docCount.toString(),
-    })
+    });
   }
 
   async getPlans() {
-    return this.request('GET', '/subscriptions/plans')
+    return this.request("GET", "/subscriptions/plans");
   }
   async syncDianEmails(cachedPrefixesWithTimestamps?: string[]) {
-    const params = new URLSearchParams()
-    if (cachedPrefixesWithTimestamps && cachedPrefixesWithTimestamps.length > 0) {
-      params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
+    const params = new URLSearchParams();
+    if (
+      cachedPrefixesWithTimestamps &&
+      cachedPrefixesWithTimestamps.length > 0
+    ) {
+      params.append("cached_prefixes", cachedPrefixesWithTimestamps.join(","));
     }
 
-    const url = `/dian-emails/sync${params.toString() ? `?${params.toString()}` : ''}`
+    const url = `/dian-emails/sync${params.toString() ? `?${params.toString()}` : ""}`;
 
     return this.request<{
-      status: string
-      sync_mode: string
-      collision_detected: boolean
+      status: string;
+      sync_mode: string;
+      collision_detected: boolean;
       changes: {
         modified_or_added: Array<{
-          id: string
-          email_masked: string
-          auth_status: string
-          authorized_at?: string | null
-          deactivated_at?: string | null
-          failed_at?: string | null
-          expired_at?: string | null
-          updated_at?: string
-          created_at: string
-          associated_entities_count: number
-        }>
-        all_valid_prefixes: string[]
-        colliding_prefixes: string[]
-        count: number
-      }
-      needs_full_ids_for_prefixes: string[]
-      total_count: number
-    }>('GET', url)
+          id: string;
+          email_masked: string;
+          auth_status: string;
+          authorized_at?: string | null;
+          deactivated_at?: string | null;
+          failed_at?: string | null;
+          expired_at?: string | null;
+          updated_at?: string;
+          created_at: string;
+          associated_entities_count: number;
+        }>;
+        all_valid_prefixes: string[];
+        colliding_prefixes: string[];
+        count: number;
+      };
+      needs_full_ids_for_prefixes: string[];
+      total_count: number;
+    }>("GET", url);
   }
 
-
   async syncJobs(cachedPrefixesWithTimestamps?: string[]) {
-    const params = new URLSearchParams()
-    if (cachedPrefixesWithTimestamps && cachedPrefixesWithTimestamps.length > 0) {
-      params.append('cached_prefixes', cachedPrefixesWithTimestamps.join(','))
+    const params = new URLSearchParams();
+    if (
+      cachedPrefixesWithTimestamps &&
+      cachedPrefixesWithTimestamps.length > 0
+    ) {
+      params.append("cached_prefixes", cachedPrefixesWithTimestamps.join(","));
     }
 
-    const url = `/jobs/sync${params.toString() ? `?${params.toString()}` : ''}`
+    const url = `/jobs/sync${params.toString() ? `?${params.toString()}` : ""}`;
 
     return this.request<{
-      status: string
-      sync_mode: string
-      collision_detected: boolean
+      status: string;
+      sync_mode: string;
+      collision_detected: boolean;
       changes: {
         modified_or_added: Array<{
-          id: string
-          job_name: string
-          status: string
-          entity_id?: string
-          entity_name?: string
-          entity_nit?: string
+          id: string;
+          job_name: string;
+          status: string;
+          entity_id?: string;
+          entity_name?: string;
+          entity_nit?: string;
           date_range?: {
-            start_date: string
-            end_date: string
-          }
-          document_filter?: string
-          docs_processed?: number
-          docs_total?: number
-          created_at: string
-          updated_at?: string
-          completed_at?: string
-        }>
-        all_valid_prefixes: string[]
-        colliding_prefixes: string[]
-        count: number
-      }
-      needs_full_ids_for_prefixes: string[]
-      total_count: number
-    }>('GET', url)
+            start_date: string;
+            end_date: string;
+          };
+          document_filter?: string;
+          docs_processed?: number;
+          docs_total?: number;
+          created_at: string;
+          updated_at?: string;
+          completed_at?: string;
+        }>;
+        all_valid_prefixes: string[];
+        colliding_prefixes: string[];
+        count: number;
+      };
+      needs_full_ids_for_prefixes: string[];
+      total_count: number;
+    }>("GET", url);
   }
 
   // === LOGS (Admin Only) ===
-  async downloadJobLogs(jobId: string): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+  async downloadJobLogs(jobId: string): Promise<{
+    success: boolean;
+    blob?: Blob;
+    filename?: string;
+    error?: string;
+  }> {
     try {
-      const headers: HeadersInit = {}
+      const headers: HeadersInit = {};
 
       if (this.accessToken) {
-        headers['Authorization'] = `Bearer ${this.accessToken}`
+        headers["Authorization"] = `Bearer ${this.accessToken}`;
       }
 
       const response = await fetch(`${API_BASE}/logs/jobs/${jobId}`, {
-        method: 'GET',
+        method: "GET",
         headers,
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        const errorData = await response.json().catch(() => ({}));
 
         if (response.status === 403) {
           return {
             success: false,
-            error: 'No tienes permisos para descargar logs. Requiere rol: super_admin o technical_support'
-          }
+            error:
+              "No tienes permisos para descargar logs. Requiere rol: super_admin o technical_support",
+          };
         }
 
         if (response.status === 404) {
           return {
             success: false,
-            error: errorData.detail || 'Logs no encontrados (pueden haber expirado o el job no completó)'
-          }
+            error:
+              errorData.detail ||
+              "Logs no encontrados (pueden haber expirado o el job no completó)",
+          };
         }
 
         return {
           success: false,
-          error: errorData.detail || errorData.message || 'Error descargando logs'
-        }
+          error:
+            errorData.detail || errorData.message || "Error descargando logs",
+        };
       }
 
-      const blob = await response.blob()
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = 'job.log'
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "job.log";
 
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+        );
         if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '')
+          filename = filenameMatch[1].replace(/['"]/g, "");
         }
       }
 
       return {
         success: true,
         blob,
-        filename
-      }
+        filename,
+      };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Error de red'
-      }
+        error: error instanceof Error ? error.message : "Error de red",
+      };
     }
   }
 
@@ -737,26 +867,29 @@ export class ApiClient {
    * Get VAPID public key for push subscription
    */
   async getVapidPublicKey() {
-    return this.request<{ vapid_public_key: string }>('GET', '/notifications/vapid-public-key')
+    return this.request<{ vapid_public_key: string }>(
+      "GET",
+      "/notifications/vapid-public-key",
+    );
   }
 
   /**
    * Subscribe to push notifications
    */
   async subscribeToNotifications(subscription: {
-    endpoint: string
-    p256dh_key: string
-    auth_key: string
-    device_name?: string
+    endpoint: string;
+    p256dh_key: string;
+    auth_key: string;
+    device_name?: string;
   }) {
-    return this.request('POST', '/notifications/subscribe', subscription)
+    return this.request("POST", "/notifications/subscribe", subscription);
   }
 
   /**
    * Unsubscribe from push notifications (soft-disable)
    */
   async unsubscribeFromNotifications(data: { endpoint: string }) {
-    return this.request('POST', '/notifications/unsubscribe', data)
+    return this.request("POST", "/notifications/unsubscribe", data);
   }
 
   /**
@@ -764,16 +897,16 @@ export class ApiClient {
    */
   async getNotificationStatus() {
     return this.request<{
-      enabled: boolean
+      enabled: boolean;
       devices: Array<{
-        id: string
-        device_name: string | null
-        created_at: string
-        endpoint_preview: string
-      }>
-      total_devices: number
-    }>('GET', '/notifications/status')
+        id: string;
+        device_name: string | null;
+        created_at: string;
+        endpoint_preview: string;
+      }>;
+      total_devices: number;
+    }>("GET", "/notifications/status");
   }
 }
 
-export const apiClient = new ApiClient()
+export const apiClient = new ApiClient();

@@ -1,20 +1,26 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Command,
   CommandEmpty,
@@ -30,761 +36,935 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Check, ChevronsUpDown, RefreshCw, Info, Zap, Mail, XCircle, FlaskConical, Sparkles, Layers } from 'lucide-react'
+} from "@/components/ui/popover";
+import {
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Building2,
+  Check,
+  ChevronsUpDown,
+  RefreshCw,
+  Info,
+  Zap,
+  Mail,
+  XCircle,
+  FlaskConical,
+  Sparkles,
+  Layers,
+} from "lucide-react";
 // FlaskConical kept for dev mode
-import { useUserRoles } from '@/lib/hooks/use-user-roles'
-import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useUserRoles } from "@/lib/hooks/use-user-roles";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   useEntitiesSelector,
   useEntityJobCreationOptions,
   useCachedExcelCheck,
   useCreateJob,
   useCreateBatchJobs,
+  useUploadListingExcel,
   type EntitySelectorItem,
-} from '@/lib/query'
-import { DuplicateJobError } from '@/lib/query/mutations/job-mutations'
-import { apiClient } from '@/lib/api/client'
+} from "@/lib/query";
+import { DuplicateJobError } from "@/lib/query/mutations/job-mutations";
+import { apiClient } from "@/lib/api/client";
 
 // Helper to get Colombia local date (UTC-5)
 const getColombiaToday = () => {
-  const now = new Date()
-  const colombiaOffset = -5 * 60
-  const localOffset = now.getTimezoneOffset()
-  const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
-  return colombiaTime.toISOString().split('T')[0]
-}
+  const now = new Date();
+  const colombiaOffset = -5 * 60;
+  const localOffset = now.getTimezoneOffset();
+  const colombiaTime = new Date(
+    now.getTime() + (colombiaOffset - localOffset) * 60 * 1000,
+  );
+  return colombiaTime.toISOString().split("T")[0];
+};
 
 const getColombiaMonth = () => {
-  const now = new Date()
-  const colombiaOffset = -5 * 60
-  const localOffset = now.getTimezoneOffset()
-  const colombiaTime = new Date(now.getTime() + (colombiaOffset - localOffset) * 60 * 1000)
-  return colombiaTime.toISOString().slice(0, 7)
-}
+  const now = new Date();
+  const colombiaOffset = -5 * 60;
+  const localOffset = now.getTimezoneOffset();
+  const colombiaTime = new Date(
+    now.getTime() + (colombiaOffset - localOffset) * 60 * 1000,
+  );
+  return colombiaTime.toISOString().slice(0, 7);
+};
 
 // Extract 'rk' parameter from DIAN token URL
 // Token format: https://catalogo-vpfe.dian.gov.co/User/AuthToken?pk=...&rk=901911696&token=...
 const extractRkFromToken = (tokenUrl: string): string | null => {
   try {
-    const url = new URL(tokenUrl)
-    return url.searchParams.get('rk')
+    const url = new URL(tokenUrl);
+    return url.searchParams.get("rk");
   } catch {
     // Try regex fallback for malformed URLs
-    const match = tokenUrl.match(/[?&]rk=(\d+)/)
-    return match ? match[1] : null
+    const match = tokenUrl.match(/[?&]rk=(\d+)/);
+    return match ? match[1] : null;
   }
-}
+};
 
 // Error code to user-friendly message mapping
 const TOKEN_ERROR_MESSAGES: Record<string, string> = {
-  'INVALID_URL': 'La URL del token DIAN no es valida',
-  'METADATA_EXTRACTION_FAILED': 'No se pudo leer la informacion del token',
-  'TOKEN_EXPIRED': 'El token DIAN ha expirado',
-  'TOKEN_INVALID': 'El token DIAN no es valido',
-  'ENTITY_NOT_FOUND': 'Entidad no encontrada',
-  'TOKEN_ENTITY_MISMATCH': 'El token pertenece a otra entidad',
-  'INTERNAL_ERROR': 'Ocurrio un error. El equipo tecnico ha sido notificado.',
+  INVALID_URL: "La URL del token DIAN no es valida",
+  METADATA_EXTRACTION_FAILED: "No se pudo leer la informacion del token",
+  TOKEN_EXPIRED: "El token DIAN ha expirado",
+  TOKEN_INVALID: "El token DIAN no es valido",
+  ENTITY_NOT_FOUND: "Entidad no encontrada",
+  TOKEN_ENTITY_MISMATCH: "El token pertenece a otra entidad",
+  INTERNAL_ERROR: "Ocurrio un error. El equipo tecnico ha sido notificado.",
   // Auto-token specific errors
-  'COOLDOWN_ACTIVE': 'Debes esperar antes de solicitar otro token',
-  'HOURLY_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes por hora (20/hora)',
-  'DAILY_LIMIT_EXCEEDED': 'Has alcanzado el limite diario de solicitudes (75/dia)',
-  'RATE_LIMIT_EXCEEDED': 'Has alcanzado el limite de solicitudes',
-  'REQUEST_IN_PROGRESS': 'Ya hay una solicitud en progreso',
-  'AUTO_TOKEN_NOT_CONFIGURED': 'La gestion automatica no esta configurada',
-  'VALID_TOKEN_EXISTS': 'Ya existe un token valido',
-  'OAUTH_EXPIRED': 'La autorizacion del email DIAN ha expirado',
-  'DIAN_REQUEST_FAILED': 'No se pudo solicitar el token a DIAN',
-  'TOKEN_NOT_RECEIVED': 'El token no llego. Intenta de nuevo.',
-  'TWOCAPTCHA_NOT_CONFIGURED': 'Error de configuracion del sistema',
-}
+  COOLDOWN_ACTIVE: "Debes esperar antes de solicitar otro token",
+  HOURLY_LIMIT_EXCEEDED:
+    "Has alcanzado el limite de solicitudes por hora (20/hora)",
+  DAILY_LIMIT_EXCEEDED:
+    "Has alcanzado el limite diario de solicitudes (75/dia)",
+  RATE_LIMIT_EXCEEDED: "Has alcanzado el limite de solicitudes",
+  REQUEST_IN_PROGRESS: "Ya hay una solicitud en progreso",
+  AUTO_TOKEN_NOT_CONFIGURED: "La gestion automatica no esta configurada",
+  VALID_TOKEN_EXISTS: "Ya existe un token valido",
+  OAUTH_EXPIRED: "La autorizacion del email DIAN ha expirado",
+  DIAN_REQUEST_FAILED: "No se pudo solicitar el token a DIAN",
+  TOKEN_NOT_RECEIVED: "El token no llego. Intenta de nuevo.",
+  TWOCAPTCHA_NOT_CONFIGURED: "Error de configuracion del sistema",
+};
 
 const getTokenErrorMessage = (errorCode?: string): string => {
-  if (!errorCode) return 'Error desconocido'
-  return TOKEN_ERROR_MESSAGES[errorCode] || 'Error desconocido'
-}
+  if (!errorCode) return "Error desconocido";
+  return TOKEN_ERROR_MESSAGES[errorCode] || "Error desconocido";
+};
 
 // Auto-token request status messages
 const AUTO_TOKEN_STATUS_MESSAGES: Record<string, string> = {
-  'pending': 'Solicitando token DIAN...',
-  'polling': 'Esperando respuesta de DIAN...',
-  'received': 'Token recibido!',
-  'failed': 'No se pudo obtener el token',
-  'timeout': 'El token no llego a tiempo',
-}
+  pending: "Solicitando token DIAN...",
+  polling: "Esperando respuesta de DIAN...",
+  received: "Token recibido!",
+  failed: "No se pudo obtener el token",
+  timeout: "El token no llego a tiempo",
+};
 
 // Validate that DIAN token matches selected entity by comparing identifier suffix
 // Returns error message if mismatch, null if valid
 const validateTokenMatchesEntity = (
   tokenUrl: string,
-  entitySuffix: string
+  entitySuffix: string,
 ): string | null => {
-  const rk = extractRkFromToken(tokenUrl)
+  const rk = extractRkFromToken(tokenUrl);
   if (!rk) {
-    return 'El token DIAN no tiene un formato valido (falta parametro rk)'
+    return "El token DIAN no tiene un formato valido (falta parametro rk)";
   }
 
-  const rkSuffix = rk.slice(-4)
+  const rkSuffix = rk.slice(-4);
   if (rkSuffix !== entitySuffix) {
-    return `El token DIAN es de otra entidad (termina en ${rkSuffix}). La entidad seleccionada termina en ${entitySuffix}.`
+    return `El token DIAN es de otra entidad (termina en ${rkSuffix}). La entidad seleccionada termina en ${entitySuffix}.`;
   }
 
-  return null // Valid
-}
+  return null; // Valid
+};
 
 function NewJobContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // User roles for dev mode
-  const { isDev: hasDevRole, loading: rolesLoading } = useUserRoles()
-  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
+  const { isDev: hasDevRole, loading: rolesLoading } = useUserRoles();
+  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === "staging";
 
   // React Query hooks
-  const { data: entitiesData, isLoading: loadingEntities, refetch: refetchEntities } = useEntitiesSelector()
-  const createJobMutation = useCreateJob()
+  const {
+    data: entitiesData,
+    isLoading: loadingEntities,
+    refetch: refetchEntities,
+  } = useEntitiesSelector();
+  const createJobMutation = useCreateJob();
 
-  const entities = entitiesData?.entities || []
+  const entities = entitiesData?.entities || [];
 
   // Entity selection
-  const [selectedEntity, setSelectedEntity] = useState<EntitySelectorItem | null>(null)
-  const [entitySearchOpen, setEntitySearchOpen] = useState(false)
-  const [entitySelectorShake, setEntitySelectorShake] = useState(false)
+  const [selectedEntity, setSelectedEntity] =
+    useState<EntitySelectorItem | null>(null);
+  const [entitySearchOpen, setEntitySearchOpen] = useState(false);
+  const [entitySelectorShake, setEntitySelectorShake] = useState(false);
 
   // Job creation options (fetched when entity is selected)
-  const { data: jobOptions, isLoading: loadingJobOptions } = useEntityJobCreationOptions(
-    selectedEntity?.id
-  )
+  const { data: jobOptions, isLoading: loadingJobOptions } =
+    useEntityJobCreationOptions(selectedEntity?.id);
 
   // Dev job mode state
-  const [isDevJob, setIsDevJob] = useState(false)
+  const [isDevJob, setIsDevJob] = useState(false);
+
+  // Listing source: 'dian_scraping' (default, automático) vs
+  // 'user_uploaded_excel' (usuario sube el Excel de listado de la DIAN,
+  // descarga vía portal público sin token). Gated to dev role in staging
+  // for now, same pattern as isDevJob, while this mode is being validated.
+  const [listingSource, setListingSource] = useState<
+    "dian_scraping" | "user_uploaded_excel"
+  >("dian_scraping");
+  const [listingExcelFile, setListingExcelFile] = useState<File | null>(null);
+  const [listingExcelFileId, setListingExcelFileId] = useState<string | null>(
+    null,
+  );
+  const [listingExcelRowCount, setListingExcelRowCount] = useState<
+    number | null
+  >(null);
+  const [listingExcelError, setListingExcelError] = useState<string | null>(
+    null,
+  );
+  const uploadListingExcelMutation = useUploadListingExcel();
 
   // Token DIAN
-  const [dianToken, setDianToken] = useState('')
-  const [dianTokenError, setDianTokenError] = useState<string | null>(null)
-  const [useNewToken, setUseNewToken] = useState(false)
+  const [dianToken, setDianToken] = useState("");
+  const [dianTokenError, setDianTokenError] = useState<string | null>(null);
+  const [useNewToken, setUseNewToken] = useState(false);
 
   // Validation phase for progressive UX
-  type ValidationPhase = 'idle' | 'validating' | 'verifying' | 'updating' | 'success' | 'success_sparkle' | 'error'
-  const [validationPhase, setValidationPhase] = useState<ValidationPhase>('idle')
-  const [representativeUpdated, setRepresentativeUpdated] = useState(false)
+  type ValidationPhase =
+    | "idle"
+    | "validating"
+    | "verifying"
+    | "updating"
+    | "success"
+    | "success_sparkle"
+    | "error";
+  const [validationPhase, setValidationPhase] =
+    useState<ValidationPhase>("idle");
+  const [representativeUpdated, setRepresentativeUpdated] = useState(false);
 
   // Auto-token request state
-  type AutoTokenStatus = 'idle' | 'pending' | 'polling' | 'received' | 'failed' | 'timeout'
-  const [autoTokenRequestId, setAutoTokenRequestId] = useState<string | null>(null)
-  const [autoTokenStatus, setAutoTokenStatus] = useState<AutoTokenStatus>('idle')
-  const [autoTokenError, setAutoTokenError] = useState<string | null>(null)
-  const [autoTokenStartedAt, setAutoTokenStartedAt] = useState<Date | null>(null)
-  const autoTokenPollingRef = useRef<NodeJS.Timeout | null>(null)
+  type AutoTokenStatus =
+    "idle" | "pending" | "polling" | "received" | "failed" | "timeout";
+  const [autoTokenRequestId, setAutoTokenRequestId] = useState<string | null>(
+    null,
+  );
+  const [autoTokenStatus, setAutoTokenStatus] =
+    useState<AutoTokenStatus>("idle");
+  const [autoTokenError, setAutoTokenError] = useState<string | null>(null);
+  const [autoTokenStartedAt, setAutoTokenStartedAt] = useState<Date | null>(
+    null,
+  );
+  const autoTokenPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Token validation timestamp (to know if we need to revalidate on submit)
-  const [tokenValidatedAt, setTokenValidatedAt] = useState<Date | null>(null)
-  const TOKEN_VALIDATION_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
+  const [tokenValidatedAt, setTokenValidatedAt] = useState<Date | null>(null);
+  const TOKEN_VALIDATION_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
 
   // Ref for token input focus
-  const dianTokenInputRef = useRef<HTMLInputElement>(null)
+  const dianTokenInputRef = useRef<HTMLInputElement>(null);
 
   // Track which NIT suffix we've already offered entity creation for (avoids repeated toasts)
-  const offeredCreationForSuffix = useRef<string | null>(null)
+  const offeredCreationForSuffix = useRef<string | null>(null);
   // Toast ID for the "create entity" offer, so we can dismiss it after creation
-  const createEntityToastId = useRef<string | number | null>(null)
+  const createEntityToastId = useRef<string | number | null>(null);
 
   // Debounce ref for server validation
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const sparkleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const phaseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sparkleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Progressive phase messages (if validation takes long)
   useEffect(() => {
-    if (validationPhase === 'validating') {
+    if (validationPhase === "validating") {
       // After 3s, show "Verificando con DIAN..."
       phaseTimeoutRef.current = setTimeout(() => {
-        setValidationPhase('verifying')
-      }, 3000)
+        setValidationPhase("verifying");
+      }, 3000);
 
       return () => {
-        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
-      }
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current);
+      };
     }
-    if (validationPhase === 'verifying') {
+    if (validationPhase === "verifying") {
       // After 2s more, show "Actualizando datos..."
       phaseTimeoutRef.current = setTimeout(() => {
-        setValidationPhase('updating')
-      }, 2000)
+        setValidationPhase("updating");
+      }, 2000);
 
       return () => {
-        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current)
-      }
+        if (phaseTimeoutRef.current) clearTimeout(phaseTimeoutRef.current);
+      };
     }
-  }, [validationPhase])
+  }, [validationPhase]);
 
   // Sparkle animation timeout (return to normal success after 2.5s)
   useEffect(() => {
-    if (validationPhase === 'success_sparkle') {
+    if (validationPhase === "success_sparkle") {
       sparkleTimeoutRef.current = setTimeout(() => {
-        setValidationPhase('success')
-        setRepresentativeUpdated(false)
-      }, 2500)
+        setValidationPhase("success");
+        setRepresentativeUpdated(false);
+      }, 2500);
 
       return () => {
-        if (sparkleTimeoutRef.current) clearTimeout(sparkleTimeoutRef.current)
-      }
+        if (sparkleTimeoutRef.current) clearTimeout(sparkleTimeoutRef.current);
+      };
     }
-  }, [validationPhase])
+  }, [validationPhase]);
 
   // Server-side token validation with debounce
-  const validateTokenWithServer = useCallback(async (tokenUrl: string, entityId?: string) => {
-    // Clear previous timeouts
-    if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current)
-    }
-    if (phaseTimeoutRef.current) {
-      clearTimeout(phaseTimeoutRef.current)
-    }
-
-    // Reset validation state
-    setValidationPhase('idle')
-
-    // Don't validate empty or short tokens
-    if (!tokenUrl.trim() || tokenUrl.length < 50) {
-      return
-    }
-
-    // Check URL structure first (instant)
-    if (!tokenUrl.includes('catalogo-vpfe.dian.gov.co')) {
-      return
-    }
-
-    // Start debounce timer (800ms after user stops typing)
-    setValidationPhase('validating')
-    validationTimeoutRef.current = setTimeout(async () => {
-      try {
-        // Pass entityId to save token if valid
-        const result = await apiClient.quickValidateDianToken(tokenUrl, entityId)
-
-        if (result.valid) {
-          setDianTokenError(null)
-          setTokenValidatedAt(new Date()) // Track when token was validated
-
-          // Check if representative was updated (sparkle animation)
-          if (result.representative_updated) {
-            setRepresentativeUpdated(true)
-            setValidationPhase('success_sparkle')
-          } else {
-            setValidationPhase('success')
-          }
-        } else {
-          // Map error code to user-friendly message
-          const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
-          const errorMessage = getTokenErrorMessage(errorCode)
-          setDianTokenError(errorMessage)
-          setValidationPhase('error')
-        }
-      } catch {
-        // Network error - show friendly message
-        setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
-        setValidationPhase('error')
+  const validateTokenWithServer = useCallback(
+    async (tokenUrl: string, entityId?: string) => {
+      // Clear previous timeouts
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
       }
-    }, 800)
-  }, [])
+      if (phaseTimeoutRef.current) {
+        clearTimeout(phaseTimeoutRef.current);
+      }
+
+      // Reset validation state
+      setValidationPhase("idle");
+
+      // Don't validate empty or short tokens
+      if (!tokenUrl.trim() || tokenUrl.length < 50) {
+        return;
+      }
+
+      // Check URL structure first (instant)
+      if (!tokenUrl.includes("catalogo-vpfe.dian.gov.co")) {
+        return;
+      }
+
+      // Start debounce timer (800ms after user stops typing)
+      setValidationPhase("validating");
+      validationTimeoutRef.current = setTimeout(async () => {
+        try {
+          // Pass entityId to save token if valid
+          const result = await apiClient.quickValidateDianToken(
+            tokenUrl,
+            entityId,
+          );
+
+          if (result.valid) {
+            setDianTokenError(null);
+            setTokenValidatedAt(new Date()); // Track when token was validated
+
+            // Check if representative was updated (sparkle animation)
+            if (result.representative_updated) {
+              setRepresentativeUpdated(true);
+              setValidationPhase("success_sparkle");
+            } else {
+              setValidationPhase("success");
+            }
+          } else {
+            // Map error code to user-friendly message
+            const errorCode =
+              typeof result.error_code === "string"
+                ? result.error_code
+                : undefined;
+            const errorMessage = getTokenErrorMessage(errorCode);
+            setDianTokenError(errorMessage);
+            setValidationPhase("error");
+          }
+        } catch {
+          // Network error - show friendly message
+          setDianTokenError(getTokenErrorMessage("INTERNAL_ERROR"));
+          setValidationPhase("error");
+        }
+      }, 800);
+    },
+    [],
+  );
 
   // Entity creation from token (inline, no navigation)
-  const [creatingEntity, setCreatingEntity] = useState(false)
+  const [creatingEntity, setCreatingEntity] = useState(false);
 
   const handleCreateEntityFromToken = async (tokenUrl: string) => {
-    setCreatingEntity(true)
-    const toastId = toast.loading('Registrando entidad...')
+    setCreatingEntity(true);
+    const toastId = toast.loading("Registrando entidad...");
     try {
-      const regResult = await apiClient.registerEntity(tokenUrl) as { error?: string; message?: string }
+      const regResult = (await apiClient.registerEntity(tokenUrl)) as {
+        error?: string;
+        message?: string;
+      };
       if (regResult?.error) {
-        toast.error(regResult.message || 'No se pudo registrar la entidad', { id: toastId })
-        offeredCreationForSuffix.current = null
-        return
+        toast.error(regResult.message || "No se pudo registrar la entidad", {
+          id: toastId,
+        });
+        offeredCreationForSuffix.current = null;
+        return;
       }
-      const result = await refetchEntities()
-      const newEntities = result.data?.entities || []
-      const rk = extractRkFromToken(tokenUrl)
-      const rkSuffix = rk ? rk.slice(-4) : ''
-      const newEntity = newEntities.find((e: EntitySelectorItem) => e.identifier_suffix === rkSuffix)
+      const result = await refetchEntities();
+      const newEntities = result.data?.entities || [];
+      const rk = extractRkFromToken(tokenUrl);
+      const rkSuffix = rk ? rk.slice(-4) : "";
+      const newEntity = newEntities.find(
+        (e: EntitySelectorItem) => e.identifier_suffix === rkSuffix,
+      );
       if (newEntity) {
-        setSelectedEntity(newEntity)
-        setDianTokenError(null)
-        offeredCreationForSuffix.current = null
+        setSelectedEntity(newEntity);
+        setDianTokenError(null);
+        offeredCreationForSuffix.current = null;
         // Dismiss the "create entity" offer toast so it can't be clicked again
         if (createEntityToastId.current !== null) {
-          toast.dismiss(createEntityToastId.current)
-          createEntityToastId.current = null
+          toast.dismiss(createEntityToastId.current);
+          createEntityToastId.current = null;
         }
-        toast.success(`Entidad registrada: ${newEntity.display_name}`, { id: toastId })
-        validateTokenWithServer(tokenUrl, newEntity.id)
+        toast.success(`Entidad registrada: ${newEntity.display_name}`, {
+          id: toastId,
+        });
+        validateTokenWithServer(tokenUrl, newEntity.id);
       } else {
-        toast.error('Entidad creada pero no se encontro en el listado. Recarga la pagina.', { id: toastId })
+        toast.error(
+          "Entidad creada pero no se encontro en el listado. Recarga la pagina.",
+          { id: toastId },
+        );
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Error registrando entidad'
-      toast.error(errMsg, { id: toastId })
-      offeredCreationForSuffix.current = null
+      const errMsg =
+        err instanceof Error ? err.message : "Error registrando entidad";
+      toast.error(errMsg, { id: toastId });
+      offeredCreationForSuffix.current = null;
     } finally {
-      setCreatingEntity(false)
+      setCreatingEntity(false);
     }
-  }
-
+  };
 
   // Auto-select entity from token URL without resetting token state
   const autoSelectEntityFromToken = (tokenUrl: string) => {
-    const rk = extractRkFromToken(tokenUrl)
-    if (!rk) return null
+    const rk = extractRkFromToken(tokenUrl);
+    if (!rk) return null;
 
-    const rkSuffix = rk.slice(-4)
-    const matchingEntity = entities.find(e => e.identifier_suffix === rkSuffix)
-    return matchingEntity || null
-  }
+    const rkSuffix = rk.slice(-4);
+    const matchingEntity = entities.find(
+      (e) => e.identifier_suffix === rkSuffix,
+    );
+    return matchingEntity || null;
+  };
 
   // Handler for token input with instant validation + auto-entity-detection
   const handleDianTokenChange = (value: string) => {
-    setDianToken(value)
+    setDianToken(value);
 
     // Reset validation state
-    setValidationPhase('idle')
-    setRepresentativeUpdated(false)
-    setTokenValidatedAt(null)
-    if (!value.trim()) offeredCreationForSuffix.current = null
+    setValidationPhase("idle");
+    setRepresentativeUpdated(false);
+    setTokenValidatedAt(null);
+    if (!value.trim()) offeredCreationForSuffix.current = null;
 
-    const isValidLookingToken = value.trim() && value.includes('catalogo-vpfe.dian.gov.co')
+    const isValidLookingToken =
+      value.trim() && value.includes("catalogo-vpfe.dian.gov.co");
 
     if (selectedEntity && isValidLookingToken) {
-      const error = validateTokenMatchesEntity(value, selectedEntity.identifier_suffix)
+      const error = validateTokenMatchesEntity(
+        value,
+        selectedEntity.identifier_suffix,
+      );
 
       if (error) {
         // Token doesn't match selected entity - try to auto-detect correct one
-        const correctEntity = autoSelectEntityFromToken(value)
+        const correctEntity = autoSelectEntityFromToken(value);
         if (correctEntity) {
           // Found the correct entity - auto-switch without resetting token
-          setSelectedEntity(correctEntity)
-          setDianTokenError(null)
+          setSelectedEntity(correctEntity);
+          setDianTokenError(null);
           // Reset auto-token states for new entity
-          setAutoTokenRequestId(null)
-          setAutoTokenStatus('idle')
-          setAutoTokenError(null)
-          setAutoTokenStartedAt(null)
+          setAutoTokenRequestId(null);
+          setAutoTokenStatus("idle");
+          setAutoTokenError(null);
+          setAutoTokenStartedAt(null);
           // Validate with server
-          validateTokenWithServer(value, correctEntity.id)
-          toast.success(`Entidad cambiada a ${correctEntity.display_name} (****${correctEntity.identifier_suffix})`)
+          validateTokenWithServer(value, correctEntity.id);
+          toast.success(
+            `Entidad cambiada a ${correctEntity.display_name} (****${correctEntity.identifier_suffix})`,
+          );
         } else {
           // No matching entity found
-          setDianTokenError(error)
+          setDianTokenError(error);
         }
       } else {
         // Entity match is OK, trigger server validation
-        setDianTokenError(null)
-        validateTokenWithServer(value, selectedEntity.id)
+        setDianTokenError(null);
+        validateTokenWithServer(value, selectedEntity.id);
       }
     } else if (isValidLookingToken) {
       // No entity selected - auto-detect from token
-      const detectedEntity = autoSelectEntityFromToken(value)
+      const detectedEntity = autoSelectEntityFromToken(value);
       if (detectedEntity) {
-        setSelectedEntity(detectedEntity)
-        setDianTokenError(null)
-        validateTokenWithServer(value, detectedEntity.id)
-        toast.success(`Entidad detectada: ${detectedEntity.display_name} (****${detectedEntity.identifier_suffix})`)
+        setSelectedEntity(detectedEntity);
+        setDianTokenError(null);
+        validateTokenWithServer(value, detectedEntity.id);
+        toast.success(
+          `Entidad detectada: ${detectedEntity.display_name} (****${detectedEntity.identifier_suffix})`,
+        );
       } else {
         // Token valid but no matching entity - offer inline creation (once per suffix)
-        const rk = extractRkFromToken(value)
-        const rkSuffix = rk ? rk.slice(-4) : '????'
-        setDianTokenError(null)
-        setValidationPhase('idle')
+        const rk = extractRkFromToken(value);
+        const rkSuffix = rk ? rk.slice(-4) : "????";
+        setDianTokenError(null);
+        setValidationPhase("idle");
         if (offeredCreationForSuffix.current !== rkSuffix) {
-          offeredCreationForSuffix.current = rkSuffix
-          const capturedToken = value
-          createEntityToastId.current = toast(`No hay entidad registrada con NIT ****${rkSuffix}`, {
-            description: 'Puedes crearla ahora sin salir de este formulario',
-            action: {
-              label: 'Crear entidad',
-              onClick: () => handleCreateEntityFromToken(capturedToken),
+          offeredCreationForSuffix.current = rkSuffix;
+          const capturedToken = value;
+          createEntityToastId.current = toast(
+            `No hay entidad registrada con NIT ****${rkSuffix}`,
+            {
+              description: "Puedes crearla ahora sin salir de este formulario",
+              action: {
+                label: "Crear entidad",
+                onClick: () => handleCreateEntityFromToken(capturedToken),
+              },
+              duration: 15000,
             },
-            duration: 15000,
-          })
+          );
         }
       }
     } else {
-      setDianTokenError(null)
+      setDianTokenError(null);
     }
-  }
+  };
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current)
+        clearTimeout(validationTimeoutRef.current);
       }
       if (autoTokenPollingRef.current) {
-        clearTimeout(autoTokenPollingRef.current)
+        clearTimeout(autoTokenPollingRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // Auto-token polling effect
   useEffect(() => {
-    if (!autoTokenRequestId || autoTokenStatus === 'received' || autoTokenStatus === 'failed' || autoTokenStatus === 'timeout') {
-      return
+    if (
+      !autoTokenRequestId ||
+      autoTokenStatus === "received" ||
+      autoTokenStatus === "failed" ||
+      autoTokenStatus === "timeout"
+    ) {
+      return;
     }
 
     const pollStatus = async () => {
       try {
-        const result = await apiClient.getAutoTokenStatus(autoTokenRequestId)
+        const result = await apiClient.getAutoTokenStatus(autoTokenRequestId);
 
         if (!result.success) {
-          setAutoTokenStatus('failed')
-          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
-          setAutoTokenError(getTokenErrorMessage(errCode))
-          return
+          setAutoTokenStatus("failed");
+          const errCode =
+            typeof result.error_code === "string"
+              ? result.error_code
+              : undefined;
+          setAutoTokenError(getTokenErrorMessage(errCode));
+          return;
         }
 
-        const status = result.status as AutoTokenStatus
-        setAutoTokenStatus(status)
+        const status = result.status as AutoTokenStatus;
+        setAutoTokenStatus(status);
 
-        if (status === 'received') {
+        if (status === "received") {
           // Token received! Clear polling and show success
-          setAutoTokenError(null)
+          setAutoTokenError(null);
           // Refresh job options to get new token status
           // The token is already saved to entity by backend
-        } else if (status === 'failed' || status === 'timeout') {
-          const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
-          setAutoTokenError(getTokenErrorMessage(errCode))
+        } else if (status === "failed" || status === "timeout") {
+          const errCode =
+            typeof result.error_code === "string"
+              ? result.error_code
+              : undefined;
+          setAutoTokenError(getTokenErrorMessage(errCode));
         } else {
           // Still pending/polling - continue polling
-          autoTokenPollingRef.current = setTimeout(pollStatus, 3000)
+          autoTokenPollingRef.current = setTimeout(pollStatus, 3000);
         }
       } catch {
         // Network error - retry
-        autoTokenPollingRef.current = setTimeout(pollStatus, 5000)
+        autoTokenPollingRef.current = setTimeout(pollStatus, 5000);
       }
-    }
+    };
 
     // Start polling
-    autoTokenPollingRef.current = setTimeout(pollStatus, 1000)
+    autoTokenPollingRef.current = setTimeout(pollStatus, 1000);
 
     return () => {
       if (autoTokenPollingRef.current) {
-        clearTimeout(autoTokenPollingRef.current)
+        clearTimeout(autoTokenPollingRef.current);
       }
-    }
-  }, [autoTokenRequestId, autoTokenStatus])
+    };
+  }, [autoTokenRequestId, autoTokenStatus]);
 
   // Check for active auto-token request when entity is selected
   useEffect(() => {
-    if (!selectedEntity?.id) return
+    if (!selectedEntity?.id) return;
 
     const checkActiveRequest = async () => {
       try {
-        const result = await apiClient.getActiveAutoTokenRequest(selectedEntity.id)
-        if (result.has_active_request && typeof result.request_id === 'string') {
+        const result = await apiClient.getActiveAutoTokenRequest(
+          selectedEntity.id,
+        );
+        if (
+          result.has_active_request &&
+          typeof result.request_id === "string"
+        ) {
           // Restore active request state
-          setAutoTokenRequestId(result.request_id)
-          const status = typeof result.status === 'string' ? result.status as AutoTokenStatus : 'pending'
-          setAutoTokenStatus(status)
-          const requestedAt = typeof result.requested_at === 'string' ? result.requested_at : null
-          setAutoTokenStartedAt(requestedAt ? new Date(requestedAt) : null)
+          setAutoTokenRequestId(result.request_id);
+          const status =
+            typeof result.status === "string"
+              ? (result.status as AutoTokenStatus)
+              : "pending";
+          setAutoTokenStatus(status);
+          const requestedAt =
+            typeof result.requested_at === "string"
+              ? result.requested_at
+              : null;
+          setAutoTokenStartedAt(requestedAt ? new Date(requestedAt) : null);
         }
       } catch {
         // Ignore errors
       }
-    }
+    };
 
-    checkActiveRequest()
-  }, [selectedEntity?.id])
+    checkActiveRequest();
+  }, [selectedEntity?.id]);
 
   // Request auto-token handler
   const handleRequestAutoToken = async () => {
-    if (!selectedEntity?.id) return
+    if (!selectedEntity?.id) return;
 
     // Reset previous state
-    setAutoTokenError(null)
-    setAutoTokenStatus('pending')
-    setAutoTokenStartedAt(new Date())
+    setAutoTokenError(null);
+    setAutoTokenStatus("pending");
+    setAutoTokenStartedAt(new Date());
 
     try {
-      const result = await apiClient.requestAutoToken(selectedEntity.id)
+      const result = await apiClient.requestAutoToken(selectedEntity.id);
 
       if (!result.success) {
-        setAutoTokenStatus('failed')
-        const errCode = typeof result.error_code === 'string' ? result.error_code : undefined
-        setAutoTokenError(getTokenErrorMessage(errCode))
+        setAutoTokenStatus("failed");
+        const errCode =
+          typeof result.error_code === "string" ? result.error_code : undefined;
+        setAutoTokenError(getTokenErrorMessage(errCode));
 
         // Show retry timer if cooldown
-        if (errCode === 'COOLDOWN_ACTIVE' && result.retry_after_seconds) {
-          setAutoTokenError(`Debes esperar ${result.retry_after_seconds} segundos`)
+        if (errCode === "COOLDOWN_ACTIVE" && result.retry_after_seconds) {
+          setAutoTokenError(
+            `Debes esperar ${result.retry_after_seconds} segundos`,
+          );
         }
-        return
+        return;
       }
 
-      const requestId = typeof result.request_id === 'string' ? result.request_id : null
-      setAutoTokenRequestId(requestId)
-      setAutoTokenStatus('pending')
+      const requestId =
+        typeof result.request_id === "string" ? result.request_id : null;
+      setAutoTokenRequestId(requestId);
+      setAutoTokenStatus("pending");
     } catch {
-      setAutoTokenStatus('failed')
-      setAutoTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
+      setAutoTokenStatus("failed");
+      setAutoTokenError(getTokenErrorMessage("INTERNAL_ERROR"));
     }
-  }
+  };
 
   // Get elapsed time message for auto-token
   const getAutoTokenElapsedMessage = (): string => {
-    if (!autoTokenStartedAt) return ''
-    const elapsed = Math.floor((Date.now() - autoTokenStartedAt.getTime()) / 1000)
+    if (!autoTokenStartedAt) return "";
+    const elapsed = Math.floor(
+      (Date.now() - autoTokenStartedAt.getTime()) / 1000,
+    );
 
-    if (elapsed < 10) return 'Solicitando token DIAN...'
-    if (elapsed < 30) return 'Esperando respuesta de DIAN...'
-    if (elapsed < 60) return 'Tomando mas tiempo del esperado...'
-    if (elapsed < 120) return 'DIAN esta tardando en responder...'
-    return 'Esto esta tomando demasiado tiempo...'
-  }
+    if (elapsed < 10) return "Solicitando token DIAN...";
+    if (elapsed < 30) return "Esperando respuesta de DIAN...";
+    if (elapsed < 60) return "Tomando mas tiempo del esperado...";
+    if (elapsed < 120) return "DIAN esta tardando en responder...";
+    return "Esto esta tomando demasiado tiempo...";
+  };
 
   // Job config
-  const [jobName, setJobName] = useState('')
-  const [jobNameError, setJobNameError] = useState<string | null>(null)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [jobName, setJobName] = useState("");
+  const [jobNameError, setJobNameError] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Sheet types (multi-select)
-  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
+  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>([
+    "ingresos",
+    "egresos",
+    "nominas",
+  ]);
 
   // Job type
-  const [jobType, setJobType] = useState<'formularios' | 'detallado'>('formularios')
+  const [jobType, setJobType] = useState<"formularios" | "detallado">(
+    "formularios",
+  );
 
   // Date selection mode
-  const [dateSelectionMode, setDateSelectionMode] = useState<'days' | 'months'>('months')
-  const [startMonth, setStartMonth] = useState('')
-  const [endMonth, setEndMonth] = useState('')
+  const [dateSelectionMode, setDateSelectionMode] = useState<"days" | "months">(
+    "months",
+  );
+  const [startMonth, setStartMonth] = useState("");
+  const [endMonth, setEndMonth] = useState("");
 
   // Consolidation interval
-  const [consolidationValue, setConsolidationValue] = useState('1')
-  const [consolidationUnit, setConsolidationUnit] = useState('months')
-  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true)
+  const [consolidationValue, setConsolidationValue] = useState("1");
+  const [consolidationUnit, setConsolidationUnit] = useState("months");
+  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true);
 
   // Form states
-  const [step, setStep] = useState<'form' | 'success'>('form')
-  const [createdJobId, setCreatedJobId] = useState<string | null>(null)
+  const [step, setStep] = useState<"form" | "success">("form");
+  const [createdJobId, setCreatedJobId] = useState<string | null>(null);
 
   // Dev cache check
-  const { data: devCacheStatus, isLoading: loadingDevCache } = useCachedExcelCheck(
-    selectedEntity?.id,
-    startDate,
-    endDate,
-    isDevJob && !!selectedEntity && !!startDate && !!endDate
-  )
+  const { data: devCacheStatus, isLoading: loadingDevCache } =
+    useCachedExcelCheck(
+      selectedEntity?.id,
+      startDate,
+      endDate,
+      isDevJob && !!selectedEntity && !!startDate && !!endDate,
+    );
 
   // Auto-select entity if preselected in URL
   useEffect(() => {
-    const preselectedEntityId = searchParams.get('entity')
+    const preselectedEntityId = searchParams.get("entity");
     if (preselectedEntityId && entities.length > 0 && !selectedEntity) {
-      const entity = entities.find(e => e.id === preselectedEntityId)
+      const entity = entities.find((e) => e.id === preselectedEntityId);
       if (entity) {
-        setSelectedEntity(entity)
+        setSelectedEntity(entity);
       }
     }
-  }, [searchParams, entities, selectedEntity])
+  }, [searchParams, entities, selectedEntity]);
 
   // Apply recommended option when job options load
   useEffect(() => {
-    if (!jobOptions) return
+    if (!jobOptions) return;
 
-    if (jobOptions.recommended_option === 'saved' && jobOptions.saved_token.available) {
-      setUseNewToken(false)
+    if (
+      jobOptions.recommended_option === "saved" &&
+      jobOptions.saved_token.available
+    ) {
+      setUseNewToken(false);
     } else {
-      setUseNewToken(true)
+      setUseNewToken(true);
     }
-  }, [jobOptions])
+  }, [jobOptions]);
 
   // Job name validation
   const validateJobName = (name: string): string | null => {
-    if (!name) return null
-    if (name.length > 20) return 'El nombre no puede exceder 20 caracteres'
-    const forbiddenChars = /[<>:"/\\|?*\s]/
-    if (forbiddenChars.test(name)) return 'No se permiten espacios ni caracteres especiales'
-    const dangerousChars = /[$%#@!`~^{}[\]]/
-    if (dangerousChars.test(name)) return 'No se permiten caracteres especiales'
-    return null
-  }
+    if (!name) return null;
+    if (name.length > 20) return "El nombre no puede exceder 20 caracteres";
+    const forbiddenChars = /[<>:"/\\|?*\s]/;
+    if (forbiddenChars.test(name))
+      return "No se permiten espacios ni caracteres especiales";
+    const dangerousChars = /[$%#@!`~^{}[\]]/;
+    if (dangerousChars.test(name))
+      return "No se permiten caracteres especiales";
+    return null;
+  };
 
   const handleJobNameChange = (value: string) => {
-    setJobName(value)
-    setJobNameError(validateJobName(value))
-  }
+    setJobName(value);
+    setJobNameError(validateJobName(value));
+  };
 
   const handleSelectEntity = (entity: EntitySelectorItem) => {
-    setSelectedEntity(entity)
-    setEntitySearchOpen(false)
+    setSelectedEntity(entity);
+    setEntitySearchOpen(false);
     // Reset token states
-    setUseNewToken(false)
-    setDianToken('')
-    setDianTokenError(null)
-    setValidationPhase('idle')
-    setRepresentativeUpdated(false)
-    setTokenValidatedAt(null)
+    setUseNewToken(false);
+    setDianToken("");
+    setDianTokenError(null);
+    setValidationPhase("idle");
+    setRepresentativeUpdated(false);
+    setTokenValidatedAt(null);
     // Reset auto-token states
-    setAutoTokenRequestId(null)
-    setAutoTokenStatus('idle')
-    setAutoTokenError(null)
-    setAutoTokenStartedAt(null)
+    setAutoTokenRequestId(null);
+    setAutoTokenStatus("idle");
+    setAutoTokenError(null);
+    setAutoTokenStartedAt(null);
     // Reset dev job mode
-    setIsDevJob(false)
+    setIsDevJob(false);
     // Dismiss any pending "create entity" offer
-    offeredCreationForSuffix.current = null
+    offeredCreationForSuffix.current = null;
     if (createEntityToastId.current !== null) {
-      toast.dismiss(createEntityToastId.current)
-      createEntityToastId.current = null
+      toast.dismiss(createEntityToastId.current);
+      createEntityToastId.current = null;
     }
     // Clear timeouts
     if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current)
+      clearTimeout(validationTimeoutRef.current);
     }
     if (autoTokenPollingRef.current) {
-      clearTimeout(autoTokenPollingRef.current)
+      clearTimeout(autoTokenPollingRef.current);
     }
-  }
+  };
 
   const handleSubmit = async () => {
     if (!selectedEntity && !dianToken.trim()) {
-      toast.error('Selecciona una entidad o ingresa un token DIAN')
-      return
+      toast.error("Selecciona una entidad o ingresa un token DIAN");
+      return;
     }
 
     if (jobName) {
-      const error = validateJobName(jobName)
+      const error = validateJobName(jobName);
       if (error) {
-        toast.error(`Nombre de trabajo invalido: ${error}`)
-        return
+        toast.error(`Nombre de trabajo invalido: ${error}`);
+        return;
       }
     }
 
     if (!startDate || !endDate) {
-      toast.error('Selecciona el rango de fechas')
-      return
+      toast.error("Selecciona el rango de fechas");
+      return;
     }
 
     if (new Date(startDate) > new Date(endDate)) {
-      toast.error('La fecha de inicio debe ser anterior a la fecha final')
-      return
+      toast.error("La fecha de inicio debe ser anterior a la fecha final");
+      return;
     }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const endDateObj = new Date(endDate)
-    endDateObj.setHours(0, 0, 0, 0)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDateObj = new Date(endDate);
+    endDateObj.setHours(0, 0, 0, 0);
 
     if (endDateObj > today) {
-      toast.error('La fecha final no puede ser mayor que hoy')
-      return
+      toast.error("La fecha final no puede ser mayor que hoy");
+      return;
     }
 
     // Token validation based on mode
     // Auto-token received counts as having a valid saved token
-    const hasAutoTokenReceived = autoTokenStatus === 'received'
+    const hasAutoTokenReceived = autoTokenStatus === "received";
 
     if (isDevJob) {
       if (!devCacheStatus?.available) {
-        toast.error('El cache de raw Excel no esta disponible')
-        return
+        toast.error("El cache de raw Excel no esta disponible");
+        return;
       }
-    } else if (!hasAutoTokenReceived && !jobOptions?.saved_token.available && !dianToken.trim()) {
-      toast.error('Ingresa el token DIAN o solicita uno automatico')
-      return
-    } else if (!hasAutoTokenReceived && jobOptions?.saved_token.available && useNewToken && !dianToken.trim()) {
-      toast.error('Ingresa el nuevo token DIAN')
-      return
+    } else if (listingSource === "user_uploaded_excel") {
+      if (!listingExcelFileId) {
+        toast.error("Sube el Excel de listado de la DIAN antes de continuar");
+        return;
+      }
+    } else if (
+      !hasAutoTokenReceived &&
+      !jobOptions?.saved_token.available &&
+      !dianToken.trim()
+    ) {
+      toast.error("Ingresa el token DIAN o solicita uno automatico");
+      return;
+    } else if (
+      !hasAutoTokenReceived &&
+      jobOptions?.saved_token.available &&
+      useNewToken &&
+      !dianToken.trim()
+    ) {
+      toast.error("Ingresa el nuevo token DIAN");
+      return;
     }
 
     // Validate token matches selected entity (instant check using identifier_suffix)
     // Only validate if: entity selected + new token provided (not auto-received, not stored, not dev, not pseudo)
-    if (selectedEntity && dianToken.trim() && !hasAutoTokenReceived && !isDevJob) {
-      const tokenMismatchError = validateTokenMatchesEntity(dianToken, selectedEntity.identifier_suffix)
+    if (
+      selectedEntity &&
+      dianToken.trim() &&
+      !hasAutoTokenReceived &&
+      !isDevJob
+    ) {
+      const tokenMismatchError = validateTokenMatchesEntity(
+        dianToken,
+        selectedEntity.identifier_suffix,
+      );
       if (tokenMismatchError) {
-        toast.error(tokenMismatchError)
-        return
+        toast.error(tokenMismatchError);
+        return;
       }
     }
 
     // For manual token: check if validated and if validation is still fresh (< 5 min)
     // Skip this check for: dev jobs, auto-token, pseudo jobs, or using saved token
-    const isUsingManualToken = !isDevJob && !hasAutoTokenReceived && dianToken.trim() && (!savedTokenAvailable || useNewToken)
+    const isUsingManualToken =
+      !isDevJob &&
+      !hasAutoTokenReceived &&
+      dianToken.trim() &&
+      (!savedTokenAvailable || useNewToken);
 
     if (isUsingManualToken && selectedEntity) {
       // Check if token was validated
-      if (!tokenValidatedAt || validationPhase !== 'success' && validationPhase !== 'success_sparkle') {
+      if (
+        !tokenValidatedAt ||
+        (validationPhase !== "success" && validationPhase !== "success_sparkle")
+      ) {
         // Token not validated - focus input and show error
-        toast.error('El token DIAN no ha sido validado')
-        dianTokenInputRef.current?.focus()
-        return
+        toast.error("El token DIAN no ha sido validado");
+        dianTokenInputRef.current?.focus();
+        return;
       }
 
       // Check if validation is stale (> 5 min)
-      const validationAge = Date.now() - tokenValidatedAt.getTime()
+      const validationAge = Date.now() - tokenValidatedAt.getTime();
       if (validationAge > TOKEN_VALIDATION_MAX_AGE_MS) {
         // Validation is stale - revalidate before creating job
-        toast.info('Revalidando token DIAN...')
-        setValidationPhase('validating')
+        toast.info("Revalidando token DIAN...");
+        setValidationPhase("validating");
 
         try {
-          const result = await apiClient.quickValidateDianToken(dianToken, selectedEntity.id)
+          const result = await apiClient.quickValidateDianToken(
+            dianToken,
+            selectedEntity.id,
+          );
 
           if (result.valid) {
-            setTokenValidatedAt(new Date())
-            setValidationPhase('success')
+            setTokenValidatedAt(new Date());
+            setValidationPhase("success");
             // Continue with job creation (don't return)
           } else {
             // Token is now invalid
-            const errorCode = typeof result.error_code === 'string' ? result.error_code : undefined
-            const errorMessage = getTokenErrorMessage(errorCode)
-            setDianTokenError(errorMessage)
-            setValidationPhase('error')
-            setTokenValidatedAt(null)
-            toast.error(errorMessage)
-            dianTokenInputRef.current?.focus()
-            return
+            const errorCode =
+              typeof result.error_code === "string"
+                ? result.error_code
+                : undefined;
+            const errorMessage = getTokenErrorMessage(errorCode);
+            setDianTokenError(errorMessage);
+            setValidationPhase("error");
+            setTokenValidatedAt(null);
+            toast.error(errorMessage);
+            dianTokenInputRef.current?.focus();
+            return;
           }
         } catch {
-          setDianTokenError(getTokenErrorMessage('INTERNAL_ERROR'))
-          setValidationPhase('error')
-          toast.error('Error validando token DIAN')
-          dianTokenInputRef.current?.focus()
-          return
+          setDianTokenError(getTokenErrorMessage("INTERNAL_ERROR"));
+          setValidationPhase("error");
+          toast.error("Error validando token DIAN");
+          dianTokenInputRef.current?.focus();
+          return;
         }
       }
     }
 
     if (selectedSheetTypes.length === 0) {
-      toast.error('Selecciona al menos un tipo de hoja')
-      return
+      toast.error("Selecciona al menos un tipo de hoja");
+      return;
     }
 
     // Prepare consolidation interval
-    let consolidationInterval: string | { value: number; unit: string } | null
+    let consolidationInterval: string | { value: number; unit: string } | null;
     if (useTotalConsolidation) {
-      consolidationInterval = 'total'
+      consolidationInterval = "total";
     } else {
       consolidationInterval = {
         value: parseInt(consolidationValue),
-        unit: consolidationUnit
-      }
+        unit: consolidationUnit,
+      };
     }
 
     // Determine token to send
     // Since we now validate and save tokens BEFORE job creation,
     // we always use 'use_stored_token' - the token is already in DB
-    let tokenToSend: string
-    if (isDevJob) {
-      tokenToSend = ''
+    const isUserUploadedExcel = listingSource === "user_uploaded_excel";
+
+    let tokenToSend: string;
+    if (isDevJob || isUserUploadedExcel) {
+      tokenToSend = "";
     } else {
       // Token was validated and saved during input validation
       // Auto-token, saved token, or manually entered token - all stored in DB
-      tokenToSend = 'use_stored_token'
+      tokenToSend = "use_stored_token";
     }
 
     try {
@@ -801,65 +981,75 @@ function NewJobContent() {
           consolidation_interval: consolidationInterval,
           is_dev_job: isDevJob,
           job_type: jobType,
+          ...(isUserUploadedExcel && listingExcelFileId
+            ? {
+                listing_source: "user_uploaded_excel" as const,
+                download_mode: "public_portal_captcha" as const,
+                listing_excel_file_id: listingExcelFileId,
+              }
+            : {}),
         },
-      })
+      });
 
-      setCreatedJobId(result.job_id || null)
-      setStep('success')
-      toast.success('Trabajo creado exitosamente')
+      setCreatedJobId(result.job_id || null);
+      setStep("success");
+      toast.success("Trabajo creado exitosamente");
     } catch (err) {
       if (err instanceof DuplicateJobError && err.existingJobId) {
-        toast.error('Ya existe un trabajo activo con los mismos parámetros. Redirigiendo...')
-        router.push(`/trabajos/${err.existingJobId}`)
-        return
+        toast.error(
+          "Ya existe un trabajo activo con los mismos parámetros. Redirigiendo...",
+        );
+        router.push(`/trabajos/${err.existingJobId}`);
+        return;
       }
-      toast.error(err instanceof Error ? err.message : 'Error creando trabajo')
+      toast.error(err instanceof Error ? err.message : "Error creando trabajo");
     }
-  }
+  };
 
   const resetForm = () => {
-    setStep('form')
-    setDianToken('')
-    setDianTokenError(null)
-    setValidationPhase('idle')
-    setRepresentativeUpdated(false)
-    setTokenValidatedAt(null)
-    setJobName('')
-    setStartDate('')
-    setEndDate('')
-    setStartMonth('')
-    setEndMonth('')
-    setSelectedSheetTypes(['ingresos', 'egresos', 'nominas'])
-    setJobType('formularios')
-    setConsolidationValue('1')
-    setConsolidationUnit('months')
-    setUseTotalConsolidation(true)
-    setSelectedEntity(null)
-    setUseNewToken(false)
-    setCreatedJobId(null)
-    setIsDevJob(false)
+    setStep("form");
+    setDianToken("");
+    setDianTokenError(null);
+    setValidationPhase("idle");
+    setRepresentativeUpdated(false);
+    setTokenValidatedAt(null);
+    setJobName("");
+    setStartDate("");
+    setEndDate("");
+    setStartMonth("");
+    setEndMonth("");
+    setSelectedSheetTypes(["ingresos", "egresos", "nominas"]);
+    setJobType("formularios");
+    setConsolidationValue("1");
+    setConsolidationUnit("months");
+    setUseTotalConsolidation(true);
+    setSelectedEntity(null);
+    setUseNewToken(false);
+    setCreatedJobId(null);
+    setIsDevJob(false);
     // Reset auto-token states
-    setAutoTokenRequestId(null)
-    setAutoTokenStatus('idle')
-    setAutoTokenError(null)
-    setAutoTokenStartedAt(null)
+    setAutoTokenRequestId(null);
+    setAutoTokenStatus("idle");
+    setAutoTokenError(null);
+    setAutoTokenStartedAt(null);
     // Clear timeouts
     if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current)
+      clearTimeout(validationTimeoutRef.current);
     }
     if (autoTokenPollingRef.current) {
-      clearTimeout(autoTokenPollingRef.current)
+      clearTimeout(autoTokenPollingRef.current);
     }
-  }
+  };
 
   // Derived states from job options
-  const autoTokenAvailable = jobOptions?.auto_management.available || false
-  const autoTokenOAuthStatus = jobOptions?.auto_management.status || 'not_configured'
-  const dianEmailMasked = jobOptions?.auto_management.dian_email_masked
-  const savedTokenAvailable = jobOptions?.saved_token.available || false
-  const tokenMasked = jobOptions?.saved_token.token_masked
+  const autoTokenAvailable = jobOptions?.auto_management.available || false;
+  const autoTokenOAuthStatus =
+    jobOptions?.auto_management.status || "not_configured";
+  const dianEmailMasked = jobOptions?.auto_management.dian_email_masked;
+  const savedTokenAvailable = jobOptions?.saved_token.available || false;
+  const tokenMasked = jobOptions?.saved_token.token_masked;
 
-  if (step === 'success') {
+  if (step === "success") {
     return (
       <div className="max-w-3xl mx-auto p-8">
         <Card>
@@ -868,7 +1058,9 @@ function NewJobContent() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4">
                 <CheckCircle2 className="h-8 w-8 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Trabajo Creado Exitosamente</h2>
+              <h2 className="text-2xl font-bold mb-2">
+                Trabajo Creado Exitosamente
+              </h2>
               <p className="text-muted-foreground mb-6">
                 Tu trabajo ha sido enviado para procesamiento
               </p>
@@ -884,7 +1076,7 @@ function NewJobContent() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -921,7 +1113,7 @@ function NewJobContent() {
                   variant="outline"
                   role="combobox"
                   aria-expanded={entitySearchOpen}
-                  className={`w-full justify-between ${entitySelectorShake ? 'animate-shake ring-2 ring-red-500' : ''}`}
+                  className={`w-full justify-between ${entitySelectorShake ? "animate-shake ring-2 ring-red-500" : ""}`}
                   disabled={loadingEntities}
                 >
                   {loadingEntities ? (
@@ -938,12 +1130,17 @@ function NewJobContent() {
                       </span>
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">Selecciona una entidad...</span>
+                    <span className="text-muted-foreground">
+                      Selecciona una entidad...
+                    </span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+              >
                 <Command>
                   <CommandInput placeholder="Buscar por nombre o identificador..." />
                   <CommandList className="max-h-[300px]">
@@ -969,7 +1166,9 @@ function NewJobContent() {
                         >
                           <Check
                             className={`mr-2 h-4 w-4 ${
-                              selectedEntity?.id === entity.id ? 'opacity-100' : 'opacity-0'
+                              selectedEntity?.id === entity.id
+                                ? "opacity-100"
+                                : "opacity-0"
                             }`}
                           />
                           <div className="flex items-center gap-2 flex-1">
@@ -996,20 +1195,27 @@ function NewJobContent() {
                 onClick={() => refetchEntities()}
                 disabled={loadingEntities}
               >
-                <RefreshCw className={`h-3 w-3 ${loadingEntities ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-3 w-3 ${loadingEntities ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </div>
 
           {/* OAuth expired/pending alerts */}
-          {selectedEntity && autoTokenOAuthStatus === 'oauth_expired' && (
+          {selectedEntity && autoTokenOAuthStatus === "oauth_expired" && (
             <Alert className="border-red-600/70 bg-red-50">
               <XCircle className="h-5 w-5 text-red-600" />
               <AlertDescription className="ml-2">
                 <div className="space-y-2">
-                  <p className="text-base font-semibold text-red-700">Email DIAN expirado</p>
+                  <p className="text-base font-semibold text-red-700">
+                    Email DIAN expirado
+                  </p>
                   <p className="text-sm text-red-600">
-                    {dianEmailMasked && <span className="font-mono">({dianEmailMasked})</span>} perdio acceso.
+                    {dianEmailMasked && (
+                      <span className="font-mono">({dianEmailMasked})</span>
+                    )}{" "}
+                    perdio acceso.
                   </p>
                   <Link href="/dian-emails">
                     <Button variant="destructive" size="sm">
@@ -1022,17 +1228,26 @@ function NewJobContent() {
             </Alert>
           )}
 
-          {selectedEntity && autoTokenOAuthStatus === 'oauth_pending' && (
+          {selectedEntity && autoTokenOAuthStatus === "oauth_pending" && (
             <Alert className="border-yellow-600/70 bg-yellow-50">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <AlertDescription className="ml-2">
                 <div className="space-y-2">
-                  <p className="text-base font-semibold text-yellow-700">Email DIAN pendiente</p>
+                  <p className="text-base font-semibold text-yellow-700">
+                    Email DIAN pendiente
+                  </p>
                   <p className="text-sm text-yellow-700">
-                    Falta completar la autorizacion OAuth {dianEmailMasked && <span className="font-mono">({dianEmailMasked})</span>}
+                    Falta completar la autorizacion OAuth{" "}
+                    {dianEmailMasked && (
+                      <span className="font-mono">({dianEmailMasked})</span>
+                    )}
                   </p>
                   <Link href="/dian-emails">
-                    <Button variant="outline" size="sm" className="border-yellow-600 text-yellow-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-yellow-600 text-yellow-700"
+                    >
                       <Mail className="h-4 w-4 mr-1.5" />
                       Completar autorizacion
                     </Button>
@@ -1047,7 +1262,8 @@ function NewJobContent() {
             <Label htmlFor="dian-token">Token DIAN *</Label>
 
             {/* Auto-token request UI (when auto-token is being requested) */}
-            {(autoTokenStatus === 'pending' || autoTokenStatus === 'polling') && (
+            {(autoTokenStatus === "pending" ||
+              autoTokenStatus === "polling") && (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
@@ -1064,7 +1280,7 @@ function NewJobContent() {
             )}
 
             {/* Auto-token received success */}
-            {autoTokenStatus === 'received' && (
+            {autoTokenStatus === "received" && (
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -1081,13 +1297,14 @@ function NewJobContent() {
             )}
 
             {/* Auto-token failed/timeout */}
-            {(autoTokenStatus === 'failed' || autoTokenStatus === 'timeout') && (
+            {(autoTokenStatus === "failed" ||
+              autoTokenStatus === "timeout") && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <XCircle className="h-5 w-5 text-red-600" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-red-700">
-                      {autoTokenError || 'No se pudo obtener el token'}
+                      {autoTokenError || "No se pudo obtener el token"}
                     </p>
                     <p className="text-xs text-red-600 mt-0.5">
                       Puedes intentar de nuevo o pegar un token manualmente
@@ -1106,7 +1323,7 @@ function NewJobContent() {
             )}
 
             {/* Normal token input (when not requesting auto-token) */}
-            {autoTokenStatus === 'idle' && (
+            {autoTokenStatus === "idle" && (
               <>
                 <div className="relative">
                   <Input
@@ -1114,27 +1331,32 @@ function NewJobContent() {
                     id="dian-token"
                     placeholder={
                       loadingJobOptions
-                        ? 'Verificando opciones...'
+                        ? "Verificando opciones..."
                         : !useNewToken && savedTokenAvailable
-                        ? `Usando token guardado (${tokenMasked || '****'})`
-                        : 'https://catalogo-vpfe.dian.gov.co/...'
+                          ? `Usando token guardado (${tokenMasked || "****"})`
+                          : "https://catalogo-vpfe.dian.gov.co/..."
                     }
                     value={dianToken}
                     onChange={(e) => {
-                      handleDianTokenChange(e.target.value)
+                      handleDianTokenChange(e.target.value);
                       // If user starts typing, disable stored token
                       if (e.target.value.trim()) {
-                        if (!useNewToken && savedTokenAvailable) setUseNewToken(true)
+                        if (!useNewToken && savedTokenAvailable)
+                          setUseNewToken(true);
                       }
                     }}
-                    disabled={loadingJobOptions || (!useNewToken && savedTokenAvailable)}
+                    disabled={
+                      loadingJobOptions || (!useNewToken && savedTokenAvailable)
+                    }
                     className={`font-mono text-sm pr-10 ${
-                      dianTokenError || validationPhase === 'error'
-                        ? 'border-red-500 focus-visible:ring-red-500'
-                        : validationPhase === 'success' || validationPhase === 'success_sparkle' || (!useNewToken && savedTokenAvailable)
-                        ? 'border-green-500 focus-visible:ring-green-500'
-                        : ''
-                    } ${(!useNewToken && savedTokenAvailable) ? 'bg-green-50/50' : ''} ${validationPhase === 'success_sparkle' ? 'bg-amber-50/50' : ''}`}
+                      dianTokenError || validationPhase === "error"
+                        ? "border-red-500 focus-visible:ring-red-500"
+                        : validationPhase === "success" ||
+                            validationPhase === "success_sparkle" ||
+                            (!useNewToken && savedTokenAvailable)
+                          ? "border-green-500 focus-visible:ring-green-500"
+                          : ""
+                    } ${!useNewToken && savedTokenAvailable ? "bg-green-50/50" : ""} ${validationPhase === "success_sparkle" ? "bg-amber-50/50" : ""}`}
                   />
                   {/* Status indicator inside input */}
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1143,13 +1365,15 @@ function NewJobContent() {
                     ) : !useNewToken && savedTokenAvailable ? (
                       <CheckCircle2 className="h-4 w-4 text-green-500" />
                     ) : dianToken.trim() ? (
-                      validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating' ? (
+                      validationPhase === "validating" ||
+                      validationPhase === "verifying" ||
+                      validationPhase === "updating" ? (
                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : validationPhase === 'success_sparkle' ? (
+                      ) : validationPhase === "success_sparkle" ? (
                         <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-                      ) : validationPhase === 'success' ? (
+                      ) : validationPhase === "success" ? (
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : validationPhase === 'error' || dianTokenError ? (
+                      ) : validationPhase === "error" || dianTokenError ? (
                         <XCircle className="h-4 w-4 text-red-500" />
                       ) : null
                     ) : null}
@@ -1175,34 +1399,36 @@ function NewJobContent() {
                         <CheckCircle2 className="h-3 w-3" />
                         Token guardado listo para usar
                       </p>
-                    ) : validationPhase === 'success_sparkle' ? (
+                    ) : validationPhase === "success_sparkle" ? (
                       <p className="text-xs text-amber-600 flex items-center gap-1">
                         <Sparkles className="h-3 w-3 animate-pulse" />
                         Representante legal actualizado
                       </p>
-                    ) : validationPhase === 'success' ? (
+                    ) : validationPhase === "success" ? (
                       <p className="text-xs text-green-600 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
                         Token DIAN valido
                       </p>
-                    ) : validationPhase === 'validating' ? (
+                    ) : validationPhase === "validating" ? (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Validando...
                       </p>
-                    ) : validationPhase === 'verifying' ? (
+                    ) : validationPhase === "verifying" ? (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Verificando con DIAN...
                       </p>
-                    ) : validationPhase === 'updating' ? (
+                    ) : validationPhase === "updating" ? (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Actualizando datos...
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        {selectedEntity ? 'Pega la URL del token DIAN o solicita uno automatico' : 'Pega la URL completa del token DIAN'}
+                        {selectedEntity
+                          ? "Pega la URL del token DIAN o solicita uno automatico"
+                          : "Pega la URL completa del token DIAN"}
                       </p>
                     )}
                   </div>
@@ -1216,17 +1442,19 @@ function NewJobContent() {
                             checked={!useNewToken}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setUseNewToken(false)
-                                setDianToken('')
-                                setDianTokenError(null)
-                                setValidationPhase('idle')
+                                setUseNewToken(false);
+                                setDianToken("");
+                                setDianTokenError(null);
+                                setValidationPhase("idle");
                               } else {
-                                setUseNewToken(true)
+                                setUseNewToken(true);
                               }
                             }}
                             className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
                           />
-                          <span className="text-xs text-muted-foreground">Guardado</span>
+                          <span className="text-xs text-muted-foreground">
+                            Guardado
+                          </span>
                         </label>
                       )}
                       {autoTokenAvailable && (
@@ -1256,13 +1484,14 @@ function NewJobContent() {
               value={jobName}
               onChange={(e) => handleJobNameChange(e.target.value)}
               maxLength={20}
-              className={jobNameError ? 'border-red-500' : ''}
+              className={jobNameError ? "border-red-500" : ""}
             />
             {jobNameError ? (
               <p className="text-xs text-red-500">{jobNameError}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Si no ingresas un nombre, se generara automaticamente. Maximo 20 caracteres.
+                Si no ingresas un nombre, se generara automaticamente. Maximo 20
+                caracteres.
               </p>
             )}
           </div>
@@ -1276,19 +1505,21 @@ function NewJobContent() {
                 <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
                   <Button
                     type="button"
-                    variant={dateSelectionMode === 'months' ? 'default' : 'ghost'}
+                    variant={
+                      dateSelectionMode === "months" ? "default" : "ghost"
+                    }
                     size="sm"
                     className="h-7 px-3"
-                    onClick={() => setDateSelectionMode('months')}
+                    onClick={() => setDateSelectionMode("months")}
                   >
                     Meses
                   </Button>
                   <Button
                     type="button"
-                    variant={dateSelectionMode === 'days' ? 'default' : 'ghost'}
+                    variant={dateSelectionMode === "days" ? "default" : "ghost"}
                     size="sm"
                     className="h-7 px-3"
-                    onClick={() => setDateSelectionMode('days')}
+                    onClick={() => setDateSelectionMode("days")}
                   >
                     Dias
                   </Button>
@@ -1296,7 +1527,7 @@ function NewJobContent() {
               </div>
             </div>
 
-            {dateSelectionMode === 'months' ? (
+            {dateSelectionMode === "months" ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1307,15 +1538,15 @@ function NewJobContent() {
                       value={startMonth}
                       max={getColombiaMonth()}
                       onChange={(e) => {
-                        const selectedMonth = e.target.value
-                        setStartMonth(selectedMonth)
+                        const selectedMonth = e.target.value;
+                        setStartMonth(selectedMonth);
                         if (selectedMonth) {
-                          const [year, month] = selectedMonth.split('-')
-                          setStartDate(`${year}-${month}-01`)
-                          const currentMonth = getColombiaMonth()
+                          const [year, month] = selectedMonth.split("-");
+                          setStartDate(`${year}-${month}-01`);
+                          const currentMonth = getColombiaMonth();
                           if (selectedMonth === currentMonth && !endMonth) {
-                            setEndMonth(currentMonth)
-                            setEndDate(getColombiaToday())
+                            setEndMonth(currentMonth);
+                            setEndDate(getColombiaToday());
                           }
                         }
                       }}
@@ -1330,15 +1561,19 @@ function NewJobContent() {
                       min={startMonth || undefined}
                       max={getColombiaMonth()}
                       onChange={(e) => {
-                        setEndMonth(e.target.value)
+                        setEndMonth(e.target.value);
                         if (e.target.value) {
-                          const [year, month] = e.target.value.split('-')
-                          const currentMonth = getColombiaMonth()
+                          const [year, month] = e.target.value.split("-");
+                          const currentMonth = getColombiaMonth();
                           if (e.target.value === currentMonth) {
-                            setEndDate(getColombiaToday())
+                            setEndDate(getColombiaToday());
                           } else {
-                            const lastDay = new Date(parseInt(year), parseInt(month), 0)
-                            setEndDate(lastDay.toISOString().split('T')[0])
+                            const lastDay = new Date(
+                              parseInt(year),
+                              parseInt(month),
+                              0,
+                            );
+                            setEndDate(lastDay.toISOString().split("T")[0]);
                           }
                         }
                       }}
@@ -1382,13 +1617,22 @@ function NewJobContent() {
           {/* Job Type */}
           <div className="space-y-2">
             <Label>Tipo de Trabajo *</Label>
-            <Select value={jobType} onValueChange={(v) => setJobType(v as 'formularios' | 'detallado')}>
+            <Select
+              value={jobType}
+              onValueChange={(v) =>
+                setJobType(v as "formularios" | "detallado")
+              }
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="formularios">Formularios (completo — incluye Exogena)</SelectItem>
-                <SelectItem value="detallado">Detallado (ingresos, egresos, nominas, alertas)</SelectItem>
+                <SelectItem value="formularios">
+                  Formularios (completo — incluye Exogena)
+                </SelectItem>
+                <SelectItem value="detallado">
+                  Detallado (ingresos, egresos, nominas, alertas)
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1407,10 +1651,17 @@ function NewJobContent() {
                           checked={selectedSheetTypes.length === 3}
                           onCheckedChange={(checked) => {
                             // Always keep at least one category selected
-                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
+                            setSelectedSheetTypes(
+                              checked
+                                ? ["ingresos", "egresos", "nominas"]
+                                : ["ingresos"],
+                            );
                           }}
                         />
-                        <Label htmlFor="select-all-categories" className="font-medium cursor-pointer">
+                        <Label
+                          htmlFor="select-all-categories"
+                          className="font-medium cursor-pointer"
+                        >
                           Seleccionar todas
                         </Label>
                       </div>
@@ -1419,9 +1670,9 @@ function NewJobContent() {
                 </thead>
                 <tbody>
                   {[
-                    { value: 'ingresos', label: 'Ingresos' },
-                    { value: 'egresos', label: 'Egresos' },
-                    { value: 'nominas', label: 'Nominas' },
+                    { value: "ingresos", label: "Ingresos" },
+                    { value: "egresos", label: "Egresos" },
+                    { value: "nominas", label: "Nominas" },
                   ].map((type) => (
                     <tr key={type.value} className="border-t">
                       <td className="p-3">
@@ -1429,20 +1680,28 @@ function NewJobContent() {
                           <Checkbox
                             id={`category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
-                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
+                            disabled={
+                              selectedSheetTypes.length === 1 &&
+                              selectedSheetTypes.includes(type.value)
+                            }
                             onCheckedChange={(checked) => {
                               if (!checked && selectedSheetTypes.length === 1) {
                                 // Don't allow unchecking the last category
-                                return
+                                return;
                               }
                               setSelectedSheetTypes(
                                 checked
                                   ? [...selectedSheetTypes, type.value]
-                                  : selectedSheetTypes.filter((t) => t !== type.value)
-                              )
+                                  : selectedSheetTypes.filter(
+                                      (t) => t !== type.value,
+                                    ),
+                              );
                             }}
                           />
-                          <Label htmlFor={`category-${type.value}`} className="text-sm font-normal cursor-pointer">
+                          <Label
+                            htmlFor={`category-${type.value}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
                             {type.label}
                           </Label>
                         </div>
@@ -1462,20 +1721,23 @@ function NewJobContent() {
                   id="dev-job-mode"
                   checked={isDevJob}
                   onCheckedChange={(checked) => {
-                    setIsDevJob(checked as boolean)
+                    setIsDevJob(checked as boolean);
                     if (checked) {
-                      setUseNewToken(false)
-                      setDianToken('')
+                      setUseNewToken(false);
+                      setDianToken("");
                       // Reset auto-token if in progress
-                      setAutoTokenRequestId(null)
-                      setAutoTokenStatus('idle')
+                      setAutoTokenRequestId(null);
+                      setAutoTokenStatus("idle");
                     }
                   }}
                   className="h-5 w-5 data-[state=checked]:bg-yellow-600"
                 />
                 <div className="flex items-center gap-2">
                   <FlaskConical className="h-4 w-4 text-yellow-600" />
-                  <Label htmlFor="dev-job-mode" className="text-sm font-medium text-yellow-800 cursor-pointer">
+                  <Label
+                    htmlFor="dev-job-mode"
+                    className="text-sm font-medium text-yellow-800 cursor-pointer"
+                  >
                     Modo desarrollo (usar Excel cacheado)
                   </Label>
                 </div>
@@ -1499,12 +1761,14 @@ function NewJobContent() {
                     <Alert className="border-red-200 bg-red-50">
                       <AlertCircle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-red-700 text-sm ml-2">
-                        <strong>Cache no disponible.</strong> Ejecuta primero un job normal.
+                        <strong>Cache no disponible.</strong> Ejecuta primero un
+                        job normal.
                       </AlertDescription>
                     </Alert>
                   ) : (
                     <p className="text-xs text-yellow-700">
-                      Selecciona una entidad y rango de fechas para verificar el cache
+                      Selecciona una entidad y rango de fechas para verificar el
+                      cache
                     </p>
                   )}
                 </div>
@@ -1513,6 +1777,107 @@ function NewJobContent() {
               <p className="text-xs text-yellow-700 pl-7">
                 Este modo usa el raw Excel cacheado de jobs anteriores.
               </p>
+            </div>
+          )}
+
+          {/* Listing source: upload DIAN Excel manually (staging only + dev role,
+              while this mode is being validated — see plan Fase 3) */}
+          {isStaging && hasDevRole && !isDevJob && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="user-uploaded-excel-mode"
+                  checked={listingSource === "user_uploaded_excel"}
+                  onCheckedChange={(checked) => {
+                    setListingSource(
+                      checked ? "user_uploaded_excel" : "dian_scraping",
+                    );
+                    if (!checked) {
+                      setListingExcelFile(null);
+                      setListingExcelFileId(null);
+                      setListingExcelRowCount(null);
+                      setListingExcelError(null);
+                    }
+                  }}
+                  className="h-5 w-5 data-[state=checked]:bg-blue-600"
+                />
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  <Label
+                    htmlFor="user-uploaded-excel-mode"
+                    className="text-sm font-medium text-blue-800 cursor-pointer"
+                  >
+                    Subir Excel de listado de la DIAN (sin token)
+                  </Label>
+                </div>
+              </div>
+
+              {listingSource === "user_uploaded_excel" && (
+                <div className="pl-7 space-y-2">
+                  <p className="text-xs text-blue-700">
+                    Sube el Excel exportado del portal de la DIAN. La descarga
+                    de documentos se hará vía el portal público (sin token
+                    DIAN).
+                  </p>
+                  <Input
+                    type="file"
+                    accept=".xlsx"
+                    disabled={
+                      !selectedEntity || uploadListingExcelMutation.isPending
+                    }
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !selectedEntity) return;
+                      setListingExcelFile(file);
+                      setListingExcelFileId(null);
+                      setListingExcelError(null);
+                      try {
+                        const result =
+                          await uploadListingExcelMutation.mutateAsync({
+                            file,
+                            entityId: selectedEntity.id,
+                          });
+                        setListingExcelFileId(result.file_id);
+                        setListingExcelRowCount(result.row_count);
+                      } catch (err) {
+                        setListingExcelError(
+                          err instanceof Error
+                            ? err.message
+                            : "Error subiendo el Excel",
+                        );
+                      }
+                    }}
+                  />
+                  {!selectedEntity && (
+                    <p className="text-xs text-blue-700">
+                      Selecciona una entidad primero
+                    </p>
+                  )}
+                  {uploadListingExcelMutation.isPending && (
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Subiendo y validando Excel...
+                    </div>
+                  )}
+                  {listingExcelFileId && listingExcelRowCount !== null && (
+                    <Alert className="border-green-200 bg-green-50">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-700 text-sm ml-2">
+                        Se detectaron {listingExcelRowCount} documentos en{" "}
+                        {listingExcelFile?.name}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {listingExcelError && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700 text-sm ml-2">
+                        {listingExcelError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1528,9 +1893,12 @@ function NewJobContent() {
                 </PopoverTrigger>
                 <PopoverContent className="w-80" align="end">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Intervalo de Consolidado</h4>
+                    <h4 className="font-medium text-sm">
+                      Intervalo de Consolidado
+                    </h4>
                     <p className="text-xs text-muted-foreground">
-                      Define el intervalo de tiempo para la hoja resumen en el Excel.
+                      Define el intervalo de tiempo para la hoja resumen en el
+                      Excel.
                     </p>
                   </div>
                 </PopoverContent>
@@ -1541,9 +1909,14 @@ function NewJobContent() {
               <Checkbox
                 id="use-total-consolidation"
                 checked={useTotalConsolidation}
-                onCheckedChange={(checked) => setUseTotalConsolidation(checked as boolean)}
+                onCheckedChange={(checked) =>
+                  setUseTotalConsolidation(checked as boolean)
+                }
               />
-              <Label htmlFor="use-total-consolidation" className="text-sm font-normal cursor-pointer">
+              <Label
+                htmlFor="use-total-consolidation"
+                className="text-sm font-normal cursor-pointer"
+              >
                 Consolidado Total (sin dividir por intervalos)
               </Label>
             </div>
@@ -1559,14 +1932,23 @@ function NewJobContent() {
                     onChange={(e) => setConsolidationValue(e.target.value)}
                     className="w-24"
                   />
-                  <Select value={consolidationUnit} onValueChange={setConsolidationUnit}>
+                  <Select
+                    value={consolidationUnit}
+                    onValueChange={setConsolidationUnit}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="days">{consolidationValue === '1' ? 'Dia' : 'Dias'}</SelectItem>
-                      <SelectItem value="weeks">{consolidationValue === '1' ? 'Semana' : 'Semanas'}</SelectItem>
-                      <SelectItem value="months">{consolidationValue === '1' ? 'Mes' : 'Meses'}</SelectItem>
+                      <SelectItem value="days">
+                        {consolidationValue === "1" ? "Dia" : "Dias"}
+                      </SelectItem>
+                      <SelectItem value="weeks">
+                        {consolidationValue === "1" ? "Semana" : "Semanas"}
+                      </SelectItem>
+                      <SelectItem value="months">
+                        {consolidationValue === "1" ? "Mes" : "Meses"}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1589,18 +1971,29 @@ function NewJobContent() {
                 !startDate ||
                 !endDate ||
                 (isDevJob && !devCacheStatus?.available) ||
-                // Non-dev: need token
-                (!isDevJob && (
+                (listingSource === "user_uploaded_excel" &&
+                  (!listingExcelFileId ||
+                    uploadListingExcelMutation.isPending)) ||
+                // Non-dev, non-uploaded-excel: need token
+                (!isDevJob &&
+                  listingSource !== "user_uploaded_excel" &&
                   // Auto-token in progress - wait for it to complete
-                  (autoTokenStatus === 'pending' || autoTokenStatus === 'polling') ||
-                  // No token available: need either auto-token received, saved token, or manual token
-                  (autoTokenStatus !== 'received' && !savedTokenAvailable && !dianToken.trim()) ||
-                  (autoTokenStatus !== 'received' && savedTokenAvailable && useNewToken && !dianToken.trim()) ||
-                  // Manual token validation in progress
-                  (validationPhase === 'validating' || validationPhase === 'verifying' || validationPhase === 'updating') ||
-                  // Manual token has validation error
-                  (!!dianToken.trim() && validationPhase === 'error')
-                ))
+                  (autoTokenStatus === "pending" ||
+                    autoTokenStatus === "polling" ||
+                    // No token available: need either auto-token received, saved token, or manual token
+                    (autoTokenStatus !== "received" &&
+                      !savedTokenAvailable &&
+                      !dianToken.trim()) ||
+                    (autoTokenStatus !== "received" &&
+                      savedTokenAvailable &&
+                      useNewToken &&
+                      !dianToken.trim()) ||
+                    // Manual token validation in progress
+                    validationPhase === "validating" ||
+                    validationPhase === "verifying" ||
+                    validationPhase === "updating" ||
+                    // Manual token has validation error
+                    (!!dianToken.trim() && validationPhase === "error")))
               }
               className="flex-1"
               size="lg"
@@ -1621,7 +2014,7 @@ function NewJobContent() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -1629,55 +2022,63 @@ function NewJobContent() {
 // ============================================================================
 
 function BatchJobContent() {
-  const router = useRouter()
-  const { data: entitiesData } = useEntitiesSelector()
+  const router = useRouter();
+  const { data: entitiesData } = useEntitiesSelector();
 
-  const [entityTypeFilter, setEntityTypeFilter] = useState<'all' | 'natural' | 'juridica'>('all')
+  const [entityTypeFilter, setEntityTypeFilter] = useState<
+    "all" | "natural" | "juridica"
+  >("all");
 
   // Date selection - same logic as individual job form
-  const [dateSelectionMode, setDateSelectionMode] = useState<'days' | 'months'>('months')
-  const [startMonth, setStartMonth] = useState('')
-  const [endMonth, setEndMonth] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [dateSelectionMode, setDateSelectionMode] = useState<"days" | "months">(
+    "months",
+  );
+  const [startMonth, setStartMonth] = useState("");
+  const [endMonth, setEndMonth] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Categories - same as individual (all 3 selected by default)
-  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>(['ingresos', 'egresos', 'nominas'])
+  const [selectedSheetTypes, setSelectedSheetTypes] = useState<string[]>([
+    "ingresos",
+    "egresos",
+    "nominas",
+  ]);
 
   // Consolidation - same as individual
-  const [consolidationValue, setConsolidationValue] = useState('1')
-  const [consolidationUnit, setConsolidationUnit] = useState('months')
-  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true)
+  const [consolidationValue, setConsolidationValue] = useState("1");
+  const [consolidationUnit, setConsolidationUnit] = useState("months");
+  const [useTotalConsolidation, setUseTotalConsolidation] = useState(true);
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const batchMutation = useCreateBatchJobs()
+  const batchMutation = useCreateBatchJobs();
 
-  const entities = entitiesData?.entities || []
-  const entityCount = entities.length
+  const entities = entitiesData?.entities || [];
+  const entityCount = entities.length;
 
   const handleSubmit = async () => {
     if (!startDate || !endDate) {
-      toast.error('Selecciona un rango de fechas')
-      return
+      toast.error("Selecciona un rango de fechas");
+      return;
     }
     if (selectedSheetTypes.length === 0) {
-      toast.error('Selecciona al menos una categoria')
-      return
+      toast.error("Selecciona al menos una categoria");
+      return;
     }
 
     // Build consolidation interval (same logic as individual)
-    let consolidationInterval: string | { value: number; unit: string }
+    let consolidationInterval: string | { value: number; unit: string };
     if (useTotalConsolidation) {
-      consolidationInterval = 'total'
+      consolidationInterval = "total";
     } else {
       consolidationInterval = {
         value: parseInt(consolidationValue),
-        unit: consolidationUnit
-      }
+        unit: consolidationUnit,
+      };
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
       const result = await batchMutation.mutateAsync({
         entity_type_filter: entityTypeFilter,
@@ -1685,24 +2086,30 @@ function BatchJobContent() {
         end_date: endDate,
         document_categories: selectedSheetTypes,
         consolidation_interval: consolidationInterval,
-      })
+      });
 
       toast.success(
-        `${result.created_count} trabajo${result.created_count !== 1 ? 's' : ''} creado${result.created_count !== 1 ? 's' : ''}` +
-        (result.failed_count > 0 ? ` (${result.failed_count} fallido${result.failed_count !== 1 ? 's' : ''})` : '')
-      )
+        `${result.created_count} trabajo${result.created_count !== 1 ? "s" : ""} creado${result.created_count !== 1 ? "s" : ""}` +
+          (result.failed_count > 0
+            ? ` (${result.failed_count} fallido${result.failed_count !== 1 ? "s" : ""})`
+            : ""),
+      );
       // Navigate to batch detail page
       if (result.batch_id) {
-        router.push(`/trabajos/batch/${result.batch_id}`)
+        router.push(`/trabajos/batch/${result.batch_id}`);
       } else {
-        router.push('/trabajos')
+        router.push("/trabajos");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error creando trabajos en lote')
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Error creando trabajos en lote",
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -1726,7 +2133,8 @@ function BatchJobContent() {
           <CardTitle>Configuracion del Lote</CardTitle>
           <CardDescription>
             Todos los trabajos se crearan en estado &quot;Esperando token&quot;.
-            Luego puedes proporcionar el token DIAN individualmente desde la lista de trabajos.
+            Luego puedes proporcionar el token DIAN individualmente desde la
+            lista de trabajos.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1735,7 +2143,9 @@ function BatchJobContent() {
             <Label>Tipo de Entidad *</Label>
             <Select
               value={entityTypeFilter}
-              onValueChange={(v) => setEntityTypeFilter(v as 'all' | 'natural' | 'juridica')}
+              onValueChange={(v) =>
+                setEntityTypeFilter(v as "all" | "natural" | "juridica")
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -1743,11 +2153,14 @@ function BatchJobContent() {
               <SelectContent>
                 <SelectItem value="all">Todas las entidades</SelectItem>
                 <SelectItem value="natural">Solo personas naturales</SelectItem>
-                <SelectItem value="juridica">Solo personas juridicas</SelectItem>
+                <SelectItem value="juridica">
+                  Solo personas juridicas
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {entityCount} entidad{entityCount !== 1 ? 'es' : ''} registrada{entityCount !== 1 ? 's' : ''} en total
+              {entityCount} entidad{entityCount !== 1 ? "es" : ""} registrada
+              {entityCount !== 1 ? "s" : ""} en total
             </p>
           </div>
 
@@ -1758,26 +2171,26 @@ function BatchJobContent() {
               <div className="flex rounded-md overflow-hidden border">
                 <Button
                   type="button"
-                  variant={dateSelectionMode === 'months' ? 'default' : 'ghost'}
+                  variant={dateSelectionMode === "months" ? "default" : "ghost"}
                   size="sm"
                   className="h-7 px-3"
-                  onClick={() => setDateSelectionMode('months')}
+                  onClick={() => setDateSelectionMode("months")}
                 >
                   Meses
                 </Button>
                 <Button
                   type="button"
-                  variant={dateSelectionMode === 'days' ? 'default' : 'ghost'}
+                  variant={dateSelectionMode === "days" ? "default" : "ghost"}
                   size="sm"
                   className="h-7 px-3"
-                  onClick={() => setDateSelectionMode('days')}
+                  onClick={() => setDateSelectionMode("days")}
                 >
                   Dias
                 </Button>
               </div>
             </div>
 
-            {dateSelectionMode === 'months' ? (
+            {dateSelectionMode === "months" ? (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1788,15 +2201,15 @@ function BatchJobContent() {
                       value={startMonth}
                       max={getColombiaMonth()}
                       onChange={(e) => {
-                        const selectedMonth = e.target.value
-                        setStartMonth(selectedMonth)
+                        const selectedMonth = e.target.value;
+                        setStartMonth(selectedMonth);
                         if (selectedMonth) {
-                          const [year, month] = selectedMonth.split('-')
-                          setStartDate(`${year}-${month}-01`)
-                          const currentMonth = getColombiaMonth()
+                          const [year, month] = selectedMonth.split("-");
+                          setStartDate(`${year}-${month}-01`);
+                          const currentMonth = getColombiaMonth();
                           if (selectedMonth === currentMonth && !endMonth) {
-                            setEndMonth(currentMonth)
-                            setEndDate(getColombiaToday())
+                            setEndMonth(currentMonth);
+                            setEndDate(getColombiaToday());
                           }
                         }
                       }}
@@ -1811,15 +2224,19 @@ function BatchJobContent() {
                       min={startMonth || undefined}
                       max={getColombiaMonth()}
                       onChange={(e) => {
-                        setEndMonth(e.target.value)
+                        setEndMonth(e.target.value);
                         if (e.target.value) {
-                          const [year, month] = e.target.value.split('-')
-                          const currentMonth = getColombiaMonth()
+                          const [year, month] = e.target.value.split("-");
+                          const currentMonth = getColombiaMonth();
                           if (e.target.value === currentMonth) {
-                            setEndDate(getColombiaToday())
+                            setEndDate(getColombiaToday());
                           } else {
-                            const lastDay = new Date(parseInt(year), parseInt(month), 0)
-                            setEndDate(lastDay.toISOString().split('T')[0])
+                            const lastDay = new Date(
+                              parseInt(year),
+                              parseInt(month),
+                              0,
+                            );
+                            setEndDate(lastDay.toISOString().split("T")[0]);
                           }
                         }
                       }}
@@ -1873,10 +2290,17 @@ function BatchJobContent() {
                           id="batch-select-all-categories"
                           checked={selectedSheetTypes.length === 3}
                           onCheckedChange={(checked) => {
-                            setSelectedSheetTypes(checked ? ['ingresos', 'egresos', 'nominas'] : ['ingresos'])
+                            setSelectedSheetTypes(
+                              checked
+                                ? ["ingresos", "egresos", "nominas"]
+                                : ["ingresos"],
+                            );
                           }}
                         />
-                        <Label htmlFor="batch-select-all-categories" className="font-medium cursor-pointer">
+                        <Label
+                          htmlFor="batch-select-all-categories"
+                          className="font-medium cursor-pointer"
+                        >
                           Seleccionar todas
                         </Label>
                       </div>
@@ -1885,9 +2309,9 @@ function BatchJobContent() {
                 </thead>
                 <tbody>
                   {[
-                    { value: 'ingresos', label: 'Ingresos' },
-                    { value: 'egresos', label: 'Egresos' },
-                    { value: 'nominas', label: 'Nominas' },
+                    { value: "ingresos", label: "Ingresos" },
+                    { value: "egresos", label: "Egresos" },
+                    { value: "nominas", label: "Nominas" },
                   ].map((type) => (
                     <tr key={type.value} className="border-t">
                       <td className="p-3">
@@ -1895,17 +2319,26 @@ function BatchJobContent() {
                           <Checkbox
                             id={`batch-category-${type.value}`}
                             checked={selectedSheetTypes.includes(type.value)}
-                            disabled={selectedSheetTypes.length === 1 && selectedSheetTypes.includes(type.value)}
+                            disabled={
+                              selectedSheetTypes.length === 1 &&
+                              selectedSheetTypes.includes(type.value)
+                            }
                             onCheckedChange={(checked) => {
-                              if (!checked && selectedSheetTypes.length === 1) return
+                              if (!checked && selectedSheetTypes.length === 1)
+                                return;
                               setSelectedSheetTypes(
                                 checked
                                   ? [...selectedSheetTypes, type.value]
-                                  : selectedSheetTypes.filter((t) => t !== type.value)
-                              )
+                                  : selectedSheetTypes.filter(
+                                      (t) => t !== type.value,
+                                    ),
+                              );
                             }}
                           />
-                          <Label htmlFor={`batch-category-${type.value}`} className="text-sm font-normal cursor-pointer">
+                          <Label
+                            htmlFor={`batch-category-${type.value}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
                             {type.label}
                           </Label>
                         </div>
@@ -1929,9 +2362,12 @@ function BatchJobContent() {
                 </PopoverTrigger>
                 <PopoverContent className="w-80" align="end">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Intervalo de Consolidado</h4>
+                    <h4 className="font-medium text-sm">
+                      Intervalo de Consolidado
+                    </h4>
                     <p className="text-xs text-muted-foreground">
-                      Define el intervalo de tiempo para la hoja resumen en el Excel.
+                      Define el intervalo de tiempo para la hoja resumen en el
+                      Excel.
                     </p>
                   </div>
                 </PopoverContent>
@@ -1942,9 +2378,14 @@ function BatchJobContent() {
               <Checkbox
                 id="batch-use-total-consolidation"
                 checked={useTotalConsolidation}
-                onCheckedChange={(checked) => setUseTotalConsolidation(checked as boolean)}
+                onCheckedChange={(checked) =>
+                  setUseTotalConsolidation(checked as boolean)
+                }
               />
-              <Label htmlFor="batch-use-total-consolidation" className="text-sm font-normal cursor-pointer">
+              <Label
+                htmlFor="batch-use-total-consolidation"
+                className="text-sm font-normal cursor-pointer"
+              >
                 Consolidado Total (sin dividir por intervalos)
               </Label>
             </div>
@@ -1960,14 +2401,23 @@ function BatchJobContent() {
                     onChange={(e) => setConsolidationValue(e.target.value)}
                     className="w-24"
                   />
-                  <Select value={consolidationUnit} onValueChange={setConsolidationUnit}>
+                  <Select
+                    value={consolidationUnit}
+                    onValueChange={setConsolidationUnit}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="days">{consolidationValue === '1' ? 'Dia' : 'Dias'}</SelectItem>
-                      <SelectItem value="weeks">{consolidationValue === '1' ? 'Semana' : 'Semanas'}</SelectItem>
-                      <SelectItem value="months">{consolidationValue === '1' ? 'Mes' : 'Meses'}</SelectItem>
+                      <SelectItem value="days">
+                        {consolidationValue === "1" ? "Dia" : "Dias"}
+                      </SelectItem>
+                      <SelectItem value="weeks">
+                        {consolidationValue === "1" ? "Semana" : "Semanas"}
+                      </SelectItem>
+                      <SelectItem value="months">
+                        {consolidationValue === "1" ? "Mes" : "Meses"}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1984,7 +2434,12 @@ function BatchJobContent() {
             </Link>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || selectedSheetTypes.length === 0 || !startDate || !endDate}
+              disabled={
+                isSubmitting ||
+                selectedSheetTypes.length === 0 ||
+                !startDate ||
+                !endDate
+              }
               className="flex-1 gap-2"
               size="lg"
             >
@@ -2004,37 +2459,43 @@ function BatchJobContent() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 export default function NewJobPage() {
   return (
-    <Suspense fallback={
-      <div className="max-w-3xl mx-auto p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-muted rounded w-48" />
-          <div className="h-96 bg-muted rounded" />
+    <Suspense
+      fallback={
+        <div className="max-w-3xl mx-auto p-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 bg-muted rounded w-48" />
+            <div className="h-96 bg-muted rounded" />
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <NewJobPageInner />
     </Suspense>
-  )
+  );
 }
 
 function NewJobPageInner() {
-  const searchParams = useSearchParams()
-  const initialMode = searchParams.get('mode')
-  const [mode, setMode] = useState<'choose' | 'single' | 'batch'>(
-    initialMode === 'batch' ? 'batch' : initialMode === 'single' ? 'single' : 'choose'
-  )
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get("mode");
+  const [mode, setMode] = useState<"choose" | "single" | "batch">(
+    initialMode === "batch"
+      ? "batch"
+      : initialMode === "single"
+        ? "single"
+        : "choose",
+  );
 
-  if (mode === 'single') {
-    return <NewJobContent />
+  if (mode === "single") {
+    return <NewJobContent />;
   }
 
-  if (mode === 'batch') {
-    return <BatchJobContent />
+  if (mode === "batch") {
+    return <BatchJobContent />;
   }
 
   // Mode selection screen
@@ -2057,7 +2518,7 @@ function NewJobPageInner() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card
           className="cursor-pointer hover:border-primary transition-colors"
-          onClick={() => setMode('single')}
+          onClick={() => setMode("single")}
         >
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -2066,23 +2527,21 @@ function NewJobPageInner() {
               </div>
               <div>
                 <CardTitle className="text-lg">Job Individual</CardTitle>
-                <CardDescription>
-                  Un trabajo para una entidad
-                </CardDescription>
+                <CardDescription>Un trabajo para una entidad</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Selecciona una entidad, proporciona el token DIAN y configura el rango de fechas.
-              El trabajo se lanza inmediatamente.
+              Selecciona una entidad, proporciona el token DIAN y configura el
+              rango de fechas. El trabajo se lanza inmediatamente.
             </p>
           </CardContent>
         </Card>
 
         <Card
           className="cursor-pointer hover:border-primary transition-colors"
-          onClick={() => setMode('batch')}
+          onClick={() => setMode("batch")}
         >
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -2091,9 +2550,7 @@ function NewJobPageInner() {
               </div>
               <div>
                 <CardTitle className="text-lg">Jobs en Lote</CardTitle>
-                <CardDescription>
-                  Multiples trabajos a la vez
-                </CardDescription>
+                <CardDescription>Multiples trabajos a la vez</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -2106,5 +2563,5 @@ function NewJobPageInner() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
