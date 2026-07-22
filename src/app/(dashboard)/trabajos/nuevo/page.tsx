@@ -203,13 +203,14 @@ function NewJobContent() {
   // Dev job mode state
   const [isDevJob, setIsDevJob] = useState(false);
 
-  // Listing source: 'dian_scraping' (default, automático) vs
-  // 'user_uploaded_excel' (usuario sube el Excel de listado de la DIAN,
-  // descarga vía portal público sin token). Gated to dev role in staging
-  // for now, same pattern as isDevJob, while this mode is being validated.
+  // Listing source: always 'user_uploaded_excel' now — the token-based
+  // 'dian_scraping' path was removed from this form entirely (DIAN's token
+  // pages are no longer viable). The value stays state (not a constant)
+  // because it's threaded through the create-job payload and several
+  // conditionals below, but nothing in this form sets it to anything else.
   const [listingSource, setListingSource] = useState<
     "dian_scraping" | "user_uploaded_excel"
-  >("dian_scraping");
+  >("user_uploaded_excel");
   const [listingExcelFile, setListingExcelFile] = useState<File | null>(null);
   const [listingExcelFileId, setListingExcelFileId] = useState<string | null>(
     null,
@@ -1123,7 +1124,7 @@ function NewJobContent() {
               input que hay que llenar. Solo se vuelve interactivo (selector)
               si la detección automática falla. */}
           <div className="space-y-2">
-            <Label>Entidad (detectada del Excel)</Label>
+            <Label>Entidad</Label>
             {showManualEntityFallback ? (
               <>
                 <Popover
@@ -1213,21 +1214,15 @@ function NewJobContent() {
                 </p>
               </>
             ) : (
-              <div className="text-sm bg-muted/50 rounded-md p-3 flex items-center gap-2">
-                {selectedEntity ? (
-                  <>
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedEntity.display_name}</span>
-                    <span className="text-muted-foreground font-mono text-xs">
-                      ****{selectedEntity.identifier_suffix}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">
-                    Se detecta automáticamente al subir el Excel
-                  </span>
-                )}
-              </div>
+              <Input
+                disabled
+                value={
+                  selectedEntity
+                    ? `${selectedEntity.display_name} ****${selectedEntity.identifier_suffix}`
+                    : ""
+                }
+                placeholder="Se detecta automáticamente al subir el Excel"
+              />
             )}
           </div>
 
@@ -1384,16 +1379,12 @@ function NewJobContent() {
           {/* Date Range — auto-detected from the uploaded Excel, no manual
               pickers: the file already determines the exact document range. */}
           <div className="space-y-2">
-            <Label>Rango de Fechas (detectado del Excel)</Label>
-            {startDate && endDate ? (
-              <div className="text-sm bg-muted/50 rounded-md p-3">
-                {startDate} al {endDate}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Se detecta automáticamente al subir el Excel
-              </p>
-            )}
+            <Label>Rango de Fechas</Label>
+            <Input
+              disabled
+              value={startDate && endDate ? `${startDate} al ${endDate}` : ""}
+              placeholder="Se detecta automáticamente al subir el Excel"
+            />
           </div>
 
           {/* Job Type */}
