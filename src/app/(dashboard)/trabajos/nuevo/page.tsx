@@ -1118,118 +1118,118 @@ function NewJobContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Entity Selector — hidden in user_uploaded_excel mode since the
-              entity is auto-detected from the file itself, unless
-              auto-detection failed and the user needs to pick it manually
-              as a fallback (showManualEntityFallback). */}
-          {(listingSource !== "user_uploaded_excel" ||
-            showManualEntityFallback) && (
-            <div className="space-y-2">
-              <Label>Entidad *</Label>
-              <Popover
-                open={entitySearchOpen}
-                onOpenChange={setEntitySearchOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={entitySearchOpen}
-                    className={`w-full justify-between ${entitySelectorShake ? "animate-shake ring-2 ring-red-500" : ""}`}
-                    disabled={
-                      loadingEntities ||
-                      (listingSource === "user_uploaded_excel" &&
-                        !!listingExcelFileId)
-                    }
-                  >
-                    {loadingEntities ? (
-                      <span className="text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Cargando entidades...
-                      </span>
-                    ) : selectedEntity ? (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span>{selectedEntity.display_name}</span>
-                        <span className="text-muted-foreground font-mono text-xs">
-                          ****{selectedEntity.identifier_suffix}
+          {/* Entidad — mismo lenguaje visual que Rango de Fechas: un campo
+              gris de confirmación que se rellena solo al detectarse, no un
+              input que hay que llenar. Solo se vuelve interactivo (selector)
+              si la detección automática falla. */}
+          <div className="space-y-2">
+            <Label>Entidad (detectada del Excel)</Label>
+            {showManualEntityFallback ? (
+              <>
+                <Popover
+                  open={entitySearchOpen}
+                  onOpenChange={setEntitySearchOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={entitySearchOpen}
+                      className={`w-full justify-between ${entitySelectorShake ? "animate-shake ring-2 ring-red-500" : ""}`}
+                      disabled={loadingEntities}
+                    >
+                      {loadingEntities ? (
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Cargando entidades...
                         </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        Selecciona una entidad...
-                      </span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command>
-                    <CommandInput placeholder="Buscar por nombre o identificador..." />
-                    <CommandList className="max-h-[300px]">
-                      <CommandEmpty>
-                        <div className="py-6 text-center">
-                          <p className="text-sm text-muted-foreground mb-2">
-                            No se encontraron entidades
-                          </p>
-                          <Link href="/entidades">
-                            <Button variant="outline" size="sm">
-                              <Building2 className="h-4 w-4 mr-2" />
-                              Registrar Entidad
-                            </Button>
-                          </Link>
+                      ) : selectedEntity ? (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <span>{selectedEntity.display_name}</span>
+                          <span className="text-muted-foreground font-mono text-xs">
+                            ****{selectedEntity.identifier_suffix}
+                          </span>
                         </div>
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {entities.map((entity) => (
-                          <CommandItem
-                            key={entity.id}
-                            value={`${entity.display_name} ${entity.identifier_suffix}`}
-                            onSelect={() => handleSelectEntity(entity)}
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                selectedEntity?.id === entity.id
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              }`}
-                            />
-                            <div className="flex items-center gap-2 flex-1">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              <span>{entity.display_name}</span>
-                              <span className="text-muted-foreground font-mono text-xs">
-                                ****{entity.identifier_suffix}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  {showManualEntityFallback
-                    ? "No pudimos detectar la entidad automáticamente — selecciónala y vuelve a subir el archivo"
-                    : "Selecciona la entidad para la cual deseas procesar documentos"}
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Selecciona una entidad...
+                        </span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Buscar por nombre o identificador..." />
+                      <CommandList className="max-h-[300px]">
+                        <CommandEmpty>
+                          <div className="py-6 text-center">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              No se encontraron entidades
+                            </p>
+                            <Link href="/entidades">
+                              <Button variant="outline" size="sm">
+                                <Building2 className="h-4 w-4 mr-2" />
+                                Registrar Entidad
+                              </Button>
+                            </Link>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {entities.map((entity) => (
+                            <CommandItem
+                              key={entity.id}
+                              value={`${entity.display_name} ${entity.identifier_suffix}`}
+                              onSelect={() => handleSelectEntity(entity)}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedEntity?.id === entity.id
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                                <span>{entity.display_name}</span>
+                                <span className="text-muted-foreground font-mono text-xs">
+                                  ****{entity.identifier_suffix}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-amber-700">
+                  No pudimos detectar la entidad automáticamente — selecciónala
+                  y vuelve a subir el archivo
                 </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refetchEntities()}
-                  disabled={loadingEntities}
-                >
-                  <RefreshCw
-                    className={`h-3 w-3 ${loadingEntities ? "animate-spin" : ""}`}
-                  />
-                </Button>
+              </>
+            ) : (
+              <div className="text-sm bg-muted/50 rounded-md p-3 flex items-center gap-2">
+                {selectedEntity ? (
+                  <>
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedEntity.display_name}</span>
+                    <span className="text-muted-foreground font-mono text-xs">
+                      ****{selectedEntity.identifier_suffix}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Se detecta automáticamente al subir el Excel
+                  </span>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Excel de listado DIAN — el único flujo de creación de job.
               El token DIAN dejó de ser viable (anti-bot de DIAN); la
@@ -1256,26 +1256,8 @@ function NewJobContent() {
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-700 text-sm ml-2">
                       <strong>{listingExcelFile?.name}</strong>: se detectaron{" "}
-                      {listingExcelRowCount} documentos
-                      {listingExcelDateRange && (
-                        <>
-                          {" "}
-                          del {listingExcelDateRange.start_date} al{" "}
-                          {listingExcelDateRange.end_date}
-                        </>
-                      )}
-                      {selectedEntity && (
-                        <div className="mt-1 flex items-center gap-2">
-                          <Building2 className="h-3.5 w-3.5" />
-                          <span>
-                            {listingExcelEntityAutoDetected
-                              ? "Entidad detectada: "
-                              : "Entidad seleccionada: "}
-                            <strong>{selectedEntity.display_name}</strong> ****
-                            {selectedEntity.identifier_suffix}
-                          </span>
-                        </div>
-                      )}
+                      {listingExcelRowCount} documentos. Revisa la entidad y el
+                      rango de fechas detectados.
                     </AlertDescription>
                   </Alert>
                   <Button
