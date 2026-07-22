@@ -1231,464 +1231,152 @@ function NewJobContent() {
             </div>
           )}
 
-          {/* Listing source: upload DIAN Excel manually (staging only + dev role,
-              while this mode is being validated — see plan Fase 3). Placed
-              right after entity selection since it changes what the rest of
-              the form needs — token/date-range are irrelevant once a file
-              drives the job instead of a live DIAN session. */}
-          {isStaging && hasDevRole && !isDevJob && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="user-uploaded-excel-mode"
-                  checked={listingSource === "user_uploaded_excel"}
-                  onCheckedChange={(checked) => {
-                    setListingSource(
-                      checked ? "user_uploaded_excel" : "dian_scraping",
-                    );
-                    setListingExcelFile(null);
-                    setListingExcelFileId(null);
-                    setListingExcelRowCount(null);
-                    setListingExcelDateRange(null);
-                    setListingExcelError(null);
-                    setListingExcelEntityAutoDetected(false);
-                    setShowManualEntityFallback(false);
-                    setSelectedEntity(null);
-                    setStartDate("");
-                    setEndDate("");
-                  }}
-                  className="h-5 w-5 data-[state=checked]:bg-blue-600"
-                />
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  <Label
-                    htmlFor="user-uploaded-excel-mode"
-                    className="text-sm font-medium text-blue-800 cursor-pointer"
-                  >
-                    Subir Excel de listado de la DIAN (sin token)
-                  </Label>
-                </div>
-              </div>
+          {/* Excel de listado DIAN — el único flujo de creación de job.
+              El token DIAN dejó de ser viable (anti-bot de DIAN); la
+              descarga se hace vía el portal público sin token, y la entidad/
+              rango de fechas se detectan del archivo, no se piden a mano. */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-600" />
+              <Label className="text-sm font-medium text-blue-800">
+                Excel de listado de la DIAN
+              </Label>
+            </div>
 
-              {listingSource === "user_uploaded_excel" && (
-                <div className="pl-7 space-y-2">
-                  <p className="text-xs text-blue-700">
-                    Sube el Excel exportado del portal de la DIAN. La entidad se
-                    detecta automáticamente del archivo, y el token DIAN / rango
-                    de fechas no aplican en este modo — la descarga se hace vía
-                    el portal público (sin token).
-                  </p>
+            <div className="space-y-2">
+              <p className="text-xs text-blue-700">
+                Sube el Excel exportado del portal de la DIAN. La entidad, el
+                rango de fechas y la cantidad de documentos se detectan del
+                archivo — solo confírmalos abajo.
+              </p>
 
-                  {listingExcelFileId ? (
-                    <div className="space-y-2">
-                      <Alert className="border-green-200 bg-green-50">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <AlertDescription className="text-green-700 text-sm ml-2">
-                          <strong>{listingExcelFile?.name}</strong>: se
-                          detectaron {listingExcelRowCount} documentos
-                          {listingExcelDateRange && (
-                            <>
-                              {" "}
-                              del {listingExcelDateRange.start_date} al{" "}
-                              {listingExcelDateRange.end_date}
-                            </>
-                          )}
-                          {selectedEntity && (
-                            <div className="mt-1 flex items-center gap-2">
-                              <Building2 className="h-3.5 w-3.5" />
-                              <span>
-                                {listingExcelEntityAutoDetected
-                                  ? "Entidad detectada: "
-                                  : "Entidad seleccionada: "}
-                                <strong>{selectedEntity.display_name}</strong>{" "}
-                                ****{selectedEntity.identifier_suffix}
-                              </span>
-                            </div>
-                          )}
-                        </AlertDescription>
-                      </Alert>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setListingExcelFile(null);
-                          setListingExcelFileId(null);
-                          setListingExcelRowCount(null);
-                          setListingExcelDateRange(null);
-                          setListingExcelError(null);
-                          setListingExcelEntityAutoDetected(false);
-                          setShowManualEntityFallback(false);
-                          setSelectedEntity(null);
-                          setStartDate("");
-                          setEndDate("");
-                        }}
-                      >
-                        Quitar archivo y subir otro
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Input
-                        type="file"
-                        accept=".xlsx"
-                        disabled={uploadListingExcelMutation.isPending}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setListingExcelFile(file);
-                          setListingExcelFileId(null);
-                          setListingExcelError(null);
-                          try {
-                            const result =
-                              await uploadListingExcelMutation.mutateAsync({
-                                file,
-                                // Manual fallback: if auto-detection already
-                                // failed once and the user picked an entity
-                                // above, retry with it as an explicit override.
-                                entityId: showManualEntityFallback
-                                  ? selectedEntity?.id
-                                  : undefined,
-                              });
-                            setListingExcelFileId(result.file_id);
-                            setListingExcelRowCount(result.row_count);
-                            setListingExcelDateRange(result.date_range);
-                            setListingExcelEntityAutoDetected(
-                              result.entity_auto_detected,
-                            );
-                            setShowManualEntityFallback(false);
-                            setSelectedEntity({
-                              id: result.entity.id,
-                              display_name: result.entity.display_name || "",
-                              identifier_suffix:
-                                result.entity.identifier_suffix || "",
-                            });
-                            setStartDate(result.date_range.start_date);
-                            setEndDate(result.date_range.end_date);
-                          } catch (err) {
-                            if (err instanceof EntityNotDetectedError) {
-                              setShowManualEntityFallback(true);
-                              setListingExcelError(
-                                `${err.message} Selecciona la entidad manualmente arriba y vuelve a subir el archivo.`,
-                              );
-                            } else {
-                              setListingExcelError(
-                                err instanceof Error
-                                  ? err.message
-                                  : "Error subiendo el Excel",
-                              );
-                            }
-                          }
-                        }}
-                      />
-                      {uploadListingExcelMutation.isPending && (
-                        <div className="flex items-center gap-2 text-sm text-blue-700">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Subiendo y validando Excel...
+              {listingExcelFileId ? (
+                <div className="space-y-2">
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700 text-sm ml-2">
+                      <strong>{listingExcelFile?.name}</strong>: se detectaron{" "}
+                      {listingExcelRowCount} documentos
+                      {listingExcelDateRange && (
+                        <>
+                          {" "}
+                          del {listingExcelDateRange.start_date} al{" "}
+                          {listingExcelDateRange.end_date}
+                        </>
+                      )}
+                      {selectedEntity && (
+                        <div className="mt-1 flex items-center gap-2">
+                          <Building2 className="h-3.5 w-3.5" />
+                          <span>
+                            {listingExcelEntityAutoDetected
+                              ? "Entidad detectada: "
+                              : "Entidad seleccionada: "}
+                            <strong>{selectedEntity.display_name}</strong> ****
+                            {selectedEntity.identifier_suffix}
+                          </span>
                         </div>
                       )}
-                      {showManualEntityFallback && selectedEntity && (
-                        <p className="text-xs text-blue-700">
-                          Entidad seleccionada manualmente:{" "}
-                          <strong>{selectedEntity.display_name}</strong> — sube
-                          el archivo de nuevo para continuar
-                        </p>
-                      )}
-                      {listingExcelError && (
-                        <Alert className="border-red-200 bg-red-50">
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                          <AlertDescription className="text-red-700 text-sm ml-2">
-                            {listingExcelError}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </>
-                  )}
+                    </AlertDescription>
+                  </Alert>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setListingExcelFile(null);
+                      setListingExcelFileId(null);
+                      setListingExcelRowCount(null);
+                      setListingExcelDateRange(null);
+                      setListingExcelError(null);
+                      setListingExcelEntityAutoDetected(false);
+                      setShowManualEntityFallback(false);
+                      setSelectedEntity(null);
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                  >
+                    Quitar archivo y subir otro
+                  </Button>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* OAuth expired/pending alerts */}
-          {selectedEntity &&
-            listingSource !== "user_uploaded_excel" &&
-            autoTokenOAuthStatus === "oauth_expired" && (
-              <Alert className="border-red-600/70 bg-red-50">
-                <XCircle className="h-5 w-5 text-red-600" />
-                <AlertDescription className="ml-2">
-                  <div className="space-y-2">
-                    <p className="text-base font-semibold text-red-700">
-                      Email DIAN expirado
-                    </p>
-                    <p className="text-sm text-red-600">
-                      {dianEmailMasked && (
-                        <span className="font-mono">({dianEmailMasked})</span>
-                      )}{" "}
-                      perdio acceso.
-                    </p>
-                    <Link href="/dian-emails">
-                      <Button variant="destructive" size="sm">
-                        <Mail className="h-4 w-4 mr-1.5" />
-                        Re-autorizar ahora
-                      </Button>
-                    </Link>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-          {selectedEntity &&
-            listingSource !== "user_uploaded_excel" &&
-            autoTokenOAuthStatus === "oauth_pending" && (
-              <Alert className="border-yellow-600/70 bg-yellow-50">
-                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                <AlertDescription className="ml-2">
-                  <div className="space-y-2">
-                    <p className="text-base font-semibold text-yellow-700">
-                      Email DIAN pendiente
-                    </p>
-                    <p className="text-sm text-yellow-700">
-                      Falta completar la autorizacion OAuth{" "}
-                      {dianEmailMasked && (
-                        <span className="font-mono">({dianEmailMasked})</span>
-                      )}
-                    </p>
-                    <Link href="/dian-emails">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-yellow-600 text-yellow-700"
-                      >
-                        <Mail className="h-4 w-4 mr-1.5" />
-                        Completar autorizacion
-                      </Button>
-                    </Link>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-          {/* Token DIAN section (not applicable in user_uploaded_excel mode —
-              no DIAN session/token is used at all in that mode) */}
-          {listingSource !== "user_uploaded_excel" && (
-            <div className="space-y-2">
-              <Label htmlFor="dian-token">Token DIAN *</Label>
-
-              {/* Auto-token request UI (when auto-token is being requested) */}
-              {(autoTokenStatus === "pending" ||
-                autoTokenStatus === "polling") && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-700">
-                        {getAutoTokenElapsedMessage()}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-0.5">
-                        El token llegara automaticamente cuando DIAN responda
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Auto-token received success */}
-              {autoTokenStatus === "received" && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-green-700">
-                        Token DIAN recibido!
-                      </p>
-                      <p className="text-xs text-green-600 mt-0.5">
-                        El token ha sido guardado y esta listo para usar
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Auto-token failed/timeout */}
-              {(autoTokenStatus === "failed" ||
-                autoTokenStatus === "timeout") && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-red-700">
-                        {autoTokenError || "No se pudo obtener el token"}
-                      </p>
-                      <p className="text-xs text-red-600 mt-0.5">
-                        Puedes intentar de nuevo o pegar un token manualmente
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRequestAutoToken}
-                      className="border-red-300 text-red-700 hover:bg-red-100"
-                    >
-                      Reintentar
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Normal token input (when not requesting auto-token) */}
-              {autoTokenStatus === "idle" && (
+              ) : (
                 <>
-                  <div className="relative">
-                    <Input
-                      ref={dianTokenInputRef}
-                      id="dian-token"
-                      placeholder={
-                        loadingJobOptions
-                          ? "Verificando opciones..."
-                          : !useNewToken && savedTokenAvailable
-                            ? `Usando token guardado (${tokenMasked || "****"})`
-                            : "https://catalogo-vpfe.dian.gov.co/..."
-                      }
-                      value={dianToken}
-                      onChange={(e) => {
-                        handleDianTokenChange(e.target.value);
-                        // If user starts typing, disable stored token
-                        if (e.target.value.trim()) {
-                          if (!useNewToken && savedTokenAvailable)
-                            setUseNewToken(true);
+                  <Input
+                    type="file"
+                    accept=".xlsx"
+                    disabled={uploadListingExcelMutation.isPending}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setListingExcelFile(file);
+                      setListingExcelFileId(null);
+                      setListingExcelError(null);
+                      try {
+                        const result =
+                          await uploadListingExcelMutation.mutateAsync({
+                            file,
+                            // Manual fallback: if auto-detection already
+                            // failed once and the user picked an entity
+                            // above, retry with it as an explicit override.
+                            entityId: showManualEntityFallback
+                              ? selectedEntity?.id
+                              : undefined,
+                          });
+                        setListingExcelFileId(result.file_id);
+                        setListingExcelRowCount(result.row_count);
+                        setListingExcelDateRange(result.date_range);
+                        setListingExcelEntityAutoDetected(
+                          result.entity_auto_detected,
+                        );
+                        setShowManualEntityFallback(false);
+                        setSelectedEntity({
+                          id: result.entity.id,
+                          display_name: result.entity.display_name || "",
+                          identifier_suffix:
+                            result.entity.identifier_suffix || "",
+                        });
+                        setStartDate(result.date_range.start_date);
+                        setEndDate(result.date_range.end_date);
+                      } catch (err) {
+                        if (err instanceof EntityNotDetectedError) {
+                          setShowManualEntityFallback(true);
+                          setListingExcelError(
+                            `${err.message} Selecciona la entidad manualmente arriba y vuelve a subir el archivo.`,
+                          );
+                        } else {
+                          setListingExcelError(
+                            err instanceof Error
+                              ? err.message
+                              : "Error subiendo el Excel",
+                          );
                         }
-                      }}
-                      disabled={
-                        loadingJobOptions ||
-                        (!useNewToken && savedTokenAvailable)
                       }
-                      className={`font-mono text-sm pr-10 ${
-                        dianTokenError || validationPhase === "error"
-                          ? "border-red-500 focus-visible:ring-red-500"
-                          : validationPhase === "success" ||
-                              validationPhase === "success_sparkle" ||
-                              (!useNewToken && savedTokenAvailable)
-                            ? "border-green-500 focus-visible:ring-green-500"
-                            : ""
-                      } ${!useNewToken && savedTokenAvailable ? "bg-green-50/50" : ""} ${validationPhase === "success_sparkle" ? "bg-amber-50/50" : ""}`}
-                    />
-                    {/* Status indicator inside input */}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {loadingJobOptions ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : !useNewToken && savedTokenAvailable ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : dianToken.trim() ? (
-                        validationPhase === "validating" ||
-                        validationPhase === "verifying" ||
-                        validationPhase === "updating" ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        ) : validationPhase === "success_sparkle" ? (
-                          <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
-                        ) : validationPhase === "success" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        ) : validationPhase === "error" || dianTokenError ? (
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        ) : null
-                      ) : null}
+                    }}
+                  />
+                  {uploadListingExcelMutation.isPending && (
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Subiendo y validando Excel...
                     </div>
-                  </div>
-
-                  {/* Status message and options row */}
-                  <div className="flex items-center justify-between">
-                    {/* Left: Status message */}
-                    <div className="flex-1">
-                      {loadingJobOptions ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Verificando opciones disponibles...
-                        </p>
-                      ) : dianTokenError ? (
-                        <p className="text-xs text-red-600 flex items-center gap-1">
-                          <XCircle className="h-3 w-3" />
-                          {dianTokenError}
-                        </p>
-                      ) : !useNewToken && savedTokenAvailable ? (
-                        <p className="text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Token guardado listo para usar
-                        </p>
-                      ) : validationPhase === "success_sparkle" ? (
-                        <p className="text-xs text-amber-600 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3 animate-pulse" />
-                          Representante legal actualizado
-                        </p>
-                      ) : validationPhase === "success" ? (
-                        <p className="text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Token DIAN valido
-                        </p>
-                      ) : validationPhase === "validating" ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Validando...
-                        </p>
-                      ) : validationPhase === "verifying" ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Verificando con DIAN...
-                        </p>
-                      ) : validationPhase === "updating" ? (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Actualizando datos...
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {selectedEntity
-                            ? "Pega la URL del token DIAN o solicita uno automatico"
-                            : "Pega la URL completa del token DIAN"}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Right: Options */}
-                    {selectedEntity && !loadingJobOptions && (
-                      <div className="flex items-center gap-3 ml-4">
-                        {savedTokenAvailable && (
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <Checkbox
-                              checked={!useNewToken}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setUseNewToken(false);
-                                  setDianToken("");
-                                  setDianTokenError(null);
-                                  setValidationPhase("idle");
-                                } else {
-                                  setUseNewToken(true);
-                                }
-                              }}
-                              className="h-3.5 w-3.5 data-[state=checked]:bg-green-600"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              Guardado
-                            </span>
-                          </label>
-                        )}
-                        {autoTokenAvailable && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRequestAutoToken}
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Zap className="h-3 w-3 mr-1" />
-                            Solicitar
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  {showManualEntityFallback && selectedEntity && (
+                    <p className="text-xs text-blue-700">
+                      Entidad seleccionada manualmente:{" "}
+                      <strong>{selectedEntity.display_name}</strong> — sube el
+                      archivo de nuevo para continuar
+                    </p>
+                  )}
+                  {listingExcelError && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700 text-sm ml-2">
+                        {listingExcelError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </>
               )}
             </div>
-          )}
+          </div>
 
           {/* Job Name */}
           <div className="space-y-2">
@@ -1711,142 +1399,20 @@ function NewJobContent() {
             )}
           </div>
 
-          {/* Date Range — auto-detected from the uploaded Excel in
-              user_uploaded_excel mode, no manual pickers needed there since
-              the file already determines the exact document range. */}
-          {listingSource === "user_uploaded_excel" ? (
-            <div className="space-y-2">
-              <Label>Rango de Fechas (detectado del Excel)</Label>
-              {startDate && endDate ? (
-                <div className="text-sm bg-muted/50 rounded-md p-3">
-                  {startDate} al {endDate}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Se detecta automáticamente al subir el Excel
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Rango de Fechas *</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Por:</span>
-                  <div className="flex items-center gap-1 bg-muted p-1 rounded-md">
-                    <Button
-                      type="button"
-                      variant={
-                        dateSelectionMode === "months" ? "default" : "ghost"
-                      }
-                      size="sm"
-                      className="h-7 px-3"
-                      onClick={() => setDateSelectionMode("months")}
-                    >
-                      Meses
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        dateSelectionMode === "days" ? "default" : "ghost"
-                      }
-                      size="sm"
-                      className="h-7 px-3"
-                      onClick={() => setDateSelectionMode("days")}
-                    >
-                      Dias
-                    </Button>
-                  </div>
-                </div>
+          {/* Date Range — auto-detected from the uploaded Excel, no manual
+              pickers: the file already determines the exact document range. */}
+          <div className="space-y-2">
+            <Label>Rango de Fechas (detectado del Excel)</Label>
+            {startDate && endDate ? (
+              <div className="text-sm bg-muted/50 rounded-md p-3">
+                {startDate} al {endDate}
               </div>
-
-              {dateSelectionMode === "months" ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="start-month">Mes Inicial</Label>
-                      <Input
-                        id="start-month"
-                        type="month"
-                        value={startMonth}
-                        max={getColombiaMonth()}
-                        onChange={(e) => {
-                          const selectedMonth = e.target.value;
-                          setStartMonth(selectedMonth);
-                          if (selectedMonth) {
-                            const [year, month] = selectedMonth.split("-");
-                            setStartDate(`${year}-${month}-01`);
-                            const currentMonth = getColombiaMonth();
-                            if (selectedMonth === currentMonth && !endMonth) {
-                              setEndMonth(currentMonth);
-                              setEndDate(getColombiaToday());
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="end-month">Mes Final</Label>
-                      <Input
-                        id="end-month"
-                        type="month"
-                        value={endMonth}
-                        min={startMonth || undefined}
-                        max={getColombiaMonth()}
-                        onChange={(e) => {
-                          setEndMonth(e.target.value);
-                          if (e.target.value) {
-                            const [year, month] = e.target.value.split("-");
-                            const currentMonth = getColombiaMonth();
-                            if (e.target.value === currentMonth) {
-                              setEndDate(getColombiaToday());
-                            } else {
-                              const lastDay = new Date(
-                                parseInt(year),
-                                parseInt(month),
-                                0,
-                              );
-                              setEndDate(lastDay.toISOString().split("T")[0]);
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                  {startMonth && endMonth && (
-                    <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                      <span className="font-medium">Rango: </span>
-                      {startDate} al {endDate}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-date">Fecha Inicio</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={startDate}
-                      max={getColombiaToday()}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-date">Fecha Final</Label>
-                    <Input
-                      id="end-date"
-                      type="date"
-                      value={endDate}
-                      min={startDate || undefined}
-                      max={getColombiaToday()}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Se detecta automáticamente al subir el Excel
+              </p>
+            )}
+          </div>
 
           {/* Job Type */}
           <div className="space-y-2">
@@ -1947,74 +1513,74 @@ function NewJobContent() {
             </div>
           </div>
 
-          {/* Dev Mode (staging only + dev role, not for pseudo entities) */}
-          {isStaging &&
-            hasDevRole &&
-            listingSource !== "user_uploaded_excel" && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+          {/* Dev Mode (staging only + dev role, not for pseudo entities) —
+              separate internal testing shortcut (cached raw Excel from a
+              previous real run), independent of the Excel-upload flow. */}
+          {isStaging && hasDevRole && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="dev-job-mode"
+                  checked={isDevJob}
+                  onCheckedChange={(checked) => {
+                    setIsDevJob(checked as boolean);
+                    if (checked) {
+                      setUseNewToken(false);
+                      setDianToken("");
+                      // Reset auto-token if in progress
+                      setAutoTokenRequestId(null);
+                      setAutoTokenStatus("idle");
+                    }
+                  }}
+                  className="h-5 w-5 data-[state=checked]:bg-yellow-600"
+                />
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="dev-job-mode"
-                    checked={isDevJob}
-                    onCheckedChange={(checked) => {
-                      setIsDevJob(checked as boolean);
-                      if (checked) {
-                        setUseNewToken(false);
-                        setDianToken("");
-                        // Reset auto-token if in progress
-                        setAutoTokenRequestId(null);
-                        setAutoTokenStatus("idle");
-                      }
-                    }}
-                    className="h-5 w-5 data-[state=checked]:bg-yellow-600"
-                  />
-                  <div className="flex items-center gap-2">
-                    <FlaskConical className="h-4 w-4 text-yellow-600" />
-                    <Label
-                      htmlFor="dev-job-mode"
-                      className="text-sm font-medium text-yellow-800 cursor-pointer"
-                    >
-                      Modo desarrollo (usar Excel cacheado)
-                    </Label>
-                  </div>
+                  <FlaskConical className="h-4 w-4 text-yellow-600" />
+                  <Label
+                    htmlFor="dev-job-mode"
+                    className="text-sm font-medium text-yellow-800 cursor-pointer"
+                  >
+                    Modo desarrollo (usar Excel cacheado)
+                  </Label>
                 </div>
-
-                {isDevJob && (
-                  <div className="pl-7 space-y-2">
-                    {loadingDevCache ? (
-                      <div className="flex items-center gap-2 text-sm text-yellow-700">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Verificando cache...
-                      </div>
-                    ) : devCacheStatus?.available ? (
-                      <Alert className="border-green-200 bg-green-50">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <AlertDescription className="text-green-700 text-sm ml-2">
-                          <strong>Cache disponible</strong>
-                        </AlertDescription>
-                      </Alert>
-                    ) : selectedEntity && startDate && endDate ? (
-                      <Alert className="border-red-200 bg-red-50">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-700 text-sm ml-2">
-                          <strong>Cache no disponible.</strong> Ejecuta primero
-                          un job normal.
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <p className="text-xs text-yellow-700">
-                        Selecciona una entidad y rango de fechas para verificar
-                        el cache
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-xs text-yellow-700 pl-7">
-                  Este modo usa el raw Excel cacheado de jobs anteriores.
-                </p>
               </div>
-            )}
+
+              {isDevJob && (
+                <div className="pl-7 space-y-2">
+                  {loadingDevCache ? (
+                    <div className="flex items-center gap-2 text-sm text-yellow-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verificando cache...
+                    </div>
+                  ) : devCacheStatus?.available ? (
+                    <Alert className="border-green-200 bg-green-50">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-700 text-sm ml-2">
+                        <strong>Cache disponible</strong>
+                      </AlertDescription>
+                    </Alert>
+                  ) : selectedEntity && startDate && endDate ? (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-700 text-sm ml-2">
+                        <strong>Cache no disponible.</strong> Ejecuta primero un
+                        job normal.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <p className="text-xs text-yellow-700">
+                      Selecciona una entidad y rango de fechas para verificar el
+                      cache
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p className="text-xs text-yellow-700 pl-7">
+                Este modo usa el raw Excel cacheado de jobs anteriores.
+              </p>
+            </div>
+          )}
 
           {/* Consolidation Interval */}
           <div className="space-y-3">
