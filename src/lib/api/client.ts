@@ -13,6 +13,27 @@ interface ApiResponse<T = unknown> {
   [key: string]: unknown;
 }
 
+/**
+ * Carries the backend's machine-readable error code (e.g. "job_not_found",
+ * "ip_blocked") alongside the human message, so callers can branch on
+ * `code` instead of string-matching `message` (localized, free-text).
+ */
+export class ApiError extends Error {
+  code: string;
+  details: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    code: string,
+    details: Record<string, unknown> = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
 export class ApiClient {
   private accessToken: string | null = null;
 
