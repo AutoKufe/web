@@ -1,14 +1,20 @@
-'use client'
+"use client";
 
-import { useState, use } from 'react'
-import Link from 'next/link'
-import { apiClient } from '@/lib/api/client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState, use } from "react";
+import Link from "next/link";
+import { apiClient, ApiError } from "@/lib/api/client";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
   RefreshCw,
@@ -23,220 +29,269 @@ import {
   AlertCircle,
   Info,
   Ban,
-  Send
-} from 'lucide-react'
-import { toast } from 'sonner'
+  Send,
+} from "lucide-react";
+import { toast } from "sonner";
 import {
   useJob,
   useEntity,
   useCancelJob,
   useMarkJobAsFailed,
   useProvideToken,
-} from '@/lib/query'
-
+} from "@/lib/query";
 
 // Helper: Format document categories with proper "y" conjunction
 // Input: ['ingresos', 'egresos', 'nominas'] or "ingresosegresosnominas"
 // Output: "Ingresos, Egresos y Nominas"
-function formatDocumentCategories(categories: string | string[] | undefined | null): string {
-  if (!categories) return 'Todos'
+function formatDocumentCategories(
+  categories: string | string[] | undefined | null,
+): string {
+  if (!categories) return "Todos";
 
   const categoryMap: Record<string, string> = {
-    'ingresos': 'Ingresos',
-    'egresos': 'Egresos',
-    'nominas': 'Nominas'
-  }
+    ingresos: "Ingresos",
+    egresos: "Egresos",
+    nominas: "Nominas",
+  };
 
   const joinWithY = (items: string[]): string => {
-    if (items.length === 0) return ''
-    if (items.length === 1) return items[0]
-    if (items.length === 2) return items.join(' y ')
+    if (items.length === 0) return "";
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return items.join(" y ");
 
-    const lastItem = items[items.length - 1]
-    const beforeLast = items.slice(0, -1)
-    return beforeLast.join(', ') + ' y ' + lastItem
-  }
+    const lastItem = items[items.length - 1];
+    const beforeLast = items.slice(0, -1);
+    return beforeLast.join(", ") + " y " + lastItem;
+  };
 
   // If it's an array, map directly
   if (Array.isArray(categories)) {
-    const formatted = categories.map(cat => categoryMap[cat.toLowerCase()] || cat)
-    return joinWithY(formatted)
+    const formatted = categories.map(
+      (cat) => categoryMap[cat.toLowerCase()] || cat,
+    );
+    return joinWithY(formatted);
   }
 
   // If it's a string, parse it
-  if (typeof categories === 'string') {
-    const parts: string[] = []
-    const remaining = categories.toLowerCase()
+  if (typeof categories === "string") {
+    const parts: string[] = [];
+    const remaining = categories.toLowerCase();
 
     for (const [key, label] of Object.entries(categoryMap)) {
       if (remaining.includes(key)) {
-        parts.push(label)
+        parts.push(label);
       }
     }
 
-    return parts.length > 0 ? joinWithY(parts) : categories
+    return parts.length > 0 ? joinWithY(parts) : categories;
   }
 
-  return 'Todos'
+  return "Todos";
 }
 
 // Helper: Format date without timezone shift (fix -1 day bug)
 // Input: "2025-01-01" from DB → Output: "1/1/2025"
 function formatDateOnly(dateString: string | undefined | null): string {
-  if (!dateString || typeof dateString !== 'string') return 'N/A'
+  if (!dateString || typeof dateString !== "string") return "N/A";
 
   // Parse as local date (not UTC) to avoid timezone shift
-  const [year, month, day] = dateString.split('T')[0].split('-')
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  const [year, month, day] = dateString.split("T")[0].split("-");
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
-  return date.toLocaleDateString()
+  return date.toLocaleDateString();
 }
 
-const getStatusIcon = (status: string, size = 'h-5 w-5') => {
+const getStatusIcon = (status: string, size = "h-5 w-5") => {
   switch (status) {
-    case 'completed':
-      return <CheckCircle2 className={`${size} text-green-500`} />
-    case 'processing':
-      return <Loader2 className={`${size} text-blue-500 animate-spin`} />
-    case 'pending':
-    case 'queued':
-      return <Clock className={`${size} text-yellow-500`} />
-    case 'waiting_token':
-      return <AlertCircle className={`${size} text-orange-500`} />
-    case 'failed':
-      return <XCircle className={`${size} text-red-500`} />
+    case "completed":
+      return <CheckCircle2 className={`${size} text-green-500`} />;
+    case "processing":
+      return <Loader2 className={`${size} text-blue-500 animate-spin`} />;
+    case "pending":
+    case "queued":
+      return <Clock className={`${size} text-yellow-500`} />;
+    case "waiting_token":
+      return <AlertCircle className={`${size} text-orange-500`} />;
+    case "failed":
+      return <XCircle className={`${size} text-red-500`} />;
     default:
-      return <Clock className={`${size} text-muted-foreground`} />
+      return <Clock className={`${size} text-muted-foreground`} />;
   }
-}
+};
 
 const getStatusBadge = (status: string) => {
-  const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; className?: string }> = {
-    completed: { variant: 'default', label: 'Completado' },
-    processing: { variant: 'secondary', label: 'Procesando' },
-    queued: { variant: 'secondary', label: 'En Cola' },
-    pending: { variant: 'outline', label: 'Pendiente' },
-    waiting_token: { variant: 'outline', label: 'Requiere Token', className: 'border-orange-500 text-orange-600' },
-    failed: { variant: 'destructive', label: 'Fallido' },
-  }
-  const { variant, label, className } = config[status] || { variant: 'outline' as const, label: status }
-  return <Badge variant={variant} className={`text-base px-3 py-1 ${className || ''}`}>{label}</Badge>
-}
+  const config: Record<
+    string,
+    {
+      variant: "default" | "secondary" | "destructive" | "outline";
+      label: string;
+      className?: string;
+    }
+  > = {
+    completed: { variant: "default", label: "Completado" },
+    processing: { variant: "secondary", label: "Procesando" },
+    queued: { variant: "secondary", label: "En Cola" },
+    pending: { variant: "outline", label: "Pendiente" },
+    waiting_token: {
+      variant: "outline",
+      label: "Requiere Token",
+      className: "border-orange-500 text-orange-600",
+    },
+    failed: { variant: "destructive", label: "Fallido" },
+  };
+  const { variant, label, className } = config[status] || {
+    variant: "outline" as const,
+    label: status,
+  };
+  return (
+    <Badge
+      variant={variant}
+      className={`text-base px-3 py-1 ${className || ""}`}
+    >
+      {label}
+    </Badge>
+  );
+};
 
 const getEntityTypeLabel = (typeCode: string) => {
   const types: Record<string, string> = {
-    'persona_juridica': 'Persona Juridica',
-    'juridica': 'Persona Juridica',
-    'persona_natural': 'Persona Natural',
-    'natural': 'Persona Natural'
-  }
-  return types[typeCode.toLowerCase()] || typeCode
-}
+    persona_juridica: "Persona Juridica",
+    juridica: "Persona Juridica",
+    persona_natural: "Persona Natural",
+    natural: "Persona Natural",
+  };
+  return types[typeCode.toLowerCase()] || typeCode;
+};
 
 const formatIdentifier = (suffix: string) => {
-  return `****${suffix}`
-}
+  return `****${suffix}`;
+};
 
-
-export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function JobDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
 
   // React Query hooks
-  const { data: job, isLoading, isFetching, refetch, error } = useJob(id)
+  const { data: job, isLoading, isFetching, refetch, error } = useJob(id);
 
   // Get entity data from cache or fetch if needed
-  const { data: entity } = useEntity(job?.entity_id)
+  const { data: entity } = useEntity(job?.entity_id);
 
   // Mutations
-  const cancelMutation = useCancelJob()
-  const markFailedMutation = useMarkJobAsFailed()
-  const provideTokenMutation = useProvideToken()
+  const cancelMutation = useCancelJob();
+  const markFailedMutation = useMarkJobAsFailed();
+  const provideTokenMutation = useProvideToken();
 
   // Local state for token input
-  const [newTokenUrl, setNewTokenUrl] = useState('')
+  const [newTokenUrl, setNewTokenUrl] = useState("");
 
   // Check if we're in staging/dev environment (show dev tools)
-  const isDevEnvironment = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname.includes('dev.') ||
-    process.env.NEXT_PUBLIC_ENVIRONMENT === 'staging'
-  )
+  const isDevEnvironment =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname.includes("dev.") ||
+      process.env.NEXT_PUBLIC_ENVIRONMENT === "staging");
 
   const handleCancelJob = async () => {
-    if (!confirm('Estas seguro de que quieres cancelar este trabajo? Esta accion no se puede deshacer.')) {
-      return
+    if (
+      !confirm(
+        "Estas seguro de que quieres cancelar este trabajo? Esta accion no se puede deshacer.",
+      )
+    ) {
+      return;
     }
 
     try {
-      await cancelMutation.mutateAsync(id)
-      toast.success('Trabajo cancelado exitosamente')
+      await cancelMutation.mutateAsync(id);
+      toast.success("Trabajo cancelado exitosamente");
     } catch (err) {
-      console.error('Error cancelling job:', err)
-      toast.error(err instanceof Error ? err.message : 'Error cancelando trabajo')
+      console.error("Error cancelling job:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Error cancelando trabajo",
+      );
     }
-  }
+  };
 
   const handleMarkFailed = async () => {
-    if (!confirm('[DEV] Marcar este trabajo como fallido? Esto es solo para testing.')) {
-      return
+    if (
+      !confirm(
+        "[DEV] Marcar este trabajo como fallido? Esto es solo para testing.",
+      )
+    ) {
+      return;
     }
 
     try {
-      await markFailedMutation.mutateAsync(id)
-      toast.success('[DEV] Trabajo marcado como fallido')
+      await markFailedMutation.mutateAsync(id);
+      toast.success("[DEV] Trabajo marcado como fallido");
     } catch (err) {
-      console.error('Error marking job as failed:', err)
-      toast.error(err instanceof Error ? err.message : 'Error marcando trabajo como fallido')
+      console.error("Error marking job as failed:", err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Error marcando trabajo como fallido",
+      );
     }
-  }
+  };
 
   const handleProvideToken = async () => {
     if (!newTokenUrl.trim()) {
-      toast.error('Por favor ingresa una URL de token valida')
-      return
+      toast.error("Por favor ingresa una URL de token valida");
+      return;
     }
 
     // Validate it looks like a DIAN token URL
-    if (!newTokenUrl.includes('dian.gov.co') && !newTokenUrl.includes('muisca.dian.gov.co')) {
-      toast.error('La URL debe ser del portal DIAN (dian.gov.co)')
-      return
+    if (
+      !newTokenUrl.includes("dian.gov.co") &&
+      !newTokenUrl.includes("muisca.dian.gov.co")
+    ) {
+      toast.error("La URL debe ser del portal DIAN (dian.gov.co)");
+      return;
     }
 
     try {
-      await provideTokenMutation.mutateAsync({ jobId: id, tokenUrl: newTokenUrl.trim() })
-      toast.success('Token DIAN aceptado. Reanudando procesamiento...')
-      setNewTokenUrl('')
+      await provideTokenMutation.mutateAsync({
+        jobId: id,
+        tokenUrl: newTokenUrl.trim(),
+      });
+      toast.success("Token DIAN aceptado. Reanudando procesamiento...");
+      setNewTokenUrl("");
     } catch (err) {
-      console.error('Error providing token:', err)
-      toast.error(err instanceof Error ? err.message : 'Error al enviar el token')
+      console.error("Error providing token:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Error al enviar el token",
+      );
     }
-  }
+  };
 
   const handleDownload = async () => {
-    if (!job) return
+    if (!job) return;
 
     try {
-      const result = await apiClient.downloadExcel(job.id)
+      const result = await apiClient.downloadExcel(job.id);
 
       if (!result.success || !result.blob) {
-        toast.error(result.error || 'Error al descargar el archivo')
-        return
+        toast.error(result.error || "Error al descargar el archivo");
+        return;
       }
 
-      const url = window.URL.createObjectURL(result.blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = result.filename || `${job.job_name}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success('Archivo descargado correctamente')
+      const url = window.URL.createObjectURL(result.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename || `${job.job_name}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Archivo descargado correctamente");
     } catch (error) {
-      console.error('Error descargando Excel:', error)
-      toast.error('Error al descargar el archivo')
+      console.error("Error descargando Excel:", error);
+      toast.error("Error al descargar el archivo");
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -246,28 +301,61 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div className="h-64 bg-muted rounded" />
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !job) {
+    const isRateLimited =
+      error instanceof ApiError && error.code === "ip_blocked";
+    const remainingMinutes =
+      isRateLimited && typeof error.details?.remaining_minutes === "number"
+        ? error.details.remaining_minutes
+        : null;
+
+    const title = isRateLimited
+      ? "Acceso temporalmente limitado"
+      : "Trabajo no encontrado";
+    const description = isRateLimited
+      ? `Se detectaron demasiadas solicitudes seguidas y tu conexión quedó bloqueada temporalmente por seguridad.${
+          remainingMinutes !== null
+            ? ` Volvé a intentar en ${remainingMinutes} min.`
+            : " Volvé a intentar en unos minutos."
+        }`
+      : error instanceof ApiError
+        ? error.message
+        : "No se pudo cargar este trabajo.";
+
     return (
       <div className="max-w-4xl mx-auto">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">Trabajo no encontrado</p>
-              <Link href="/trabajos">
-                <Button>Volver a Lista de Trabajos</Button>
-              </Link>
+              <p className="font-medium mb-2">{title}</p>
+              <p className="text-muted-foreground mb-4">{description}</p>
+              <div className="flex justify-center gap-2">
+                {!isRateLimited && (
+                  <Button variant="outline" onClick={() => refetch()}>
+                    Reintentar
+                  </Button>
+                )}
+                <Link href="/trabajos">
+                  <Button>Volver a Lista de Trabajos</Button>
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
-  const isActiveJob = ['processing', 'pending', 'queued', 'waiting_token'].includes(job.status)
+  const isActiveJob = [
+    "processing",
+    "pending",
+    "queued",
+    "waiting_token",
+  ].includes(job.status);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -293,7 +381,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+            />
           </Button>
           {isActiveJob && (
             <>
@@ -305,7 +395,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 disabled={cancelMutation.isPending}
               >
                 <Ban className="h-4 w-4" />
-                {cancelMutation.isPending ? 'Cancelando...' : 'Cancelar Trabajo'}
+                {cancelMutation.isPending
+                  ? "Cancelando..."
+                  : "Cancelar Trabajo"}
               </Button>
               {isDevEnvironment && (
                 <Button
@@ -316,12 +408,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   disabled={markFailedMutation.isPending}
                 >
                   <XCircle className="h-4 w-4" />
-                  {markFailedMutation.isPending ? 'Marcando...' : '[DEV] Marcar Fallido'}
+                  {markFailedMutation.isPending
+                    ? "Marcando..."
+                    : "[DEV] Marcar Fallido"}
                 </Button>
               )}
             </>
           )}
-          {job.status === 'completed' && (
+          {job.status === "completed" && (
             <Button className="gap-2" onClick={handleDownload}>
               <Download className="h-4 w-4" />
               Descargar Excel
@@ -331,7 +425,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       </div>
 
       {/* Progress Card (only for active jobs) */}
-      {(job.status === 'processing' || job.status === 'pending' || job.status === 'queued') && (
+      {(job.status === "processing" ||
+        job.status === "pending" ||
+        job.status === "queued") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -342,10 +438,12 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <CardContent>
             <div className="space-y-4">
               {/* Pending / queued: waiting to start */}
-              {(job.status === 'pending' || job.status === 'queued') && (
+              {(job.status === "pending" || job.status === "queued") && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {job.status === 'queued' ? 'En cola, iniciando pronto...' : 'Preparando la maquina de procesamiento...'}
+                    {job.status === "queued"
+                      ? "En cola, iniciando pronto..."
+                      : "Preparando la maquina de procesamiento..."}
                   </p>
                   <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                     <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
@@ -354,119 +452,159 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               )}
 
               {/* Processing: downloading listing from DIAN (no count yet, no stage) */}
-              {job.status === 'processing' && !job.listing_doc_count && !job.stage && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Obteniendo lista de documentos DIAN...</p>
-                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+              {job.status === "processing" &&
+                !job.listing_doc_count &&
+                !job.stage && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Obteniendo lista de documentos DIAN...
+                    </p>
+                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Processing: listing known, download starting (no docs yet) */}
-              {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) === 0 && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Iniciando descarga de <strong>{(job.listing_doc_count ?? 0).toLocaleString()}</strong> documentos...
-                  </p>
-                  <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+              {job.status === "processing" &&
+                (job.listing_doc_count ?? 0) > 0 &&
+                (job.docs_downloaded ?? 0) === 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Iniciando descarga de{" "}
+                      <strong>
+                        {(job.listing_doc_count ?? 0).toLocaleString()}
+                      </strong>{" "}
+                      documentos...
+                    </p>
+                    <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-primary/40 rounded-full animate-pulse w-full" />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Processing: active download with real progress */}
-              {job.status === 'processing' && (job.listing_doc_count ?? 0) > 0 && (job.docs_downloaded ?? 0) > 0 && (() => {
-                const total = job.listing_doc_count ?? 0
-                const downloaded = job.docs_downloaded ?? 0
-                const pct = Math.min(Math.round((downloaded / total) * 100), 100)
+              {job.status === "processing" &&
+                (job.listing_doc_count ?? 0) > 0 &&
+                (job.docs_downloaded ?? 0) > 0 &&
+                (() => {
+                  const total = job.listing_doc_count ?? 0;
+                  const downloaded = job.docs_downloaded ?? 0;
+                  const pct = Math.min(
+                    Math.round((downloaded / total) * 100),
+                    100,
+                  );
 
-                let etaText: string | null = null
-                if (job.download_started_at && downloaded > 0 && downloaded < total) {
-                  const elapsedMs = Date.now() - new Date(job.download_started_at).getTime()
-                  if (elapsedMs > 0) {
-                    const docsPerMs = downloaded / elapsedMs
-                    const remaining = total - downloaded
-                    const etaMs = remaining / docsPerMs
-                    const etaMin = Math.round(etaMs / 60000)
-                    if (etaMin >= 1) {
-                      etaText = etaMin >= 60
-                        ? `~${Math.round(etaMin / 60)}h ${etaMin % 60}min restantes`
-                        : `~${etaMin} min restantes`
-                    } else {
-                      etaText = 'menos de 1 min restante'
+                  let etaText: string | null = null;
+                  if (
+                    job.download_started_at &&
+                    downloaded > 0 &&
+                    downloaded < total
+                  ) {
+                    const elapsedMs =
+                      Date.now() - new Date(job.download_started_at).getTime();
+                    if (elapsedMs > 0) {
+                      const docsPerMs = downloaded / elapsedMs;
+                      const remaining = total - downloaded;
+                      const etaMs = remaining / docsPerMs;
+                      const etaMin = Math.round(etaMs / 60000);
+                      if (etaMin >= 1) {
+                        etaText =
+                          etaMin >= 60
+                            ? `~${Math.round(etaMin / 60)}h ${etaMin % 60}min restantes`
+                            : `~${etaMin} min restantes`;
+                      } else {
+                        etaText = "menos de 1 min restante";
+                      }
                     }
                   }
-                }
 
-                return (
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">Descargando documentos DIAN</span>
-                      <span className="text-sm text-muted-foreground">{pct}%</span>
+                  return (
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-medium">
+                          Descargando documentos DIAN
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1.5">
+                        <span className="text-xs text-muted-foreground">
+                          {downloaded.toLocaleString()} /{" "}
+                          {total.toLocaleString()} docs
+                        </span>
+                        {etaText && (
+                          <span className="text-xs text-muted-foreground">
+                            {etaText}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {downloaded.toLocaleString()} / {total.toLocaleString()} docs
-                      </span>
-                      {etaText && (
-                        <span className="text-xs text-muted-foreground">{etaText}</span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
+                  );
+                })()}
 
               {/* Generic stage progress (fallback when no download counters) */}
-              {job.stage && job.status === 'processing' && !job.listing_doc_count && (() => {
-                const stageLabels: Record<string, string> = {
-                  'downloading_raw_excel': 'Descargando listado DIAN...',
-                  'processing_excel': 'Procesando listado DIAN...',
-                  'setup': 'Inicializando...',
-                  'download': 'Descargando documentos...',
-                  'analysis': 'Analizando documentos...',
-                  'excel_generation': 'Generando Excel...',
-                  'upload': 'Subiendo archivos...',
-                }
-                const label = stageLabels[job.stage] || job.stage
-                const pct = job.progress_percentage || 0
-                return (
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">{label}</span>
-                      {pct > 0 && <span className="text-sm text-muted-foreground">{pct}%</span>}
+              {job.stage &&
+                job.status === "processing" &&
+                !job.listing_doc_count &&
+                (() => {
+                  const stageLabels: Record<string, string> = {
+                    downloading_raw_excel: "Descargando listado DIAN...",
+                    processing_excel: "Procesando listado DIAN...",
+                    setup: "Inicializando...",
+                    download: "Descargando documentos...",
+                    analysis: "Analizando documentos...",
+                    excel_generation: "Generando Excel...",
+                    upload: "Subiendo archivos...",
+                  };
+                  const label = stageLabels[job.stage] || job.stage;
+                  const pct = job.progress_percentage || 0;
+                  return (
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-medium">{label}</span>
+                        {pct > 0 && (
+                          <span className="text-sm text-muted-foreground">
+                            {pct}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${pct > 0 ? "bg-primary" : "bg-primary/40 animate-pulse w-full"}`}
+                          style={pct > 0 ? { width: `${pct}%` } : undefined}
+                        />
+                      </div>
                     </div>
-                    <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ${pct > 0 ? 'bg-primary' : 'bg-primary/40 animate-pulse w-full'}`}
-                        style={pct > 0 ? { width: `${pct}%` } : undefined}
-                      />
-                    </div>
-                  </div>
-                )
-              })()}
+                  );
+                })()}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Waiting Token Card */}
-      {job.status === 'waiting_token' && (
+      {job.status === "waiting_token" && (
         <Card className="border-orange-500">
           <CardContent className="py-4 px-4">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
               <div className="flex-1 space-y-4">
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-orange-600">Se requiere nuevo Token DIAN</h3>
+                  <h3 className="font-semibold text-orange-600">
+                    Se requiere nuevo Token DIAN
+                  </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    El token DIAN expiro durante el procesamiento del trabajo. Para continuar, obten un nuevo token desde el portal DIAN y pegalo abajo.
+                    El token DIAN expiro durante el procesamiento del trabajo.
+                    Para continuar, obten un nuevo token desde el portal DIAN y
+                    pegalo abajo.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -485,7 +623,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     />
                     <Button
                       onClick={handleProvideToken}
-                      disabled={provideTokenMutation.isPending || !newTokenUrl.trim()}
+                      disabled={
+                        provideTokenMutation.isPending || !newTokenUrl.trim()
+                      }
                       className="gap-2"
                     >
                       {provideTokenMutation.isPending ? (
@@ -512,24 +652,30 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       )}
 
       {/* Error Card */}
-      {job.status === 'failed' && job.error_message && (
+      {job.status === "failed" && job.error_message && (
         <Card className="border-destructive">
           <CardContent className="py-1 px-4">
             <div className="flex items-start gap-3">
               <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 space-y-3">
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-destructive">Error al realizar el trabajo</h3>
+                  <h3 className="font-semibold text-destructive">
+                    Error al realizar el trabajo
+                  </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Ha ocurrido un error durante el procesamiento. Nuestro equipo tecnico ha sido notificado automaticamente y trabajara en resolverlo.
+                    Ha ocurrido un error durante el procesamiento. Nuestro
+                    equipo tecnico ha sido notificado automaticamente y
+                    trabajara en resolverlo.
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Si despues de unas horas no ves cambios, puedes contactar a soporte con este codigo de referencia para consultar el estado:
+                    Si despues de unas horas no ves cambios, puedes contactar a
+                    soporte con este codigo de referencia para consultar el
+                    estado:
                   </p>
                   {job.error_code && (
                     <div className="bg-muted/50 rounded p-3 border">
                       <p className="text-sm font-mono">
-                        <span className="text-muted-foreground">Codigo:</span>{' '}
+                        <span className="text-muted-foreground">Codigo:</span>{" "}
                         <span className="font-semibold">{job.error_code}</span>
                       </p>
                     </div>
@@ -557,7 +703,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               Entidad
             </h3>
             <div className="bg-muted p-4 rounded-lg space-y-2">
-              <p className="font-medium">{entity?.display_name || job.entity_name || 'Cargando...'}</p>
+              <p className="font-medium">
+                {entity?.display_name || job.entity_name || "Cargando..."}
+              </p>
               {entity?.identifier_suffix && (
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground font-mono">
@@ -566,7 +714,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   <div className="group relative">
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-md border z-10">
-                      Los ultimos 4 digitos del numero de identificacion de la entidad
+                      Los ultimos 4 digitos del numero de identificacion de la
+                      entidad
                     </div>
                   </div>
                 </div>
@@ -593,7 +742,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="font-medium">
                   {job.date_range?.start_date
                     ? formatDateOnly(job.date_range.start_date)
-                    : 'N/A'}
+                    : "N/A"}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
@@ -601,7 +750,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="font-medium">
                   {job.date_range?.end_date
                     ? formatDateOnly(job.date_range.end_date)
-                    : 'N/A'}
+                    : "N/A"}
                 </p>
               </div>
             </div>
@@ -617,13 +766,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Categorias de documentos</p>
-                <p className="font-medium capitalize">{formatDocumentCategories(job.document_categories)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Categorias de documentos
+                </p>
+                <p className="font-medium capitalize">
+                  {formatDocumentCategories(job.document_categories)}
+                </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Intervalo</p>
                 <p className="font-medium capitalize">
-                  {job.consolidation_interval || 'Total'}
+                  {job.consolidation_interval || "Total"}
                 </p>
               </div>
             </div>
@@ -649,7 +802,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="font-medium text-sm">
                   {job.processing_start_time
                     ? new Date(job.processing_start_time).toLocaleString()
-                    : '-'}
+                    : "-"}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
@@ -657,7 +810,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="font-medium text-sm">
                   {job.completed_at
                     ? new Date(job.completed_at).toLocaleString()
-                    : '-'}
+                    : "-"}
                 </p>
               </div>
             </div>
@@ -673,29 +826,34 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </h3>
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Total encontrados</p>
+                <p className="text-xs text-muted-foreground">
+                  Total encontrados
+                </p>
                 <p className="font-medium text-lg">
                   {job.docs_total !== undefined && job.docs_total !== null
                     ? job.docs_total.toLocaleString()
-                    : 'Calculando...'}
+                    : "Calculando..."}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
-                <p className="text-xs text-muted-foreground">Unicos (cobrados)</p>
+                <p className="text-xs text-muted-foreground">
+                  Unicos (cobrados)
+                </p>
                 <p className="font-medium text-lg">
                   {job.docs_unique !== undefined && job.docs_unique !== null
                     ? job.docs_unique.toLocaleString()
                     : job.docs_total !== undefined && job.docs_total !== null
                       ? job.docs_total.toLocaleString()
-                      : 'Calculando...'}
+                      : "Calculando..."}
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="text-xs text-muted-foreground">Procesados</p>
                 <p className="font-medium text-lg">
-                  {job.docs_processed !== undefined && job.docs_processed !== null
+                  {job.docs_processed !== undefined &&
+                  job.docs_processed !== null
                     ? job.docs_processed.toLocaleString()
-                    : '0'}
+                    : "0"}
                 </p>
               </div>
             </div>
@@ -703,5 +861,5 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

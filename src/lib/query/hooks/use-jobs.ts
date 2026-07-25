@@ -1,132 +1,137 @@
-'use client'
+"use client";
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient } from '@/lib/api/client'
-import { queryKeys } from '../keys'
-import { staleTime, gcTime, refetchInterval, ACTIVE_JOB_STATUSES } from '../config'
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient, ApiError } from "@/lib/api/client";
+import { queryKeys } from "../keys";
+import {
+  staleTime,
+  gcTime,
+  refetchInterval,
+  ACTIVE_JOB_STATUSES,
+} from "../config";
 
 /**
  * Job interface matching backend response
  */
 export interface Job {
-  id: string
-  job_name: string
-  status: string
-  entity_id?: string
-  entity_name?: string
-  entity_nit?: string
+  id: string;
+  job_name: string;
+  status: string;
+  entity_id?: string;
+  entity_name?: string;
+  entity_nit?: string;
   date_range?: {
-    start_date: string
-    end_date: string
-  }
-  document_filter?: string
-  docs_processed?: number
-  docs_total?: number
-  docs_unique?: number
+    start_date: string;
+    end_date: string;
+  };
+  document_filter?: string;
+  docs_processed?: number;
+  docs_total?: number;
+  docs_unique?: number;
   // Real-time download progress
-  docs_downloaded?: number        // running count updated every ~50 docs
-  listing_doc_count?: number      // total docs from DIAN listing Excel
-  download_started_at?: string    // ISO timestamp when download phase began
-  created_at: string
-  updated_at?: string
-  completed_at?: string
-  error_code?: string
-  error_message?: string
-  error_category?: string
-  technical_review_status?: string
+  docs_downloaded?: number; // running count updated every ~50 docs
+  listing_doc_count?: number; // total docs from DIAN listing Excel
+  download_started_at?: string; // ISO timestamp when download phase began
+  created_at: string;
+  updated_at?: string;
+  completed_at?: string;
+  error_code?: string;
+  error_message?: string;
+  error_category?: string;
+  technical_review_status?: string;
   progress_data?: {
-    phase?: string
-    message?: string
-    percentage?: number
-  }
+    phase?: string;
+    message?: string;
+    percentage?: number;
+  };
   // Detail-only fields
-  document_categories?: string | string[]
-  consolidation_interval?: string
-  processing_start_time?: string
-  stage?: string
-  progress_percentage?: number
+  document_categories?: string | string[];
+  consolidation_interval?: string;
+  processing_start_time?: string;
+  stage?: string;
+  progress_percentage?: number;
 }
 
 /**
  * Minimal job for dashboard/recent lists
  */
 export interface JobSummary {
-  id: string
-  job_name: string
-  status: string
-  entity_name?: string
-  created_at: string
+  id: string;
+  job_name: string;
+  status: string;
+  entity_name?: string;
+  created_at: string;
 }
 
 interface JobsListResponse {
   jobs: Array<{
-    job_id?: string
-    id?: string
-    job_name: string
-    status: string
-    entity_id?: string
-    entity_name?: string
-    start_date?: string
-    end_date?: string
-    processed_documents?: number
-    total_documents?: number
-    created_at: string
-    updated_at?: string
-    completed_at?: string
-    error_code?: string
-  }>
-  total_count: number
-  per_page: number
+    job_id?: string;
+    id?: string;
+    job_name: string;
+    status: string;
+    entity_id?: string;
+    entity_name?: string;
+    start_date?: string;
+    end_date?: string;
+    processed_documents?: number;
+    total_documents?: number;
+    created_at: string;
+    updated_at?: string;
+    completed_at?: string;
+    error_code?: string;
+  }>;
+  total_count: number;
+  per_page: number;
 }
 
 interface JobDetailResponse {
   job_data: {
-    job_id: string
-    id?: string
-    job_name: string
-    status: string
-    entity_id?: string
-    entity_name?: string
-    start_date?: string
-    end_date?: string
-    processed_documents?: number
-    total_documents?: number
-    unique_documents?: number
-    docs_downloaded?: number
-    listing_doc_count?: number
-    download_started_at?: string
-    created_at: string
-    updated_at?: string
-    completed_at?: string
-    processing_start_time?: string
-    error_code?: string
-    error_message?: string
-    error_category?: string
-    document_categories?: string | string[]
-    consolidation_interval?: string
-    stage?: string
-    progress_percentage?: number
+    job_id: string;
+    id?: string;
+    job_name: string;
+    status: string;
+    entity_id?: string;
+    entity_name?: string;
+    start_date?: string;
+    end_date?: string;
+    processed_documents?: number;
+    total_documents?: number;
+    unique_documents?: number;
+    docs_downloaded?: number;
+    listing_doc_count?: number;
+    download_started_at?: string;
+    created_at: string;
+    updated_at?: string;
+    completed_at?: string;
+    processing_start_time?: string;
+    error_code?: string;
+    error_message?: string;
+    error_category?: string;
+    document_categories?: string | string[];
+    consolidation_interval?: string;
+    stage?: string;
+    progress_percentage?: number;
     progress_data?: {
-      phase?: string
-      message?: string
-      percentage?: number
-    }
-  }
+      phase?: string;
+      message?: string;
+      percentage?: number;
+    };
+  };
 }
 
 interface JobsQueryResult {
-  jobs: Job[]
-  totalCount: number
-  totalPages: number
-  hasActiveJobs: boolean
+  jobs: Job[];
+  totalCount: number;
+  totalPages: number;
+  hasActiveJobs: boolean;
 }
 
 /**
  * Transform raw job response to Job interface
  */
-function mapJobResponse(job: JobsListResponse['jobs'][0]): Job {
+function mapJobResponse(job: JobsListResponse["jobs"][0]): Job {
   return {
-    id: job.job_id || job.id || '',
+    id: job.job_id || job.id || "",
     job_name: job.job_name,
     status: job.status,
     entity_id: job.entity_id,
@@ -141,7 +146,7 @@ function mapJobResponse(job: JobsListResponse['jobs'][0]): Job {
     updated_at: job.updated_at,
     completed_at: job.completed_at,
     error_code: job.error_code,
-  }
+  };
 }
 
 /**
@@ -153,27 +158,31 @@ export function useJobs(page = 1, pageSize = 10) {
   return useQuery<JobsQueryResult>({
     queryKey: queryKeys.jobs.list(page),
     queryFn: async () => {
-      const response = await apiClient.listJobs(page, pageSize)
+      const response = await apiClient.listJobs(page, pageSize);
 
       if (response.error) {
-        throw new Error(response.message || 'Error fetching jobs')
+        throw new Error(response.message || "Error fetching jobs");
       }
 
-      const data = response as unknown as JobsListResponse
-      const jobs: Job[] = (data.jobs || []).map(mapJobResponse)
+      const data = response as unknown as JobsListResponse;
+      const jobs: Job[] = (data.jobs || []).map(mapJobResponse);
 
-      const hasActiveJobs = jobs.some((job) => ACTIVE_JOB_STATUSES.includes(job.status))
+      const hasActiveJobs = jobs.some((job) =>
+        ACTIVE_JOB_STATUSES.includes(job.status),
+      );
 
       return {
         jobs,
         totalCount: data.total_count || 0,
-        totalPages: Math.ceil((data.total_count || 0) / (data.per_page || pageSize)),
+        totalPages: Math.ceil(
+          (data.total_count || 0) / (data.per_page || pageSize),
+        ),
         hasActiveJobs,
-      }
+      };
     },
     staleTime: staleTime.jobs,
     gcTime: gcTime.jobs,
-  })
+  });
 }
 
 /**
@@ -185,34 +194,49 @@ export function useJobsWithPolling(page = 1, pageSize = 10) {
   return useQuery<JobsQueryResult>({
     queryKey: queryKeys.jobs.list(page),
     queryFn: async () => {
-      const response = await apiClient.listJobs(page, pageSize)
+      const response = await apiClient.listJobs(page, pageSize);
 
       if (response.error) {
-        throw new Error(response.message || 'Error fetching jobs')
+        throw new ApiError(
+          response.message || "Error fetching jobs",
+          response.error,
+          response,
+        );
       }
 
-      const data = response as unknown as JobsListResponse
-      const jobs: Job[] = (data.jobs || []).map(mapJobResponse)
+      const data = response as unknown as JobsListResponse;
+      const jobs: Job[] = (data.jobs || []).map(mapJobResponse);
 
-      const hasActiveJobs = jobs.some((job) => ACTIVE_JOB_STATUSES.includes(job.status))
+      const hasActiveJobs = jobs.some((job) =>
+        ACTIVE_JOB_STATUSES.includes(job.status),
+      );
 
       return {
         jobs,
         totalCount: data.total_count || 0,
-        totalPages: Math.ceil((data.total_count || 0) / (data.per_page || pageSize)),
+        totalPages: Math.ceil(
+          (data.total_count || 0) / (data.per_page || pageSize),
+        ),
         hasActiveJobs,
-      }
+      };
     },
     staleTime: staleTime.jobs,
     gcTime: gcTime.jobs,
     refetchInterval: (query) => {
-      const data = query.state.data
-      if (data?.hasActiveJobs) {
-        return refetchInterval.jobsListWithActive
+      // Stop auto-polling once a fetch has failed (e.g. auth expired,
+      // rate-limited) instead of retrying forever on the same interval —
+      // that loop is what previously tripped the backend's IP-block
+      // protection during a stale-session window.
+      if (query.state.error) {
+        return false;
       }
-      return false
+      const data = query.state.data;
+      if (data?.hasActiveJobs) {
+        return refetchInterval.jobsListWithActive;
+      }
+      return false;
     },
-  })
+  });
 }
 
 /**
@@ -222,26 +246,36 @@ export function useJobsWithPolling(page = 1, pageSize = 10) {
  * If jobs are already cached, returns instantly.
  */
 export function useRecentJobs(limit = 5) {
-  return useQuery<JobsQueryResult, Error, { jobs: JobSummary[]; hasActiveJobs: boolean }>({
+  return useQuery<
+    JobsQueryResult,
+    Error,
+    { jobs: JobSummary[]; hasActiveJobs: boolean }
+  >({
     queryKey: queryKeys.jobs.list(1),
     queryFn: async () => {
-      const response = await apiClient.listJobs(1, limit)
+      const response = await apiClient.listJobs(1, limit);
 
       if (response.error) {
-        throw new Error(response.message || 'Error fetching jobs')
+        throw new ApiError(
+          response.message || "Error fetching jobs",
+          response.error,
+          response,
+        );
       }
 
-      const data = response as unknown as JobsListResponse
-      const jobs: Job[] = (data.jobs || []).map(mapJobResponse)
+      const data = response as unknown as JobsListResponse;
+      const jobs: Job[] = (data.jobs || []).map(mapJobResponse);
 
-      const hasActiveJobs = jobs.some((job) => ACTIVE_JOB_STATUSES.includes(job.status))
+      const hasActiveJobs = jobs.some((job) =>
+        ACTIVE_JOB_STATUSES.includes(job.status),
+      );
 
       return {
         jobs,
         totalCount: data.total_count || 0,
         totalPages: Math.ceil((data.total_count || 0) / limit),
         hasActiveJobs,
-      }
+      };
     },
     staleTime: staleTime.jobs,
     gcTime: gcTime.jobs,
@@ -255,7 +289,7 @@ export function useRecentJobs(limit = 5) {
       })),
       hasActiveJobs: data.hasActiveJobs,
     }),
-  })
+  });
 }
 
 /**
@@ -264,20 +298,22 @@ export function useRecentJobs(limit = 5) {
  * Useful for quick lookups without API calls.
  */
 export function useJobFromList(jobId: string | null | undefined) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   if (!jobId) {
-    return null
+    return null;
   }
 
   // Check page 1 cache (most common case)
-  const page1Cache = queryClient.getQueryData<JobsQueryResult>(queryKeys.jobs.list(1))
+  const page1Cache = queryClient.getQueryData<JobsQueryResult>(
+    queryKeys.jobs.list(1),
+  );
   if (page1Cache) {
-    const job = page1Cache.jobs.find((j) => j.id === jobId)
-    if (job) return job
+    const job = page1Cache.jobs.find((j) => j.id === jobId);
+    if (job) return job;
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -286,31 +322,37 @@ export function useJobFromList(jobId: string | null | undefined) {
  * Use this for /trabajos/[id] detail page.
  */
 export function useJob(jobId: string | undefined) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: queryKeys.jobs.detail(jobId!),
     queryFn: async () => {
       // First, try to get basic data from list cache
-      const listCache = queryClient.getQueryData<JobsQueryResult>(queryKeys.jobs.list(1))
-      const cachedJob = listCache?.jobs.find((j) => j.id === jobId)
+      const listCache = queryClient.getQueryData<JobsQueryResult>(
+        queryKeys.jobs.list(1),
+      );
+      const cachedJob = listCache?.jobs.find((j) => j.id === jobId);
 
       // Always fetch fresh data for detail (has progress_data)
-      const response = await apiClient.getJobStatus(jobId!)
+      const response = await apiClient.getJobStatus(jobId!);
 
       if (response.error) {
-        throw new Error(response.message || 'Error fetching job')
+        throw new ApiError(
+          response.message || "Error fetching job",
+          response.error,
+          response,
+        );
       }
 
-      const data = response as unknown as JobDetailResponse
-      const jobData = data.job_data
+      const data = response as unknown as JobDetailResponse;
+      const jobData = data.job_data;
 
       if (!jobData) {
-        throw new Error('Job not found')
+        throw new ApiError("Job not found", "job_not_found");
       }
 
       const job: Job = {
-        id: jobData.job_id || jobData.id || '',
+        id: jobData.job_id || jobData.id || "",
         job_name: jobData.job_name,
         status: jobData.status,
         entity_id: jobData.entity_id,
@@ -337,21 +379,28 @@ export function useJob(jobId: string | undefined) {
         stage: jobData.stage,
         progress_percentage: jobData.progress_percentage,
         progress_data: jobData.progress_data,
-      }
+      };
 
-      return job
+      return job;
     },
     enabled: !!jobId,
     staleTime: staleTime.jobDetail,
     gcTime: gcTime.jobs,
     refetchInterval: (query) => {
-      const job = query.state.data
-      if (job && ACTIVE_JOB_STATUSES.includes(job.status)) {
-        return refetchInterval.activeJob
+      // Stop auto-polling once a fetch has failed instead of retrying
+      // forever on the same 5s interval — that loop is what previously
+      // tripped the backend's IP-block protection during a stale-session
+      // window (repeated 401s from an expired token count as violations).
+      if (query.state.error) {
+        return false;
       }
-      return false
+      const job = query.state.data;
+      if (job && ACTIVE_JOB_STATUSES.includes(job.status)) {
+        return refetchInterval.activeJob;
+      }
+      return false;
     },
-  })
+  });
 }
 
 /**
@@ -361,20 +410,24 @@ export function useCachedExcelCheck(
   entityId: string | undefined,
   startDate: string | undefined,
   endDate: string | undefined,
-  enabled = true
+  enabled = true,
 ) {
   return useQuery({
     queryKey: queryKeys.jobs.cachedExcel(entityId!, startDate!, endDate!),
     queryFn: async () => {
-      const response = await apiClient.checkCachedRawExcel(entityId!, startDate!, endDate!)
+      const response = await apiClient.checkCachedRawExcel(
+        entityId!,
+        startDate!,
+        endDate!,
+      );
 
       if (response.error) {
-        return { available: false }
+        return { available: false };
       }
 
-      return response as { available: boolean; cached_at?: string }
+      return response as { available: boolean; cached_at?: string };
     },
     enabled: enabled && !!entityId && !!startDate && !!endDate,
     staleTime: staleTime.jobs,
-  })
+  });
 }
