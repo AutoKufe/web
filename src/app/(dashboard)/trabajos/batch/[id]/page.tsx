@@ -152,13 +152,21 @@ function BatchJobRow({ job }: { job: BatchJob }) {
       </TableCell>
       <TableCell>{getStatusBadge(job.status)}</TableCell>
       <TableCell className="text-sm">
-        {job.total_documents ? (
-          <span>
-            {job.processed_documents || 0} / {job.total_documents}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
+        {/* total_documents/processed_documents are never written by the
+            pipeline, so this column rendered "-" for every job. This is
+            the field the job detail page already uses; completed jobs
+            reach 100 on their own, so no status is special-cased. */}
+        <span
+          className={
+            job.status === 'failed' ||
+            job.status === 'creation_failed' ||
+            job.status === 'cancelled'
+              ? 'text-muted-foreground'
+              : undefined
+          }
+        >
+          {job.progress_percentage ?? 0}%
+        </span>
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}
@@ -364,7 +372,7 @@ export default function BatchDetailPage({ params }: { params: Promise<{ id: stri
                 <TableRow>
                   <TableHead>Trabajo</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Documentos</TableHead>
+                  <TableHead>Progreso</TableHead>
                   <TableHead>Completado</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
