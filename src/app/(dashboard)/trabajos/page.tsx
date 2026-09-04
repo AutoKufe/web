@@ -96,6 +96,9 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
     actionLabel: 'Reintentar',
     getActionUrl: (job) => `/trabajos/nuevo?entity_id=${job.entity_id}`,
     isWarning: true
+  },
+  CAPTCHA_SERVICE_UNAVAILABLE: {
+    message: 'El servicio de captcha no tiene saldo o su clave no es valida. El trabajo se detuvo sin descargar documentos.',
   }
 }
 
