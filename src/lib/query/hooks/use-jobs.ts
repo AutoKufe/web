@@ -30,7 +30,7 @@ export interface Job {
   docs_unique?: number;
   // Real-time download progress
   docs_downloaded?: number; // running count updated every ~50 docs
-  listing_doc_count?: number; // total docs from DIAN listing Excel
+  listing_doc_count?: number; // docs this job downloads from DIAN, after category filter and reuse
   download_started_at?: string; // ISO timestamp when download phase began
   created_at: string;
   updated_at?: string;
