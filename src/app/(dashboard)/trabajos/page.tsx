@@ -99,6 +99,12 @@ const ERROR_CODES: Record<string, ErrorCodeInfo> = {
   },
   CAPTCHA_SERVICE_UNAVAILABLE: {
     message: 'El servicio de captcha no tiene saldo o su clave no es valida. El trabajo se detuvo sin descargar documentos.',
+  },
+  CORE_LAUNCH_FAILED: {
+    message: 'No se pudo iniciar la maquina de procesamiento. El trabajo no descargo ningun documento.',
+    actionLabel: 'Reintentar',
+    getActionUrl: (job) => `/trabajos/nuevo?entity_id=${job.entity_id}`,
+    isWarning: true
   }
 }
 
