@@ -590,6 +590,33 @@ export default function JobDetailPage({
         </Card>
       )}
 
+      {/* Missing Documents Card (completed, but part of the documents never made it into the report) */}
+      {job.status === "completed" && (job.docs_failed ?? 0) > 0 && (
+        <Card className="border-orange-500">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <h3 className="font-semibold text-orange-600">
+                  Faltan {job.docs_failed} documento(s) en el reporte
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {job.docs_failed} de{" "}
+                  {(job.docs_final ?? 0) + (job.docs_failed ?? 0)} documentos
+                  no se pudieron descargar o procesar. El Excel incluye los{" "}
+                  {job.docs_final ?? 0} restantes.
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Para completarlo, crea de nuevo el trabajo con el mismo rango
+                  de fechas: los documentos ya descargados se reutilizan y solo
+                  se buscan los que faltan.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Waiting Token Card */}
       {job.status === "waiting_token" && (
         <Card className="border-orange-500">
