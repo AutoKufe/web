@@ -77,7 +77,6 @@ export {
 export {
   useRegisterEntity,
   useRegisterEntityManual,
-  useDeleteEntity,
   useCleanupEntityStorage,
   type ManualEntityData,
 } from "./mutations/entity-mutations";
