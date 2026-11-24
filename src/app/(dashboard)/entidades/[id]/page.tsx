@@ -15,20 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { ArrowLeft, Trash2, Building2, User, Calendar, Mail, Receipt, Loader2 } from 'lucide-react'
+import { ArrowLeft, Building2, User, Calendar, Mail, Receipt, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useEntity, useDianEmailLookup, useDeleteEntity, useUpdateEntityTaxConfig } from '@/lib/query'
+import { useEntity, useDianEmailLookup, useUpdateEntityTaxConfig } from '@/lib/query'
 
 // Entity type is inferred from useEntity hook
 
@@ -66,7 +55,6 @@ export default function EntityDetailPage() {
   // React Query hooks
   const { data: entity, isLoading, error } = useEntity(entityId)
   const dianEmail = useDianEmailLookup(entity?.dian_email_id)
-  const deleteMutation = useDeleteEntity()
   const updateTaxConfigMutation = useUpdateEntityTaxConfig()
 
   // Tax configuration local state - no defaults, show real DB state
@@ -121,17 +109,6 @@ export default function EntityDetailPage() {
     }
   }
 
-  const handleDelete = async () => {
-    try {
-      await deleteMutation.mutateAsync(entityId)
-      toast.success('Entidad eliminada exitosamente')
-      router.push('/entidades')
-    } catch (err) {
-      console.error('Error deleting entity:', err)
-      toast.error(err instanceof Error ? err.message : 'Error eliminando entidad')
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -182,34 +159,6 @@ export default function EntityDetailPage() {
             </p>
           </div>
         </div>
-
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="gap-2">
-              <Trash2 className="h-4 w-4" />
-              Eliminar Entidad
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente la entidad
-                <strong> {entity.display_name}</strong> y todos sus datos asociados.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deleteMutation.isPending ? 'Eliminando...' : 'Si, eliminar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
 
       {/* Entity Info */}

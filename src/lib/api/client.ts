@@ -183,10 +183,6 @@ export class ApiClient {
     return this.request("GET", `/entities/${entityId}`);
   }
 
-  async deleteEntity(entityId: string) {
-    return this.request("DELETE", `/entities/${entityId}`);
-  }
-
   async updateEntityTaxConfig(
     entityId: string,
     config: {

@@ -59,32 +59,6 @@ export function useRegisterEntityManual() {
 }
 
 /**
- * Delete an entity
- */
-export function useDeleteEntity() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (entityId: string) => {
-      const response = await apiClient.deleteEntity(entityId)
-
-      if (response.error) {
-        throw new Error(response.message || 'Error deleting entity')
-      }
-
-      return response
-    },
-    onSuccess: (_, entityId) => {
-      // Entity removed: invalidate both full list AND selector
-      queryClient.invalidateQueries({ queryKey: queryKeys.entities.all })
-      queryClient.invalidateQueries({ queryKey: queryKeys.entities.selector() })
-      // Remove specific entity from cache
-      queryClient.removeQueries({ queryKey: queryKeys.entities.detail(entityId) })
-    },
-  })
-}
-
-/**
  * Cleanup entity storage (staging only, dev role required)
  */
 export function useCleanupEntityStorage() {
